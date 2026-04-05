@@ -193,8 +193,15 @@ export default function AnalyticsPage() {
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value?: number | string) => {
-                    const n = typeof value === "number" ? value : Number(value);
+                  formatter={(
+                    value:
+                      | string
+                      | number
+                      | readonly (string | number)[]
+                      | undefined
+                  ) => {
+                    const raw = Array.isArray(value) ? value[0] : value;
+                    const n = typeof raw === "number" ? raw : Number(raw);
                     if (Number.isNaN(n)) return "";
                     return `$${n.toFixed(2)}`;
                   }}
