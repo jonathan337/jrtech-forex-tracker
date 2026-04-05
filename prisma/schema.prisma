@@ -1,0 +1,74 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["views"]
+  binaryTargets   = ["native", "rhel-openssl-1.0.x"]
+}
+
+datasource db {
+  provider     = "mysql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
+}
+
+model User {
+  id                       String    @id @default(cuid())
+  email                    String    @unique
+  password                 String
+  businessName             String
+  defaultExchangeRate      Float     @default(6.7993)
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  emailVerificationExpires DateTime?
+  emailVerificationToken   String?
+  emailVerified            Boolean   @default(false)
+  people                   Person[]
+}
+
+model Person {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  email     String?
+  phone     String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cards     Card[]
+
+  @@index([userId])
+}
+
+model Card {
+  id                  String                @id @default(cuid())
+  personId            String
+  cardNickname        String
+  lastFourDigits      String?
+  notes               String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  person              Person                @relation(fields: [personId], references: [id], onDelete: Cascade)
+  monthlyAvailability MonthlyAvailability[]
+
+  @@index([personId])
+}
+
+model MonthlyAvailability {
+  id           String   @id @default(cuid())
+  cardId       String
+  year         Int
+  month        Int
+  amountUSD    Float
+  exchangeRate Float
+  paymentDate  DateTime
+  feeAmount    Float?
+  feeCurrency  String   @default("USD")
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  card         Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, year, month])
+  @@index([year, month])
+  @@index([cardId])
+}
