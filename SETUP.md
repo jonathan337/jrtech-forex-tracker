@@ -12,17 +12,25 @@ npm install
 
 ### 2. Set Up Environment Variables
 
-Create a `.env` file in the root directory:
+Create a `.env` file in the root directory.
+
+**Database (Supabase + Prisma)** — in the [Supabase dashboard](https://supabase.com/dashboard) open **Project Settings → Database**. Copy:
+
+- **Transaction pooler** (URI, port `6543`) → use as `DATABASE_URL` (add `?pgbouncer=true` if not already in the string; Prisma needs this for the pooler).
+- **Direct connection** (URI, port `5432`) → use as `DIRECT_URL` for migrations.
+
+For local development you can point **both** `DATABASE_URL` and `DIRECT_URL` at the **same direct** `postgresql://...5432/...` connection string.
 
 ```bash
-# Database
-DATABASE_URL="file:./dev.db"
+# Supabase PostgreSQL (see above)
+DATABASE_URL="postgresql://..."
+DIRECT_URL="postgresql://..."
 
-# NextAuth Secret (generate with: openssl rand -base64 32)
+# Auth.js / NextAuth (generate secret with: openssl rand -base64 32)
 AUTH_SECRET="your-generated-secret-here"
 
-# NextAuth URL
-NEXTAUTH_URL="http://localhost"
+# Public URL of the app (use http://localhost:3004 for local dev)
+AUTH_URL="http://localhost:3004"
 
 # Brevo Email Service (for email verification)
 BREVO_API_KEY="your-brevo-api-key-here"
@@ -44,16 +52,19 @@ BREVO_FROM_NAME="FX Payment Tracker"
 
 ### 3. Initialize the Database
 
-Run the Prisma migrations to set up your database:
+With `DATABASE_URL` and `DIRECT_URL` set to your Supabase Postgres instance, apply migrations:
+
+```bash
+npx prisma migrate deploy
+```
+
+For active development (creates/updates migration files when you change the schema):
 
 ```bash
 npx prisma migrate dev
 ```
 
-This will:
-- Create the SQLite database
-- Run all migrations
-- Generate the Prisma Client
+This applies migrations and generates the Prisma Client (`npx prisma generate` also runs via `npm` `postinstall`).
 
 ### 4. Start the Development Server
 
@@ -176,35 +187,20 @@ The exchange rate feature attempts to scrape data from Republic Bank's website. 
 
 ### Environment Variables for Production
 
-Set these environment variables in your hosting platform:
+Set these environment variables in your hosting platform (e.g. Netlify):
 
 ```
-DATABASE_URL="your-production-database-url"
+DATABASE_URL="postgresql://...pooler...6543...?pgbouncer=true"
+DIRECT_URL="postgresql://...direct...5432..."
 AUTH_SECRET="your-secure-secret"
-NEXTAUTH_URL="https://yourdomain.com"
+AUTH_URL="https://your-site.netlify.app"
 ```
 
-### Database Options
+Use the **Transaction pooler** URI for `DATABASE_URL` and the **Direct** URI for `DIRECT_URL` on Supabase. Run `npx prisma migrate deploy` against the direct URL whenever you ship new migrations (locally or in CI).
 
-For production, consider upgrading from SQLite to:
-- **PostgreSQL** (recommended for Vercel, Railway)
-- **MySQL** (good for shared hosting)
-- **PlanetScale** (serverless MySQL)
+### Database
 
-Update `prisma/schema.prisma`:
-
-```prisma
-datasource db {
-  provider = "postgresql"  // or "mysql"
-  url      = env("DATABASE_URL")
-}
-```
-
-Then run:
-```bash
-npx prisma migrate dev
-npx prisma generate
-```
+The app uses **PostgreSQL on Supabase** with Prisma. Schema and migrations live under `prisma/`.
 
 ### Build for Production
 
@@ -217,7 +213,7 @@ npm start
 
 - **Framework**: Next.js 15 with App Router
 - **Language**: TypeScript
-- **Database**: SQLite (dev) / PostgreSQL (prod recommended)
+- **Database**: PostgreSQL (Supabase) via Prisma
 - **ORM**: Prisma
 - **Authentication**: NextAuth.js v5
 - **Styling**: Tailwind CSS

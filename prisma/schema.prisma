@@ -1,13 +1,14 @@
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["views"]
-  binaryTargets   = ["native", "rhel-openssl-1.0.x"]
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-1.0.x"]
 }
 
+// Supabase: use the Transaction pooler URL for the app; use Direct connection for migrations.
+// See: https://www.prisma.io/docs/guides/database/supabase
 datasource db {
-  provider     = "mysql"
-  url          = env("DATABASE_URL")
-  relationMode = "prisma"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {

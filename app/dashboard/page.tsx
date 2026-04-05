@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -42,7 +43,8 @@ interface ExchangeRate {
 }
 
 export default function Dashboard() {
-  const { data: session, status } = useSession()
+  const router = useRouter()
+  const { status } = useSession()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [summary, setSummary] = useState<Summary | null>(null)
   const [exchangeRate, setExchangeRate] = useState<ExchangeRate | null>(null)
@@ -50,6 +52,12 @@ export default function Dashboard() {
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth() + 1
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.replace('/login')
+    }
+  }, [status, router])
 
   useEffect(() => {
     // Only fetch data if authenticated
