@@ -192,7 +192,13 @@ export default function AnalyticsPage() {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
+                <Tooltip
+                  formatter={(value?: number | string) => {
+                    const n = typeof value === "number" ? value : Number(value);
+                    if (Number.isNaN(n)) return "";
+                    return `$${n.toFixed(2)}`;
+                  }}
+                />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
