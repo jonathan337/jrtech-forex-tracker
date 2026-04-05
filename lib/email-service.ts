@@ -94,6 +94,16 @@ export async function sendVerificationEmail(data: EmailVerificationData) {
     return { success: true, messageId: response.body?.messageId || 'sent' }
   } catch (error) {
     console.error('Error sending verification email:', error)
+    const body =
+      error &&
+      typeof error === 'object' &&
+      'response' in error &&
+      error.response &&
+      typeof error.response === 'object' &&
+      'body' in error.response
+        ? (error.response as { body?: unknown }).body
+        : undefined
+    if (body !== undefined) console.error('Brevo API response body:', body)
     throw new Error('Failed to send verification email')
   }
 }
@@ -200,6 +210,16 @@ export async function sendWelcomeEmail(data: { email: string; businessName: stri
     return { success: true, messageId: response.body?.messageId || 'sent' }
   } catch (error) {
     console.error('Error sending welcome email:', error)
+    const body =
+      error &&
+      typeof error === 'object' &&
+      'response' in error &&
+      error.response &&
+      typeof error.response === 'object' &&
+      'body' in error.response
+        ? (error.response as { body?: unknown }).body
+        : undefined
+    if (body !== undefined) console.error('Brevo API response body:', body)
     throw new Error('Failed to send welcome email')
   }
 }
