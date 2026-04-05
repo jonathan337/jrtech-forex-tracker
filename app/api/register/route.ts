@@ -2,7 +2,11 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
-import { generateVerificationToken, getVerificationExpiry } from '@/lib/auth-helper'
+import {
+  generateVerificationToken,
+  getAppUrl,
+  getVerificationExpiry,
+} from '@/lib/auth-helper'
 import { sendVerificationEmail } from '@/lib/email-service'
 
 export const runtime = 'nodejs'
@@ -54,7 +58,7 @@ export async function POST(request: Request) {
     })
 
     // Send verification email
-    const verificationUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3004'}/verify-email?token=${verificationToken}`
+    const verificationUrl = `${getAppUrl()}/verify-email?token=${verificationToken}`
     
     try {
       await sendVerificationEmail({

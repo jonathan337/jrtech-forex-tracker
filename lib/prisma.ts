@@ -6,5 +6,6 @@ const globalForPrisma = globalThis as unknown as {
 
 export const prisma = globalForPrisma.prisma ?? new PrismaClient()
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+// Reuse one client per warm serverless instance (avoid opening a new pool to Supabase every request).
+globalForPrisma.prisma = prisma
 

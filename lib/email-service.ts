@@ -1,4 +1,5 @@
 import { TransactionalEmailsApi, TransactionalEmailsApiApiKeys, SendSmtpEmail } from '@getbrevo/brevo'
+import { getAppUrl } from '@/lib/auth-helper'
 
 const brevoApi = new TransactionalEmailsApi()
 
@@ -154,7 +155,7 @@ export async function sendWelcomeEmail(data: { email: string; businessName: stri
                 Set your default exchange rates and business preferences.
               </div>
               
-              <p>Ready to get started? <a href="${process.env.NEXTAUTH_URL || 'http://localhost:3004'}/dashboard" style="color: #667eea;">Visit your dashboard</a> to begin tracking your payments.</p>
+              <p>Ready to get started? <a href="${getAppUrl()}/dashboard" style="color: #667eea;">Visit your dashboard</a> to begin tracking your payments.</p>
             </div>
             <div class="footer">
               <p>Best regards,<br>The FX Payment Tracker Team</p>

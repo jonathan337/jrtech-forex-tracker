@@ -1,5 +1,14 @@
 import { randomBytes } from 'crypto'
 
+/** Public site URL (Auth.js v5 uses AUTH_URL; NEXTAUTH_URL kept for compatibility). */
+export function getAppUrl(): string {
+  return (
+    process.env.AUTH_URL ||
+    process.env.NEXTAUTH_URL ||
+    'http://localhost:3004'
+  )
+}
+
 export function generateVerificationToken(): string {
   return randomBytes(32).toString('hex')
 }
