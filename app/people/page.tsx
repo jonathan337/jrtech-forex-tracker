@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,6 +29,8 @@ interface Person {
 }
 
 export default function PeoplePage() {
+  const router = useRouter()
+  const { status, data: session } = useSession()
   const [people, setPeople] = useState<Person[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -43,24 +48,64 @@ export default function PeoplePage() {
   const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.replace('/login')
+    }
+  }, [status, router])
+
+  useEffect(() => {
+    if (status !== 'authenticated' || !session?.user?.id) return
     fetchPeople()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, session?.user?.id])
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (
+        document.visibilityState === 'visible' &&
+        status === 'authenticated' &&
+        session?.user?.id
+      ) {
+        fetchPeople()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, session?.user?.id])
 
   const fetchPeople = async () => {
     setLoading(true)
     setLoadError('')
     try {
-      const response = await fetch('/api/people')
+      const url =
+        typeof window !== 'undefined'
+          ? new URL('/api/people', window.location.origin).toString()
+          : '/api/people'
+      const response = await fetch(url, {
+        credentials: 'include',
+        cache: 'no-store',
+      })
+      const contentType = response.headers.get('content-type') ?? ''
       if (response.ok) {
+        if (!contentType.includes('application/json')) {
+          setLoadError(
+            'People API returned non-JSON (often HTML). Confirm the request URL is /api/people in the Network tab.'
+          )
+          setPeople([])
+          return
+        }
         const data = await response.json()
         setPeople(Array.isArray(data) ? data : [])
       } else {
         const body = await response.json().catch(() => ({}))
-        const msg =
+        const parts = [
           typeof body.error === 'string'
             ? body.error
-            : `Could not load people (${response.status}).`
-        setLoadError(msg)
+            : `Could not load people (${response.status}).`,
+          typeof body.detail === 'string' ? body.detail : '',
+        ].filter(Boolean)
+        setLoadError(parts.join(' '))
         setPeople([])
       }
     } catch (error) {
@@ -159,6 +204,14 @@ export default function PeoplePage() {
     setEditingPerson(null)
     setFormError('')
     setShowForm(false)
+  }
+
+  if (status === 'loading' || status === 'unauthenticated') {
+    return (
+      <div className="min-h-[40vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    )
   }
 
   return (
@@ -293,10 +346,11 @@ export default function PeoplePage() {
         <div className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-md text-sm space-y-2">
           <p className="font-medium">{loadError}</p>
           <p className="text-amber-800 text-xs">
-            If you recently deployed database changes, run migrations against production
-            (e.g. <code className="bg-amber-100 px-1 rounded">npx prisma migrate deploy</code>
-            ). Also confirm each Person row&apos;s <code className="bg-amber-100 px-1 rounded">userId</code>{' '}
-            matches your logged-in account in the User table.
+            Local: ensure <code className="bg-amber-100 px-1 rounded">DATABASE_URL</code> is correct and
+            Postgres is running; run{' '}
+            <code className="bg-amber-100 px-1 rounded">npx prisma migrate deploy</code>. If you only set
+            one URL, the app now mirrors <code className="bg-amber-100 px-1 rounded">DATABASE_URL</code> to{' '}
+            <code className="bg-amber-100 px-1 rounded">DIRECT_URL</code> for development.
           </p>
           <Button type="button" variant="outline" size="sm" onClick={() => fetchPeople()}>
             Retry
@@ -315,6 +369,16 @@ export default function PeoplePage() {
             <User className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-700 mb-2">No People Added</h3>
             <p className="text-gray-500 mb-4">Start by adding your foreign currency providers</p>
+            <p className="text-sm text-gray-600 mb-4 max-w-md mx-auto">
+              If you already have rows in Supabase but see this locally, your logged-in{' '}
+              <code className="bg-gray-100 px-1 rounded text-xs">User.id</code> may not match{' '}
+              <code className="bg-gray-100 px-1 rounded text-xs">Person.userId</code>. On{' '}
+              <strong>local dev</strong>, open{' '}
+              <Link href="/api/debug/me" className="text-blue-600 underline font-medium" target="_blank">
+                /api/debug/me
+              </Link>{' '}
+              while signed in — it compares session id to row counts (404 on production).
+            </p>
             <Button onClick={openAddForm}>
               <Plus className="w-4 h-4 mr-2" />
               Add First Person

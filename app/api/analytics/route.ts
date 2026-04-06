@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
+import { ratePremiumUsd } from '@/lib/rate-premium'
 
 export const runtime = 'nodejs'
 
@@ -54,19 +55,16 @@ export async function GET() {
     const defaultRate = user.defaultExchangeRate
 
     const analytics = availability.map((item) => {
-      // Convert fee to USD if needed
-      const feeInUSD = item.feeAmount
-        ? item.feeCurrency === 'TTD'
-          ? item.feeAmount / defaultRate
-          : item.feeAmount
-        : 0
+      const feeInUSD = ratePremiumUsd(
+        item.amountUSD,
+        item.exchangeRate,
+        defaultRate
+      )
 
-      // Calculate premium (extra cost beyond default rate)
       const premiumPercentage = ((item.exchangeRate / defaultRate) - 1) * 100
       const premiumCost = item.amountUSD * (item.exchangeRate - defaultRate)
 
-      // Total cost in TTD
-      const totalCostTTD = item.amountUSD * item.exchangeRate + (item.feeAmount && item.feeCurrency === 'TTD' ? item.feeAmount : 0)
+      const totalCostTTD = item.amountUSD * item.exchangeRate
       
       // Cost at default rate
       const costAtDefaultRate = item.amountUSD * defaultRate

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { buildRecurringAvailabilityEntry } from '@/lib/recurring-availability'
+import { ratePremiumTtd, ratePremiumUsd } from '@/lib/rate-premium'
 
 export const runtime = 'nodejs'
 
@@ -11,6 +12,12 @@ export async function GET(request: Request) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { defaultExchangeRate: true },
+    })
+    const baseline = user?.defaultExchangeRate ?? 0
 
     const { searchParams } = new URL(request.url)
     const year = searchParams.get('year')
@@ -79,9 +86,60 @@ export async function GET(request: Request) {
         new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()
     )
 
+    let usageRows: { cardId: string; amountUSD: number }[] = []
+    try {
+      usageRows = await prisma.cardUsage.findMany({
+        where: {
+          year: y,
+          month: m,
+          cardId: { in: cardIds },
+        },
+        select: { cardId: true, amountUSD: true },
+      })
+    } catch (usageErr) {
+      // e.g. migration not applied yet — treat as no usage so availability still loads
+      console.error('[summary] CardUsage query failed:', usageErr)
+    }
+
+    const usageByCard = new Map<string, number>()
+    for (const u of usageRows) {
+      usageByCard.set(
+        u.cardId,
+        (usageByCard.get(u.cardId) ?? 0) + u.amountUSD
+      )
+    }
+
+    const totalUsedUSD = usageRows.reduce((sum, u) => sum + u.amountUSD, 0)
+
+    const availabilityWithUsage = availability.map((item) => {
+      const cid = item.cardId
+      const usageUSD = usageByCard.get(cid) ?? 0
+      const impliedFeeTTD = ratePremiumTtd(
+        item.amountUSD,
+        item.exchangeRate,
+        baseline
+      )
+      const impliedFeeUSD = ratePremiumUsd(
+        item.amountUSD,
+        item.exchangeRate,
+        baseline
+      )
+      return {
+        ...item,
+        usageUSD,
+        balanceUSD: item.amountUSD - usageUSD,
+        impliedFeeTTD,
+        impliedFeeUSD,
+      }
+    })
+
     const totalUSD = availability.reduce((sum, item) => sum + item.amountUSD, 0)
-    const totalFees = availability.reduce(
-      (sum, item) => sum + (item.feeAmount || 0),
+    const totalFeesTTD = availabilityWithUsage.reduce(
+      (sum, item) => sum + item.impliedFeeTTD,
+      0
+    )
+    const totalFeesUSD = availabilityWithUsage.reduce(
+      (sum, item) => sum + item.impliedFeeUSD,
       0
     )
     const averageRate =
@@ -95,16 +153,22 @@ export async function GET(request: Request) {
       0
     )
 
+    const netUSD = totalUSD - totalFeesUSD
+    const balanceUSD = totalUSD - totalUsedUSD
+
     const summary = {
       year: y,
       month: m,
       totalCards: availability.length,
       totalUSD,
-      totalFees,
+      totalFeesTTD,
+      totalFeesUSD,
       averageRate,
       totalTTD,
-      netUSD: totalUSD - totalFees,
-      availability,
+      netUSD,
+      totalUsedUSD,
+      balanceUSD,
+      availability: availabilityWithUsage,
     }
 
     return NextResponse.json(summary)

@@ -72,12 +72,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
+        token.sub = user.id
       }
       return token
     },
     async session({ session, token }) {
       if (token && session.user) {
-        session.user.id = token.id as string
+        // Credentials flow sets token.id in jwt; keep sub fallback for older tokens / edge cases
+        session.user.id = (token.id ?? token.sub) as string
       }
       return session
     },

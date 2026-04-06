@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { CreditCard, Users, Calendar, LayoutDashboard, LogOut, Building2, BarChart3, Settings } from 'lucide-react'
+import { CreditCard, Users, Calendar, LayoutDashboard, LogOut, Building2, BarChart3, Settings, Wallet } from 'lucide-react'
 import { signOut, useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 
@@ -16,6 +16,7 @@ export default function Navigation() {
     { href: '/people', label: 'People', icon: Users },
     { href: '/cards', label: 'Cards', icon: CreditCard },
     { href: '/availability', label: 'Availability', icon: Calendar },
+    { href: '/usage', label: 'Usage', icon: Wallet },
     { href: '/settings', label: 'Settings', icon: Settings },
   ]
 

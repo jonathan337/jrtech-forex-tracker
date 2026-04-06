@@ -2,16 +2,19 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { z } from 'zod'
+import {
+  cardHasAvailabilityForMonth,
+  USAGE_REQUIRES_AVAILABILITY_MESSAGE,
+} from '@/lib/card-available-for-month'
 
 export const runtime = 'nodejs'
 
-const availabilitySchema = z.object({
+const usageSchema = z.object({
   cardId: z.string().min(1, 'Card is required'),
   year: z.number().int().min(2000).max(2100),
   month: z.number().int().min(1).max(12),
   amountUSD: z.number().positive('Amount must be positive'),
-  exchangeRate: z.number().positive('Exchange rate must be positive'),
-  paymentDate: z.string().datetime(),
+  usageDate: z.string().datetime().optional(),
   notes: z.string().optional(),
 })
 
@@ -25,34 +28,40 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const year = searchParams.get('year')
     const month = searchParams.get('month')
+    const cardId = searchParams.get('cardId')
 
-    const where = {
-      card: {
-        person: {
-          userId: session.user.id,
+    let usage: Awaited<ReturnType<typeof prisma.cardUsage.findMany>>
+    try {
+      usage = await prisma.cardUsage.findMany({
+        where: {
+          card: {
+            person: {
+              userId: session.user.id,
+            },
+          },
+          ...(year && { year: parseInt(year, 10) }),
+          ...(month && { month: parseInt(month, 10) }),
+          ...(cardId && { cardId }),
         },
-      },
-      ...(year && { year: parseInt(year) }),
-      ...(month && { month: parseInt(month) }),
-    }
-
-    const availability = await prisma.monthlyAvailability.findMany({
-      where,
-      include: {
-        card: {
-          include: {
-            person: true,
+        include: {
+          card: {
+            include: {
+              person: true,
+            },
           },
         },
-      },
-      orderBy: [{ year: 'desc' }, { month: 'desc' }, { paymentDate: 'asc' }],
-    })
+        orderBy: [{ usageDate: 'desc' }, { createdAt: 'desc' }],
+      })
+    } catch (usageErr) {
+      console.error('[usage GET] CardUsage query failed:', usageErr)
+      usage = []
+    }
 
-    return NextResponse.json(availability)
+    return NextResponse.json(usage)
   } catch (error) {
-    console.error('Error fetching availability:', error)
+    console.error('Error fetching usage:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch availability' },
+      { error: 'Failed to fetch usage' },
       { status: 500 }
     )
   }
@@ -66,9 +75,8 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const validatedData = availabilitySchema.parse(body)
+    const validatedData = usageSchema.parse(body)
 
-    // Verify card belongs to user
     const card = await prisma.card.findFirst({
       where: {
         id: validatedData.cardId,
@@ -82,14 +90,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Card not found' }, { status: 404 })
     }
 
-    const availability = await prisma.monthlyAvailability.create({
+    const allowed = await cardHasAvailabilityForMonth(
+      validatedData.cardId,
+      validatedData.year,
+      validatedData.month
+    )
+    if (!allowed) {
+      return NextResponse.json(
+        { error: USAGE_REQUIRES_AVAILABILITY_MESSAGE },
+        { status: 400 }
+      )
+    }
+
+    const entry = await prisma.cardUsage.create({
       data: {
         cardId: validatedData.cardId,
         year: validatedData.year,
         month: validatedData.month,
         amountUSD: validatedData.amountUSD,
-        exchangeRate: validatedData.exchangeRate,
-        paymentDate: new Date(validatedData.paymentDate),
+        usageDate: validatedData.usageDate
+          ? new Date(validatedData.usageDate)
+          : new Date(),
         notes: validatedData.notes || null,
       },
       include: {
@@ -101,7 +122,7 @@ export async function POST(request: Request) {
       },
     })
 
-    return NextResponse.json(availability, { status: 201 })
+    return NextResponse.json(entry, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -109,9 +130,9 @@ export async function POST(request: Request) {
         { status: 400 }
       )
     }
-    console.error('Error creating availability:', error)
+    console.error('Error creating usage:', error)
     return NextResponse.json(
-      { error: 'Failed to create availability' },
+      { error: 'Failed to create usage entry' },
       { status: 500 }
     )
   }

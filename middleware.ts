@@ -10,7 +10,7 @@ export default auth((req) => {
   const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route))
   
   // Protected routes that require authentication
-  const protectedRoutes = ['/dashboard', '/people', '/cards', '/availability', '/analytics', '/settings']
+  const protectedRoutes = ['/dashboard', '/people', '/cards', '/availability', '/usage', '/analytics', '/settings']
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
   
   // If not authenticated and trying to access protected route, redirect to login
@@ -29,13 +29,11 @@ export default auth((req) => {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - api/auth (authentication routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
+     * Skip all /api/* — route handlers call auth() themselves. Only excluding
+     * /api/auth caused every other API route to hit this middleware on the
+     * Edge; that can interfere with JSON responses. Match page routes only.
      */
-    "/((?!api/auth|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico).*)",
   ],
 }
 

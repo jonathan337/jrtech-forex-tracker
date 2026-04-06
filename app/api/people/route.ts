@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { z } from 'zod'
+import { serverErrorResponse } from '@/lib/api-error'
 import {
   mapPersonPhoneForResponse,
   parsePersonRequestBody,
@@ -38,10 +39,7 @@ export async function GET() {
     return NextResponse.json(people.map((p) => mapPersonPhoneForResponse(p)))
   } catch (error) {
     console.error('Error fetching people:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch people' },
-      { status: 500 }
-    )
+    return serverErrorResponse('Failed to fetch people', error)
   }
 }
 

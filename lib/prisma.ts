@@ -1,5 +1,11 @@
 import { PrismaClient } from '@prisma/client'
 
+// Schema declares `directUrl = env("DIRECT_URL")`. Migrations need it; for local dev,
+// many setups only set DATABASE_URL — mirror it so the client and CLI can run.
+if (process.env.DATABASE_URL && !process.env.DIRECT_URL) {
+  process.env.DIRECT_URL = process.env.DATABASE_URL
+}
+
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }

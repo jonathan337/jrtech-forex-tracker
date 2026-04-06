@@ -1,17 +1,22 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Edit, Trash2, X, Calendar, Loader2 } from 'lucide-react'
+import { Plus, Edit, Trash2, X, Calendar, Loader2, User } from 'lucide-react'
 import { format } from 'date-fns'
+import { ratePremiumTtd } from '@/lib/rate-premium'
+import { useGroupByOwner } from '@/hooks/use-group-by-owner'
 
 interface CardType {
   id: string
   cardNickname: string
   person: {
+    id: string
     name: string
   }
 }
@@ -23,8 +28,6 @@ interface Availability {
   amountUSD: number
   exchangeRate: number
   paymentDate: string
-  feeAmount: number | null
-  feeCurrency: string
   notes: string | null
   card: CardType
 }
@@ -35,6 +38,8 @@ const MONTHS = [
 ]
 
 export default function AvailabilityPage() {
+  const router = useRouter()
+  const { status } = useSession()
   const [availability, setAvailability] = useState<Availability[]>([])
   const [cards, setCards] = useState<CardType[]>([])
   const [loading, setLoading] = useState(true)
@@ -43,7 +48,9 @@ export default function AvailabilityPage() {
   const [isRangeMode, setIsRangeMode] = useState(false)
   const [saving, setSaving] = useState(false)
   const savingLockRef = useRef(false)
-  
+  const [baselineTtd, setBaselineTtd] = useState<number | null>(null)
+  const [groupByOwner, setGroupByOwner] = useGroupByOwner()
+
   const currentDate = new Date()
   const [formData, setFormData] = useState({
     cardId: '',
@@ -56,20 +63,70 @@ export default function AvailabilityPage() {
     amountUSD: '',
     exchangeRate: '',
     paymentDate: '',
-    feeAmount: '',
-    feeCurrency: 'USD' as 'USD' | 'TTD',
     notes: '',
   })
 
   useEffect(() => {
-    fetchAvailability()
-    fetchCards()
-  }, [])
+    if (status === 'unauthenticated') {
+      router.replace('/login')
+    }
+  }, [status, router])
+
+  useEffect(() => {
+    if (status !== 'authenticated') return
+
+    let cancelled = false
+
+    const load = async () => {
+      setLoading(true)
+      try {
+        const [availRes, cardsRes, settingsRes] = await Promise.all([
+          fetch('/api/availability', { credentials: 'include', cache: 'no-store' }),
+          fetch('/api/cards', { credentials: 'include', cache: 'no-store' }),
+          fetch('/api/settings', { credentials: 'include', cache: 'no-store' }),
+        ])
+        if (cancelled) return
+        if (availRes.ok) {
+          setAvailability(await availRes.json())
+        }
+        if (cardsRes.ok) {
+          setCards(await cardsRes.json())
+        }
+        if (settingsRes.ok) {
+          const s = await settingsRes.json()
+          if (typeof s.defaultExchangeRate === 'number') {
+            setBaselineTtd(s.defaultExchangeRate)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching availability:', error)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [status])
+
+  /** Prefill exchange field when settings finish loading after the add form is already open. */
+  useEffect(() => {
+    if (baselineTtd == null || !showForm || editingAvailability) return
+    setFormData((prev) => {
+      if (prev.exchangeRate !== '') return prev
+      return { ...prev, exchangeRate: String(baselineTtd) }
+    })
+  }, [baselineTtd, showForm, editingAvailability])
 
   const fetchAvailability = async () => {
     setLoading(true)
     try {
-      const response = await fetch('/api/availability')
+      const response = await fetch('/api/availability', {
+        credentials: 'include',
+        cache: 'no-store',
+      })
       if (response.ok) {
         const data = await response.json()
         setAvailability(data)
@@ -83,7 +140,10 @@ export default function AvailabilityPage() {
 
   const fetchCards = async () => {
     try {
-      const response = await fetch('/api/cards')
+      const response = await fetch('/api/cards', {
+        credentials: 'include',
+        cache: 'no-store',
+      })
       if (response.ok) {
         const data = await response.json()
         setCards(data)
@@ -134,8 +194,6 @@ export default function AvailabilityPage() {
             amountUSD: parseFloat(formData.amountUSD),
             exchangeRate: parseFloat(formData.exchangeRate),
             paymentDate: new Date(formData.paymentDate).toISOString(),
-            feeAmount: formData.feeAmount ? parseFloat(formData.feeAmount) : undefined,
-            feeCurrency: formData.feeCurrency,
             notes: formData.notes || undefined,
           }
 
@@ -172,8 +230,6 @@ export default function AvailabilityPage() {
           amountUSD: parseFloat(formData.amountUSD),
           exchangeRate: parseFloat(formData.exchangeRate),
           paymentDate: new Date(formData.paymentDate).toISOString(),
-          feeAmount: formData.feeAmount ? parseFloat(formData.feeAmount) : undefined,
-          feeCurrency: formData.feeCurrency,
           notes: formData.notes || undefined,
         }
 
@@ -211,8 +267,6 @@ export default function AvailabilityPage() {
       amountUSD: item.amountUSD.toString(),
       exchangeRate: item.exchangeRate.toString(),
       paymentDate: format(new Date(item.paymentDate), 'yyyy-MM-dd'),
-      feeAmount: item.feeAmount?.toString() || '',
-      feeCurrency: (item.feeCurrency || 'USD') as 'USD' | 'TTD',
       notes: item.notes || '',
     })
     setShowForm(true)
@@ -247,8 +301,6 @@ export default function AvailabilityPage() {
       amountUSD: '',
       exchangeRate: '',
       paymentDate: '',
-      feeAmount: '',
-      feeCurrency: 'USD',
       notes: '',
     })
     setEditingAvailability(null)
@@ -256,32 +308,104 @@ export default function AvailabilityPage() {
     setIsRangeMode(false)
   }
 
-  // Group availability by card
-  const groupedByCard = availability.reduce((acc, item) => {
-    const cardKey = item.card.id
-    if (!acc[cardKey]) {
-      acc[cardKey] = {
-        card: item.card,
-        entries: []
+  const newAvailabilityBaselineRate = () =>
+    baselineTtd != null ? String(baselineTtd) : ''
+
+  const openAddForm = () => {
+    setEditingAvailability(null)
+    setIsRangeMode(false)
+    const d = new Date()
+    setFormData({
+      cardId: '',
+      year: d.getFullYear(),
+      month: d.getMonth() + 1,
+      startYear: d.getFullYear(),
+      startMonth: d.getMonth() + 1,
+      endYear: d.getFullYear(),
+      endMonth: d.getMonth() + 1,
+      amountUSD: '',
+      exchangeRate: newAvailabilityBaselineRate(),
+      paymentDate: '',
+      notes: '',
+    })
+    setShowForm(true)
+  }
+
+  if (status === 'loading' || status === 'unauthenticated') {
+    return (
+      <div className="min-h-[40vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    )
+  }
+
+  const groupedByCard = useMemo(() => {
+    return availability.reduce(
+      (acc, item) => {
+        const cardKey = item.card.id
+        if (!acc[cardKey]) {
+          acc[cardKey] = {
+            card: item.card,
+            entries: [],
+          }
+        }
+        acc[cardKey].entries.push(item)
+        return acc
+      },
+      {} as Record<string, { card: CardType; entries: Availability[] }>
+    )
+  }, [availability])
+
+  const groupedByOwner = useMemo(() => {
+    type CardGroup = { card: CardType; entries: Availability[] }
+    const map = new Map<
+      string,
+      { person: { id: string; name: string }; cardGroups: CardGroup[] }
+    >()
+    for (const { card, entries } of Object.values(groupedByCard)) {
+      const pid = card.person.id
+      if (!map.has(pid)) {
+        map.set(pid, {
+          person: { id: pid, name: card.person.name },
+          cardGroups: [],
+        })
       }
+      map.get(pid)!.cardGroups.push({ card, entries })
     }
-    acc[cardKey].entries.push(item)
-    return acc
-  }, {} as Record<string, { card: CardType, entries: Availability[] }>)
+    for (const g of map.values()) {
+      g.cardGroups.sort((a, b) =>
+        a.card.cardNickname.localeCompare(b.card.cardNickname)
+      )
+    }
+    return [...map.values()].sort((a, b) =>
+      a.person.name.localeCompare(b.person.name)
+    )
+  }, [groupedByCard])
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
             Monthly Availability
           </h1>
           <p className="text-gray-600 mt-1">Track card availability by month and manage payment schedules</p>
         </div>
-        <Button onClick={() => setShowForm(true)} className="shadow-lg">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Availability
-        </Button>
+        <div className="flex flex-wrap items-center gap-4">
+          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={groupByOwner}
+              onChange={(e) => setGroupByOwner(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            Group by owner
+          </label>
+          <Button onClick={openAddForm} className="shadow-lg">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Availability
+          </Button>
+        </div>
       </div>
 
       {showForm && (
@@ -480,15 +604,23 @@ export default function AvailabilityPage() {
                   <Input
                     id="exchangeRate"
                     type="number"
-                    step="0.01"
+                    step="0.0001"
                     value={formData.exchangeRate}
                     onChange={(e) =>
                       setFormData({ ...formData, exchangeRate: e.target.value })
                     }
-                    placeholder="6.80"
+                    placeholder={
+                      baselineTtd != null ? String(baselineTtd) : 'e.g. 6.7993'
+                    }
                     required
                   />
                 </div>
+                {!editingAvailability && baselineTtd != null && (
+                  <p className="text-xs text-gray-500 col-span-2">
+                    Defaults to your baseline rate from Settings; change if this month
+                    uses a different rate.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -502,36 +634,6 @@ export default function AvailabilityPage() {
                   }
                   required
                 />
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-2">
-                  <Label htmlFor="feeAmount">Fee Amount</Label>
-                  <Input
-                    id="feeAmount"
-                    type="number"
-                    step="0.01"
-                    value={formData.feeAmount}
-                    onChange={(e) =>
-                      setFormData({ ...formData, feeAmount: e.target.value })
-                    }
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="feeCurrency">Currency</Label>
-                  <select
-                    id="feeCurrency"
-                    value={formData.feeCurrency}
-                    onChange={(e) =>
-                      setFormData({ ...formData, feeCurrency: e.target.value as 'USD' | 'TTD' })
-                    }
-                    className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                  >
-                    <option value="USD">USD</option>
-                    <option value="TTD">TTD</option>
-                  </select>
-                </div>
               </div>
 
               <div>
@@ -583,12 +685,143 @@ export default function AvailabilityPage() {
             <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-700 mb-2">No Availability Entries</h3>
             <p className="text-gray-500 mb-4">Start by adding availability for your cards</p>
-            <Button onClick={() => setShowForm(true)}>
+            <Button onClick={openAddForm}>
               <Plus className="w-4 h-4 mr-2" />
               Add First Entry
             </Button>
           </CardContent>
         </Card>
+      ) : groupByOwner ? (
+        <div className="space-y-10">
+          {groupedByOwner.map((ownerBlock) => (
+            <section key={ownerBlock.person.id} className="space-y-4">
+              <div className="flex flex-wrap items-baseline gap-2 border-b border-gray-200 pb-2">
+                <User className="w-5 h-5 text-gray-500 shrink-0 translate-y-0.5" />
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {ownerBlock.person.name}
+                </h2>
+                <span className="text-sm text-gray-500">
+                  {ownerBlock.cardGroups.length} card
+                  {ownerBlock.cardGroups.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className="grid gap-6">
+                {ownerBlock.cardGroups.map(({ card, entries }) => (
+                  <Card
+                    key={card.id}
+                    className="shadow-md hover:shadow-lg transition-shadow"
+                  >
+                    <CardHeader className="bg-gradient-to-r from-purple-50 to-blue-50 border-b">
+                      <CardTitle className="flex items-center gap-2">
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+                          <span className="text-white font-bold">
+                            {card.cardNickname[0]}
+                          </span>
+                        </div>
+                        <div>
+                          <div className="text-lg">{card.cardNickname}</div>
+                        </div>
+                      </CardTitle>
+                      <CardDescription>
+                        {entries.length}{' '}
+                        {entries.length === 1 ? 'month' : 'months'} of availability
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-4">
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b bg-gray-50">
+                              <th className="text-left py-3 px-4 font-medium text-gray-700">
+                                Month
+                              </th>
+                              <th className="text-right py-3 px-4 font-medium text-gray-700">
+                                Amount (USD)
+                              </th>
+                              <th className="text-right py-3 px-4 font-medium text-gray-700">
+                                Rate
+                              </th>
+                              <th className="text-right py-3 px-4 font-medium text-gray-700">
+                                TTD Value
+                              </th>
+                              <th className="text-right py-3 px-4 font-medium text-gray-700">
+                                Fee (TTD)
+                              </th>
+                              <th className="text-left py-3 px-4 font-medium text-gray-700">
+                                Payment Date
+                              </th>
+                              <th className="text-center py-3 px-4 font-medium text-gray-700">
+                                Actions
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {entries.map((item) => (
+                              <tr
+                                key={item.id}
+                                className="border-b hover:bg-blue-50 transition-colors"
+                              >
+                                <td className="py-3 px-4 font-medium">
+                                  {MONTHS[item.month - 1]} {item.year}
+                                </td>
+                                <td className="py-3 px-4 text-right text-green-600 font-semibold">
+                                  ${item.amountUSD.toFixed(2)}
+                                </td>
+                                <td className="py-3 px-4 text-right">
+                                  {item.exchangeRate.toFixed(2)}
+                                </td>
+                                <td className="py-3 px-4 text-right text-blue-600 font-semibold">
+                                  ${(item.amountUSD * item.exchangeRate).toFixed(2)}
+                                </td>
+                                <td className="py-3 px-4 text-right">
+                                  {baselineTtd != null && baselineTtd > 0 ? (
+                                    <span className="text-red-600 font-medium">
+                                      {ratePremiumTtd(
+                                        item.amountUSD,
+                                        item.exchangeRate,
+                                        baselineTtd
+                                      ).toFixed(2)}{' '}
+                                      TTD
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400">—</span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4">
+                                  {format(new Date(item.paymentDate), 'MMM dd, yyyy')}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="flex justify-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleEdit(item)}
+                                      className="hover:bg-blue-100"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDelete(item.id)}
+                                      className="hover:bg-red-100"
+                                    >
+                                      <Trash2 className="w-4 h-4 text-red-600" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
       ) : (
         <div className="grid gap-6">
           {Object.values(groupedByCard).map(({ card, entries }) => (
@@ -616,7 +849,9 @@ export default function AvailabilityPage() {
                         <th className="text-right py-3 px-4 font-medium text-gray-700">Amount (USD)</th>
                         <th className="text-right py-3 px-4 font-medium text-gray-700">Rate</th>
                         <th className="text-right py-3 px-4 font-medium text-gray-700">TTD Value</th>
-                        <th className="text-right py-3 px-4 font-medium text-gray-700">Fees</th>
+                        <th className="text-right py-3 px-4 font-medium text-gray-700">
+                          Fee (TTD)
+                        </th>
                         <th className="text-left py-3 px-4 font-medium text-gray-700">Payment Date</th>
                         <th className="text-center py-3 px-4 font-medium text-gray-700">Actions</th>
                       </tr>
@@ -637,7 +872,18 @@ export default function AvailabilityPage() {
                             ${(item.amountUSD * item.exchangeRate).toFixed(2)}
                           </td>
                           <td className="py-3 px-4 text-right">
-                            {item.feeAmount ? `$${item.feeAmount.toFixed(2)} ${item.feeCurrency}` : '-'}
+                            {baselineTtd != null && baselineTtd > 0 ? (
+                              <span className="text-red-600 font-medium">
+                                {ratePremiumTtd(
+                                  item.amountUSD,
+                                  item.exchangeRate,
+                                  baselineTtd
+                                ).toFixed(2)}{' '}
+                                TTD
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
                           </td>
                           <td className="py-3 px-4">
                             {format(new Date(item.paymentDate), 'MMM dd, yyyy')}

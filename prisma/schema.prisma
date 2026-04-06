@@ -50,15 +50,29 @@ model Card {
   recurringAmountUSD     Float?
   recurringExchangeRate  Float?
   recurringPaymentDay    Int?
-  recurringFeeAmount     Float?
-  recurringFeeCurrency   String?
   recurringNotes         String?
   createdAt              DateTime              @default(now())
   updatedAt              DateTime              @updatedAt
   person                 Person                @relation(fields: [personId], references: [id], onDelete: Cascade)
   monthlyAvailability    MonthlyAvailability[]
+  usageEntries           CardUsage[]
 
   @@index([personId])
+}
+
+model CardUsage {
+  id         String   @id @default(cuid())
+  cardId     String
+  year       Int
+  month      Int
+  amountUSD  Float
+  usageDate  DateTime @default(now())
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  card       Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId, year, month])
 }
 
 model MonthlyAvailability {
@@ -69,8 +83,6 @@ model MonthlyAvailability {
   amountUSD    Float
   exchangeRate Float
   paymentDate  DateTime
-  feeAmount    Float?
-  feeCurrency  String   @default("USD")
   notes        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

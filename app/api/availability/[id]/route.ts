@@ -12,8 +12,6 @@ const availabilitySchema = z.object({
   amountUSD: z.number().positive('Amount must be positive'),
   exchangeRate: z.number().positive('Exchange rate must be positive'),
   paymentDate: z.string().datetime(),
-  feeAmount: z.number().nonnegative().optional(),
-  feeCurrency: z.enum(['USD', 'TTD']).optional(),
   notes: z.string().optional(),
 })
 
@@ -119,8 +117,6 @@ export async function PUT(
         amountUSD: validatedData.amountUSD,
         exchangeRate: validatedData.exchangeRate,
         paymentDate: new Date(validatedData.paymentDate),
-        feeAmount: validatedData.feeAmount || null,
-        feeCurrency: validatedData.feeCurrency || 'USD',
         notes: validatedData.notes || null,
       },
       include: {

@@ -10,8 +10,6 @@ export const cardBodySchema = z
     recurringAmountUSD: z.number().positive().optional(),
     recurringExchangeRate: z.number().positive().optional(),
     recurringPaymentDay: z.number().int().min(1).max(31).optional(),
-    recurringFeeAmount: z.number().nonnegative().optional(),
-    recurringFeeCurrency: z.enum(['USD', 'TTD']).optional(),
     recurringNotes: z.string().optional(),
   })
   .superRefine((data, ctx) => {
@@ -52,8 +50,6 @@ export function prismaDataFromCardBody(data: CardBodyInput) {
     recurringAmountUSD: on ? data.recurringAmountUSD! : null,
     recurringExchangeRate: on ? data.recurringExchangeRate! : null,
     recurringPaymentDay: on ? data.recurringPaymentDay! : null,
-    recurringFeeAmount: on ? (data.recurringFeeAmount ?? null) : null,
-    recurringFeeCurrency: on ? (data.recurringFeeCurrency ?? 'USD') : null,
     recurringNotes: on ? (data.recurringNotes || null) : null,
   }
 }

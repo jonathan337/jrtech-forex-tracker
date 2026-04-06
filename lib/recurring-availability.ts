@@ -41,8 +41,6 @@ export function buildRecurringAvailabilityEntry(
     amountUSD: card.recurringAmountUSD,
     exchangeRate: card.recurringExchangeRate,
     paymentDate,
-    feeAmount: card.recurringFeeAmount,
-    feeCurrency: card.recurringFeeCurrency ?? 'USD',
     notes: card.recurringNotes,
     createdAt: card.createdAt,
     updatedAt: card.updatedAt,
@@ -50,6 +48,7 @@ export function buildRecurringAvailabilityEntry(
     card: {
       cardNickname: card.cardNickname,
       person: {
+        id: card.person.id,
         name: card.person.name,
       },
     },
