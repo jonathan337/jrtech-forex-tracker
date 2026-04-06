@@ -7,9 +7,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Plus, Edit, Trash2, X, Mail, Phone, User, Loader2 } from 'lucide-react'
 import {
-  PHONE_INPUT_EMPTY,
-  digitsToNanpDisplay,
+  canonicalNanpFromNationalDigits,
   extractNanpNationalDigits,
+  formatNanpNationalInput,
   isValidNanpNational,
 } from '@/lib/phone'
 
@@ -33,7 +33,8 @@ export default function PeoplePage() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    phone: '',
+    /** 0–10 national digits only (after +1); keeps backspace + mask stable */
+    phoneNational: '',
     notes: '',
   })
   const [saving, setSaving] = useState(false)
@@ -74,7 +75,7 @@ export default function PeoplePage() {
   const openAddForm = () => {
     setEditingPerson(null)
     setFormError('')
-    setFormData({ name: '', email: '', phone: PHONE_INPUT_EMPTY, notes: '' })
+    setFormData({ name: '', email: '', phoneNational: '', notes: '' })
     setShowForm(true)
   }
 
@@ -82,8 +83,7 @@ export default function PeoplePage() {
     e.preventDefault()
     if (savingLockRef.current) return
 
-    const nationalDigits = extractNanpNationalDigits(formData.phone)
-    if (!isValidNanpNational(nationalDigits)) {
+    if (!isValidNanpNational(formData.phoneNational)) {
       setFormError('Enter a complete phone number: +1 (XXX) XXX-XXXX.')
       return
     }
@@ -95,10 +95,14 @@ export default function PeoplePage() {
       const url = editingPerson ? `/api/people/${editingPerson.id}` : '/api/people'
       const method = editingPerson ? 'PUT' : 'POST'
 
+      const { phoneNational, ...rest } = formData
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...rest,
+          phone: canonicalNanpFromNationalDigits(phoneNational),
+        }),
       })
 
       if (response.ok) {
@@ -126,9 +130,9 @@ export default function PeoplePage() {
     setFormData({
       name: person.name,
       email: person.email || '',
-      phone: person.phone
-        ? digitsToNanpDisplay(extractNanpNationalDigits(person.phone))
-        : PHONE_INPUT_EMPTY,
+      phoneNational: person.phone
+        ? extractNanpNationalDigits(person.phone)
+        : '',
       notes: person.notes || '',
     })
     setShowForm(true)
@@ -151,7 +155,7 @@ export default function PeoplePage() {
   }
 
   const resetForm = () => {
-    setFormData({ name: '', email: '', phone: PHONE_INPUT_EMPTY, notes: '' })
+    setFormData({ name: '', email: '', phoneNational: '', notes: '' })
     setEditingPerson(null)
     setFormError('')
     setShowForm(false)
@@ -235,11 +239,11 @@ export default function PeoplePage() {
                   type="tel"
                   inputMode="numeric"
                   autoComplete="tel-national"
-                  value={formData.phone}
+                  value={formatNanpNationalInput(formData.phoneNational)}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      phone: digitsToNanpDisplay(e.target.value),
+                      phoneNational: extractNanpNationalDigits(e.target.value),
                     })
                   }
                   placeholder="+1 (868) 555-1234"

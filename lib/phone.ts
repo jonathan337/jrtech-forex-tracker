@@ -11,17 +11,8 @@ const NANP_NATIONAL_REGEX = /^[2-9]\d{2}[2-9]\d{6}$/
 /** Initial state for the masked input (user types after "+1 ("). */
 export const PHONE_INPUT_EMPTY = '+1 ('
 
-export function extractNanpNationalDigits(raw: string): string {
-  const digits = raw.replace(/\D/g, '')
-  if (digits.length >= 11 && digits[0] === '1') {
-    return digits.slice(1, 11)
-  }
-  return digits.slice(0, 10)
-}
-
-/** Builds the masked string while typing (max 10 national digits after +1). */
-export function digitsToNanpDisplay(rawDigitsOrValue: string): string {
-  const d = extractNanpNationalDigits(rawDigitsOrValue)
+function buildNanpMaskFromNationalDigits(nationalDigits: string): string {
+  const d = nationalDigits.replace(/\D/g, '').slice(0, 10)
   if (d.length === 0) return PHONE_INPUT_EMPTY
   const a = d.slice(0, 3)
   if (d.length < 3) return `+1 (${a}`
@@ -30,6 +21,35 @@ export function digitsToNanpDisplay(rawDigitsOrValue: string): string {
   if (d.length === 3) return `+1 (${a}) `
   if (d.length <= 6) return `+1 (${a}) ${b}`
   return `+1 (${a}) ${b}-${c}`
+}
+
+/**
+ * Parse any pasted/typed value into 0–10 national digits (after +1).
+ * The visible "+1 (" contributes a trailing "1" when stripped naïvely — treat
+ * digits === "1" alone as "no national digits yet" so backspace on an empty
+ * field does not become "+1 (1".
+ */
+export function extractNanpNationalDigits(raw: string): string {
+  const all = raw.replace(/\D/g, '')
+  if (all.length === 0) return ''
+
+  if (all === '1') return ''
+
+  if (all[0] === '1') {
+    return all.slice(1, 11)
+  }
+
+  return all.slice(0, 10)
+}
+
+/** Format from 0–10 national digits (form state). Does not re-parse +1. */
+export function formatNanpNationalInput(nationalDigits: string): string {
+  return buildNanpMaskFromNationalDigits(nationalDigits)
+}
+
+/** Format from raw input (paste, etc.). */
+export function digitsToNanpDisplay(rawDigitsOrValue: string): string {
+  return buildNanpMaskFromNationalDigits(extractNanpNationalDigits(rawDigitsOrValue))
 }
 
 export function canonicalNanpFromNationalDigits(digits10: string): string {
