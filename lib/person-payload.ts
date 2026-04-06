@@ -1,17 +1,17 @@
 import { z } from 'zod'
-import { displayPhoneAsE164, normalizePhoneInput } from '@/lib/phone'
+import { displayPhoneCanonical, normalizePhoneInput } from '@/lib/phone'
 
 const personBodySchema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.string().email().optional().or(z.literal('')),
-  phone: z.string().optional(),
+  phone: z.string().min(1, 'Phone is required'),
   notes: z.string().optional(),
 })
 
 export type PersonPayload = {
   name: string
   email: string | null
-  phone: string | null
+  phone: string
   notes: string | null
 }
 
@@ -31,7 +31,7 @@ export function parsePersonRequestBody(body: unknown): PersonPayload {
   return {
     name: data.name,
     email: data.email || null,
-    phone: phoneResult.e164,
+    phone: phoneResult.value,
     notes: data.notes || null,
   }
 }
@@ -41,6 +41,6 @@ export function mapPersonPhoneForResponse<
 >(person: T): T {
   return {
     ...person,
-    phone: displayPhoneAsE164(person.phone),
+    phone: displayPhoneCanonical(person.phone),
   }
 }

@@ -6,6 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Plus, Edit, Trash2, X, Mail, Phone, User, Loader2 } from 'lucide-react'
+import {
+  PHONE_INPUT_EMPTY,
+  digitsToNanpDisplay,
+  extractNanpNationalDigits,
+  isValidNanpNational,
+} from '@/lib/phone'
 
 interface Person {
   id: string
@@ -53,9 +59,23 @@ export default function PeoplePage() {
     }
   }
 
+  const openAddForm = () => {
+    setEditingPerson(null)
+    setFormError('')
+    setFormData({ name: '', email: '', phone: PHONE_INPUT_EMPTY, notes: '' })
+    setShowForm(true)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (savingLockRef.current) return
+
+    const nationalDigits = extractNanpNationalDigits(formData.phone)
+    if (!isValidNanpNational(nationalDigits)) {
+      setFormError('Enter a complete phone number: +1 (XXX) XXX-XXXX.')
+      return
+    }
+
     savingLockRef.current = true
     setSaving(true)
     setFormError('')
@@ -90,10 +110,13 @@ export default function PeoplePage() {
 
   const handleEdit = (person: Person) => {
     setEditingPerson(person)
+    setFormError('')
     setFormData({
       name: person.name,
       email: person.email || '',
-      phone: person.phone || '',
+      phone: person.phone
+        ? digitsToNanpDisplay(extractNanpNationalDigits(person.phone))
+        : PHONE_INPUT_EMPTY,
       notes: person.notes || '',
     })
     setShowForm(true)
@@ -116,8 +139,9 @@ export default function PeoplePage() {
   }
 
   const resetForm = () => {
-    setFormData({ name: '', email: '', phone: '', notes: '' })
+    setFormData({ name: '', email: '', phone: PHONE_INPUT_EMPTY, notes: '' })
     setEditingPerson(null)
+    setFormError('')
     setShowForm(false)
   }
 
@@ -130,7 +154,7 @@ export default function PeoplePage() {
           </h1>
           <p className="text-gray-600 mt-1">Manage your foreign currency providers</p>
         </div>
-        <Button onClick={() => setShowForm(true)} className="shadow-lg">
+        <Button onClick={openAddForm} className="shadow-lg">
           <Plus className="w-4 h-4 mr-2" />
           Add Person
         </Button>
@@ -193,23 +217,25 @@ export default function PeoplePage() {
                 />
               </div>
               <div>
-                <Label htmlFor="phone">Phone</Label>
+                <Label htmlFor="phone">Phone *</Label>
                 <Input
                   id="phone"
                   type="tel"
-                  inputMode="tel"
-                  autoComplete="tel"
+                  inputMode="numeric"
+                  autoComplete="tel-national"
                   value={formData.phone}
                   onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
+                    setFormData({
+                      ...formData,
+                      phone: digitsToNanpDisplay(e.target.value),
+                    })
                   }
-                  placeholder="+12125551234"
+                  placeholder="+1 (868) 555-1234"
                   disabled={saving}
+                  aria-required="true"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Phone numbers are stored and displayed only as E.164 (e.g. +18685551234,
-                  +12125551234). Use + and the country code, or a complete national number where
-                  your server default region applies.
+                  Required. North American +1 numbers only. Format is always +1 (XXX) XXX-XXXX.
                 </p>
               </div>
               <div>
@@ -258,7 +284,7 @@ export default function PeoplePage() {
             <User className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-700 mb-2">No People Added</h3>
             <p className="text-gray-500 mb-4">Start by adding your foreign currency providers</p>
-            <Button onClick={() => setShowForm(true)}>
+            <Button onClick={openAddForm}>
               <Plus className="w-4 h-4 mr-2" />
               Add First Person
             </Button>

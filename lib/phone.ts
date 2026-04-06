@@ -1,69 +1,77 @@
-import {
-  parsePhoneNumberFromString,
-  isSupportedCountry,
-  type CountryCode,
-} from 'libphonenumber-js'
-
 /**
- * For numbers entered without a leading + / country code, libphonenumber needs a region.
- * Set `PHONE_DEFAULT_REGION` (ISO 3166-1 alpha-2, e.g. TT, US, GB) on the server.
- * If unset, defaults to TT so existing deployments keep working; change the env for other countries.
+ * North American NANP numbers only, fixed display/storage: +1 (XXX) XXX-XXXX
+ * (country code +1, area in parentheses, then xxx-xxxx).
  */
-function defaultRegionForNationalFormat(): CountryCode {
-  const fromEnv = process.env.PHONE_DEFAULT_REGION?.trim().toUpperCase()
-  if (fromEnv && isSupportedCountry(fromEnv)) {
-    return fromEnv
+
+const CANONICAL_REGEX = /^\+1 \(\d{3}\) \d{3}-\d{4}$/
+
+/** National 10 digits: NXX NXX-XXXX (N = 2–9 for area and exchange leading digits). */
+const NANP_NATIONAL_REGEX = /^[2-9]\d{2}[2-9]\d{6}$/
+
+/** Initial state for the masked input (user types after "+1 ("). */
+export const PHONE_INPUT_EMPTY = '+1 ('
+
+export function extractNanpNationalDigits(raw: string): string {
+  const digits = raw.replace(/\D/g, '')
+  if (digits.length >= 11 && digits[0] === '1') {
+    return digits.slice(1, 11)
   }
-  return 'TT'
+  return digits.slice(0, 10)
 }
 
-function parseValidNumber(trimmed: string) {
-  const international = parsePhoneNumberFromString(trimmed)
-  if (international?.isValid()) return international
+/** Builds the masked string while typing (max 10 national digits after +1). */
+export function digitsToNanpDisplay(rawDigitsOrValue: string): string {
+  const d = extractNanpNationalDigits(rawDigitsOrValue)
+  if (d.length === 0) return PHONE_INPUT_EMPTY
+  const a = d.slice(0, 3)
+  if (d.length < 3) return `+1 (${a}`
+  const b = d.slice(3, 6)
+  const c = d.slice(6, 10)
+  if (d.length === 3) return `+1 (${a}) `
+  if (d.length <= 6) return `+1 (${a}) ${b}`
+  return `+1 (${a}) ${b}-${c}`
+}
 
-  const national = parsePhoneNumberFromString(
-    trimmed,
-    defaultRegionForNationalFormat()
-  )
-  if (national?.isValid()) return national
+export function canonicalNanpFromNationalDigits(digits10: string): string {
+  const a = digits10.slice(0, 3)
+  const b = digits10.slice(3, 6)
+  const c = digits10.slice(6, 10)
+  return `+1 (${a}) ${b}-${c}`
+}
 
-  return undefined
+export function isValidNanpNational(digits10: string): boolean {
+  return digits10.length === 10 && NANP_NATIONAL_REGEX.test(digits10)
 }
 
 export type NormalizePhoneResult =
-  | { ok: true; e164: string | null }
+  | { ok: true; value: string }
   | { ok: false; message: string }
 
-/**
- * Normalize user input to E.164 for storage, or null if empty.
- * Invalid numbers are rejected — only canonical E.164 is stored.
- */
+/** Require a full valid NANP number; return canonical +1 (XXX) XXX-XXXX. */
 export function normalizePhoneInput(
   raw: string | undefined | null
 ): NormalizePhoneResult {
   if (raw == null || raw.trim() === '') {
-    return { ok: true, e164: null }
+    return { ok: false, message: 'Phone is required' }
   }
-  const parsed = parseValidNumber(raw.trim())
-  if (!parsed) {
+  const d = extractNanpNationalDigits(raw)
+  if (!isValidNanpNational(d)) {
     return {
       ok: false,
-      message:
-        'Invalid phone number. Use international format with + and country code (e.g. +12125551234), or a full national number for your configured default region.',
+      message: 'Enter a complete number as +1 (XXX) XXX-XXXX',
     }
   }
-  return { ok: true, e164: parsed.format('E.164') }
+  return { ok: true, value: canonicalNanpFromNationalDigits(d) }
 }
 
-/**
- * API responses only expose E.164. Values that are not valid numbers become null
- * (no alternate formatting or raw pass-through).
- */
-export function displayPhoneAsE164(
+/** API output: only canonical format, or null (e.g. legacy bad rows). */
+export function displayPhoneCanonical(
   stored: string | null | undefined
 ): string | null {
   if (stored == null || stored.trim() === '') return null
-  const parsed = parseValidNumber(stored.trim())
-  if (!parsed) return null
-  return parsed.format('E.164')
+  const t = stored.trim()
+  if (CANONICAL_REGEX.test(t)) return t
+  const d = extractNanpNationalDigits(t)
+  if (isValidNanpNational(d)) return canonicalNanpFromNationalDigits(d)
+  return null
 }
