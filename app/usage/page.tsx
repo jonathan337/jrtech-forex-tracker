@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -54,31 +54,7 @@ export default function UsagePage() {
     }
   }, [status, router])
 
-  useEffect(() => {
-    if (status === 'authenticated') {
-      fetchEntries()
-      fetchCards()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year, month, status])
-
-  useEffect(() => {
-    setFormError('')
-  }, [year, month])
-
-  if (status === 'loading') {
-    return (
-      <div className="min-h-[40vh] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-      </div>
-    )
-  }
-
-  if (status === 'unauthenticated') {
-    return null
-  }
-
-  const fetchEntries = async () => {
+  const fetchEntries = useCallback(async () => {
     setLoading(true)
     try {
       const res = await fetch(`/api/usage?year=${year}&month=${month}`, {
@@ -93,9 +69,9 @@ export default function UsagePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [year, month])
 
-  const fetchCards = async () => {
+  const fetchCards = useCallback(async () => {
     try {
       const res = await fetch(
         `/api/cards?year=${year}&month=${month}`,
@@ -108,7 +84,18 @@ export default function UsagePage() {
     } catch (e) {
       console.error(e)
     }
-  }
+  }, [year, month])
+
+  useEffect(() => {
+    if (status === 'authenticated') {
+      void fetchEntries()
+      void fetchCards()
+    }
+  }, [year, month, status, fetchEntries, fetchCards])
+
+  useEffect(() => {
+    setFormError('')
+  }, [year, month])
 
   useEffect(() => {
     setForm((f) => {
@@ -119,6 +106,18 @@ export default function UsagePage() {
       return f
     })
   }, [cards])
+
+  if (status === 'loading') {
+    return (
+      <div className="min-h-[40vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    )
+  }
+
+  if (status === 'unauthenticated') {
+    return null
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

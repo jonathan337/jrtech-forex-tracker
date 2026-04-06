@@ -208,21 +208,6 @@ export default function CardsPage() {
     }
   }
 
-  const fetchPeople = async () => {
-    try {
-      const response = await fetch('/api/people', {
-        credentials: 'include',
-        cache: 'no-store',
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setPeople(data)
-      }
-    } catch (error) {
-      console.error('Error fetching people:', error)
-    }
-  }
-
   const buildPayload = () => {
     const base = {
       personId: formData.personId,

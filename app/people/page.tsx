@@ -56,7 +56,6 @@ export default function PeoplePage() {
   useEffect(() => {
     if (status !== 'authenticated' || !session?.user?.id) return
     fetchPeople()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, session?.user?.id])
 
   useEffect(() => {
@@ -71,7 +70,6 @@ export default function PeoplePage() {
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, session?.user?.id])
 
   const fetchPeople = async () => {

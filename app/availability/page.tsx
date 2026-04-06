@@ -138,21 +138,6 @@ export default function AvailabilityPage() {
     }
   }
 
-  const fetchCards = async () => {
-    try {
-      const response = await fetch('/api/cards', {
-        credentials: 'include',
-        cache: 'no-store',
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setCards(data)
-      }
-    } catch (error) {
-      console.error('Error fetching cards:', error)
-    }
-  }
-
   const generateMonthsInRange = (startYear: number, startMonth: number, endYear: number, endMonth: number) => {
     const months = []
     let currentYear = startYear
@@ -331,14 +316,6 @@ export default function AvailabilityPage() {
     setShowForm(true)
   }
 
-  if (status === 'loading' || status === 'unauthenticated') {
-    return (
-      <div className="min-h-[40vh] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-      </div>
-    )
-  }
-
   const groupedByCard = useMemo(() => {
     return availability.reduce(
       (acc, item) => {
@@ -381,6 +358,14 @@ export default function AvailabilityPage() {
       a.person.name.localeCompare(b.person.name)
     )
   }, [groupedByCard])
+
+  if (status === 'loading' || status === 'unauthenticated') {
+    return (
+      <div className="min-h-[40vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
