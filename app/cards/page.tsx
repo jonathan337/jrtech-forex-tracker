@@ -17,6 +17,13 @@ interface CardType {
   cardNickname: string
   lastFourDigits: string | null
   notes: string | null
+  alwaysAvailable: boolean
+  recurringAmountUSD: number | null
+  recurringExchangeRate: number | null
+  recurringPaymentDay: number | null
+  recurringFeeAmount: number | null
+  recurringFeeCurrency: string | null
+  recurringNotes: string | null
   person: Person
   monthlyAvailability: Array<{
     id: string
@@ -25,20 +32,30 @@ interface CardType {
   }>
 }
 
+const emptyForm = () => ({
+  personId: '',
+  cardNickname: '',
+  lastFourDigits: '',
+  notes: '',
+  alwaysAvailable: false,
+  recurringAmountUSD: '',
+  recurringExchangeRate: '',
+  recurringPaymentDay: '',
+  recurringFeeAmount: '',
+  recurringFeeCurrency: 'USD' as 'USD' | 'TTD',
+  recurringNotes: '',
+})
+
 export default function CardsPage() {
   const [cards, setCards] = useState<CardType[]>([])
   const [people, setPeople] = useState<Person[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingCard, setEditingCard] = useState<CardType | null>(null)
-  const [formData, setFormData] = useState({
-    personId: '',
-    cardNickname: '',
-    lastFourDigits: '',
-    notes: '',
-  })
+  const [formData, setFormData] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const savingLockRef = useRef(false)
+  const [formError, setFormError] = useState('')
 
   useEffect(() => {
     fetchCards()
@@ -72,11 +89,37 @@ export default function CardsPage() {
     }
   }
 
+  const buildPayload = () => {
+    const base = {
+      personId: formData.personId,
+      cardNickname: formData.cardNickname,
+      lastFourDigits: formData.lastFourDigits || undefined,
+      notes: formData.notes || undefined,
+      alwaysAvailable: formData.alwaysAvailable,
+    }
+    if (!formData.alwaysAvailable) {
+      return base
+    }
+    return {
+      ...base,
+      recurringAmountUSD: parseFloat(formData.recurringAmountUSD),
+      recurringExchangeRate: parseFloat(formData.recurringExchangeRate),
+      recurringPaymentDay: parseInt(formData.recurringPaymentDay, 10),
+      recurringFeeAmount:
+        formData.recurringFeeAmount === ''
+          ? undefined
+          : parseFloat(formData.recurringFeeAmount),
+      recurringFeeCurrency: formData.recurringFeeCurrency,
+      recurringNotes: formData.recurringNotes || undefined,
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (savingLockRef.current) return
     savingLockRef.current = true
     setSaving(true)
+    setFormError('')
     try {
       const url = editingCard ? `/api/cards/${editingCard.id}` : '/api/cards'
       const method = editingCard ? 'PUT' : 'POST'
@@ -84,12 +127,26 @@ export default function CardsPage() {
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(buildPayload()),
       })
 
       if (response.ok) {
         await fetchCards()
         resetForm()
+      } else {
+        const data = await response.json().catch(() => ({}))
+        if (data.details && Array.isArray(data.details)) {
+          const first = data.details[0]
+          setFormError(
+            typeof first?.message === 'string'
+              ? first.message
+              : 'Please fix the highlighted fields.'
+          )
+        } else {
+          setFormError(
+            typeof data.error === 'string' ? data.error : 'Could not save this card.'
+          )
+        }
       }
     } catch (error) {
       console.error('Error saving card:', error)
@@ -101,11 +158,24 @@ export default function CardsPage() {
 
   const handleEdit = (card: CardType) => {
     setEditingCard(card)
+    setFormError('')
     setFormData({
       personId: card.person.id,
       cardNickname: card.cardNickname,
       lastFourDigits: card.lastFourDigits || '',
       notes: card.notes || '',
+      alwaysAvailable: card.alwaysAvailable ?? false,
+      recurringAmountUSD:
+        card.recurringAmountUSD != null ? String(card.recurringAmountUSD) : '',
+      recurringExchangeRate:
+        card.recurringExchangeRate != null ? String(card.recurringExchangeRate) : '',
+      recurringPaymentDay:
+        card.recurringPaymentDay != null ? String(card.recurringPaymentDay) : '',
+      recurringFeeAmount:
+        card.recurringFeeAmount != null ? String(card.recurringFeeAmount) : '',
+      recurringFeeCurrency:
+        (card.recurringFeeCurrency as 'USD' | 'TTD') || 'USD',
+      recurringNotes: card.recurringNotes || '',
     })
     setShowForm(true)
   }
@@ -127,9 +197,17 @@ export default function CardsPage() {
   }
 
   const resetForm = () => {
-    setFormData({ personId: '', cardNickname: '', lastFourDigits: '', notes: '' })
+    setFormData(emptyForm())
     setEditingCard(null)
+    setFormError('')
     setShowForm(false)
+  }
+
+  const openAddForm = () => {
+    setEditingCard(null)
+    setFormError('')
+    setFormData(emptyForm())
+    setShowForm(true)
   }
 
   return (
@@ -141,7 +219,7 @@ export default function CardsPage() {
           </h1>
           <p className="text-gray-600 mt-1">Manage credit cards that provide foreign currency access</p>
         </div>
-        <Button onClick={() => setShowForm(true)} className="shadow-lg">
+        <Button onClick={openAddForm} className="shadow-lg">
           <Plus className="w-4 h-4 mr-2" />
           Add Card
         </Button>
@@ -172,6 +250,11 @@ export default function CardsPage() {
           </CardHeader>
           <CardContent className="pt-6">
             <form onSubmit={handleSubmit} className="space-y-4">
+              {formError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+                  {formError}
+                </div>
+              )}
               <div>
                 <Label htmlFor="personId">Card Owner *</Label>
                 <select
@@ -231,6 +314,140 @@ export default function CardsPage() {
                   disabled={saving}
                 />
               </div>
+
+              <div className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-4 space-y-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.alwaysAvailable}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        alwaysAvailable: e.target.checked,
+                      })
+                    }
+                    disabled={saving}
+                    className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="font-medium text-gray-900">
+                    Always available (every month)
+                  </span>
+                </label>
+                <p className="text-xs text-gray-600">
+                  The dashboard will show this card for every month using the values below. If you add
+                  a specific month under Availability for this card, that entry is used instead for
+                  that month.
+                </p>
+
+                {formData.alwaysAvailable && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-indigo-100">
+                    <div>
+                      <Label htmlFor="recurringAmountUSD">Amount (USD) *</Label>
+                      <Input
+                        id="recurringAmountUSD"
+                        type="number"
+                        step="0.01"
+                        value={formData.recurringAmountUSD}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            recurringAmountUSD: e.target.value,
+                          })
+                        }
+                        required={formData.alwaysAvailable}
+                        disabled={saving}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="recurringExchangeRate">Exchange rate (TTD/USD) *</Label>
+                      <Input
+                        id="recurringExchangeRate"
+                        type="number"
+                        step="0.01"
+                        value={formData.recurringExchangeRate}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            recurringExchangeRate: e.target.value,
+                          })
+                        }
+                        required={formData.alwaysAvailable}
+                        disabled={saving}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="recurringPaymentDay">Payment day of month (1–31) *</Label>
+                      <Input
+                        id="recurringPaymentDay"
+                        type="number"
+                        min={1}
+                        max={31}
+                        value={formData.recurringPaymentDay}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            recurringPaymentDay: e.target.value,
+                          })
+                        }
+                        required={formData.alwaysAvailable}
+                        disabled={saving}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="recurringFeeAmount">Fee amount</Label>
+                      <Input
+                        id="recurringFeeAmount"
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        value={formData.recurringFeeAmount}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            recurringFeeAmount: e.target.value,
+                          })
+                        }
+                        disabled={saving}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="recurringFeeCurrency">Fee currency</Label>
+                      <select
+                        id="recurringFeeCurrency"
+                        value={formData.recurringFeeCurrency}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            recurringFeeCurrency: e.target.value as 'USD' | 'TTD',
+                          })
+                        }
+                        disabled={saving}
+                        className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                      >
+                        <option value="USD">USD</option>
+                        <option value="TTD">TTD</option>
+                      </select>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <Label htmlFor="recurringNotes">Recurring notes</Label>
+                      <textarea
+                        id="recurringNotes"
+                        value={formData.recurringNotes}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            recurringNotes: e.target.value,
+                          })
+                        }
+                        className="flex min-h-[60px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50"
+                        placeholder="Shown with each month on the dashboard"
+                        disabled={saving}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-2 pt-4 border-t">
                 <Button type="submit" className="px-8" disabled={saving}>
                   {saving ? (
@@ -264,7 +481,7 @@ export default function CardsPage() {
             <CreditCardIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-700 mb-2">No Cards Added</h3>
             <p className="text-gray-500 mb-4">Add your first credit card to start tracking</p>
-            <Button onClick={() => setShowForm(true)}>
+            <Button onClick={openAddForm}>
               <Plus className="w-4 h-4 mr-2" />
               Add First Card
             </Button>
@@ -286,6 +503,11 @@ export default function CardsPage() {
                         <p className="text-sm text-gray-500 font-mono">
                           •••• {card.lastFourDigits}
                         </p>
+                      )}
+                      {card.alwaysAvailable && (
+                        <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                          Every month
+                        </span>
                       )}
                     </div>
                   </div>
@@ -315,7 +537,7 @@ export default function CardsPage() {
                   <span className="font-medium">Owner:</span>
                   <span>{card.person.name}</span>
                 </div>
-                
+
                 {card.notes && (
                   <div className="bg-gray-50 rounded-lg p-3 mb-3">
                     <p className="text-sm text-gray-600 line-clamp-2">{card.notes}</p>

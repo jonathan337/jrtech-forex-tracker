@@ -41,15 +41,22 @@ model Person {
 }
 
 model Card {
-  id                  String                @id @default(cuid())
-  personId            String
-  cardNickname        String
-  lastFourDigits      String?
-  notes               String?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  person              Person                @relation(fields: [personId], references: [id], onDelete: Cascade)
-  monthlyAvailability MonthlyAvailability[]
+  id                     String                @id @default(cuid())
+  personId               String
+  cardNickname           String
+  lastFourDigits         String?
+  notes                  String?
+  alwaysAvailable        Boolean               @default(false)
+  recurringAmountUSD     Float?
+  recurringExchangeRate  Float?
+  recurringPaymentDay    Int?
+  recurringFeeAmount     Float?
+  recurringFeeCurrency   String?
+  recurringNotes         String?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  person                 Person                @relation(fields: [personId], references: [id], onDelete: Cascade)
+  monthlyAvailability    MonthlyAvailability[]
 
   @@index([personId])
 }

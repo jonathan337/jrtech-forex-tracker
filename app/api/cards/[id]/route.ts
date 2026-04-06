@@ -2,15 +2,9 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { z } from 'zod'
+import { cardBodySchema, prismaDataFromCardBody } from '@/lib/card-payload'
 
 export const runtime = 'nodejs'
-
-const cardSchema = z.object({
-  personId: z.string().min(1, 'Person is required'),
-  cardNickname: z.string().min(1, 'Card nickname is required'),
-  lastFourDigits: z.string().optional(),
-  notes: z.string().optional(),
-})
 
 export async function GET(
   request: Request,
@@ -63,10 +57,8 @@ export async function PUT(
     }
 
     const { id } = await params
-    const body = await request.json()
-    const validatedData = cardSchema.parse(body)
+    const validatedData = cardBodySchema.parse(await request.json())
 
-    // Verify card ownership
     const existing = await prisma.card.findFirst({
       where: {
         id,
@@ -80,7 +72,6 @@ export async function PUT(
       return NextResponse.json({ error: 'Card not found' }, { status: 404 })
     }
 
-    // Verify new person belongs to user
     const person = await prisma.person.findFirst({
       where: {
         id: validatedData.personId,
@@ -94,12 +85,7 @@ export async function PUT(
 
     const card = await prisma.card.update({
       where: { id },
-      data: {
-        personId: validatedData.personId,
-        cardNickname: validatedData.cardNickname,
-        lastFourDigits: validatedData.lastFourDigits || null,
-        notes: validatedData.notes || null,
-      },
+      data: prismaDataFromCardBody(validatedData),
       include: {
         person: true,
       },
@@ -133,7 +119,6 @@ export async function DELETE(
 
     const { id } = await params
 
-    // Verify ownership
     const existing = await prisma.card.findFirst({
       where: {
         id,

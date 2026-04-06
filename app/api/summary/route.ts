@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
+import { buildRecurringAvailabilityEntry } from '@/lib/recurring-availability'
 
 export const runtime = 'nodejs'
 
@@ -22,7 +23,9 @@ export async function GET(request: Request) {
       )
     }
 
-    // First, get all cards belonging to the user's people
+    const y = parseInt(year, 10)
+    const m = parseInt(month, 10)
+
     const userCards = await prisma.card.findMany({
       where: {
         person: {
@@ -34,11 +37,10 @@ export async function GET(request: Request) {
 
     const cardIds = userCards.map((c) => c.id)
 
-    // Then get availability for those cards
-    const availability = await prisma.monthlyAvailability.findMany({
+    const explicit = await prisma.monthlyAvailability.findMany({
       where: {
-        year: parseInt(year),
-        month: parseInt(month),
+        year: y,
+        month: m,
         cardId: {
           in: cardIds,
         },
@@ -50,12 +52,33 @@ export async function GET(request: Request) {
           },
         },
       },
-      orderBy: {
-        paymentDate: 'asc',
-      },
     })
 
-    // Calculate summary statistics
+    const explicitWithFlag = explicit.map((item) => ({
+      ...item,
+      isRecurringTemplate: false as const,
+    }))
+
+    const recurringCards = await prisma.card.findMany({
+      where: {
+        person: { userId: session.user.id },
+        alwaysAvailable: true,
+      },
+      include: { person: true },
+    })
+
+    const covered = new Set(explicit.map((a) => a.cardId))
+
+    const recurringRows = recurringCards
+      .filter((c) => !covered.has(c.id))
+      .map((c) => buildRecurringAvailabilityEntry(c, y, m))
+      .filter((row) => row != null)
+
+    const availability = [...explicitWithFlag, ...recurringRows].sort(
+      (a, b) =>
+        new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()
+    )
+
     const totalUSD = availability.reduce((sum, item) => sum + item.amountUSD, 0)
     const totalFees = availability.reduce(
       (sum, item) => sum + (item.feeAmount || 0),
@@ -67,15 +90,14 @@ export async function GET(request: Request) {
           availability.length
         : 0
 
-    // Calculate total in TTD (Trinidad and Tobago Dollar) using weighted average
     const totalTTD = availability.reduce(
       (sum, item) => sum + item.amountUSD * item.exchangeRate,
       0
     )
 
     const summary = {
-      year: parseInt(year),
-      month: parseInt(month),
+      year: y,
+      month: m,
       totalCards: availability.length,
       totalUSD,
       totalFees,

@@ -24,6 +24,7 @@ interface Summary {
     paymentDate: string
     feeAmount: number | null
     notes: string | null
+    isRecurringTemplate?: boolean
     card: {
       cardNickname: string
       person: {
@@ -322,7 +323,14 @@ export default function Dashboard() {
                       {summary.availability.map((item, index) => (
                         <tr key={item.id} className={`hover:bg-blue-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
                           <td className="py-4 px-6 font-medium text-gray-900">
-                            {item.card.cardNickname}
+                            <span className="inline-flex items-center gap-2 flex-wrap">
+                              {item.card.cardNickname}
+                              {item.isRecurringTemplate && (
+                                <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                                  Every month
+                                </span>
+                              )}
+                            </span>
                           </td>
                           <td className="py-4 px-6 text-gray-600">
                             {item.card.person.name}
