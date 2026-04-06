@@ -32,6 +32,7 @@ export default function PeoplePage() {
   })
   const [saving, setSaving] = useState(false)
   const savingLockRef = useRef(false)
+  const [formError, setFormError] = useState('')
 
   useEffect(() => {
     fetchPeople()
@@ -57,6 +58,7 @@ export default function PeoplePage() {
     if (savingLockRef.current) return
     savingLockRef.current = true
     setSaving(true)
+    setFormError('')
     try {
       const url = editingPerson ? `/api/people/${editingPerson.id}` : '/api/people'
       const method = editingPerson ? 'PUT' : 'POST'
@@ -70,6 +72,13 @@ export default function PeoplePage() {
       if (response.ok) {
         await fetchPeople()
         resetForm()
+      } else {
+        const data = await response.json().catch(() => ({}))
+        setFormError(
+          typeof data.error === 'string'
+            ? data.error
+            : 'Could not save this person. Please check your entries.'
+        )
       }
     } catch (error) {
       console.error('Error saving person:', error)
@@ -152,6 +161,11 @@ export default function PeoplePage() {
           </CardHeader>
           <CardContent className="pt-6">
             <form onSubmit={handleSubmit} className="space-y-4">
+              {formError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+                  {formError}
+                </div>
+              )}
               <div>
                 <Label htmlFor="name">Name *</Label>
                 <Input
@@ -182,13 +196,21 @@ export default function PeoplePage() {
                 <Label htmlFor="phone">Phone</Label>
                 <Input
                   id="phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
                   value={formData.phone}
                   onChange={(e) =>
                     setFormData({ ...formData, phone: e.target.value })
                   }
-                  placeholder="+1 868 555 1234"
+                  placeholder="+12125551234"
                   disabled={saving}
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Phone numbers are stored and displayed only as E.164 (e.g. +18685551234,
+                  +12125551234). Use + and the country code, or a complete national number where
+                  your server default region applies.
+                </p>
               </div>
               <div>
                 <Label htmlFor="notes">Notes</Label>

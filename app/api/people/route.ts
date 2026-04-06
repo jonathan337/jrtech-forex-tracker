@@ -2,15 +2,13 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { z } from 'zod'
+import {
+  mapPersonPhoneForResponse,
+  parsePersonRequestBody,
+  PhoneValidationError,
+} from '@/lib/person-payload'
 
 export const runtime = 'nodejs'
-
-const personSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  email: z.string().email().optional().or(z.literal('')),
-  phone: z.string().optional(),
-  notes: z.string().optional(),
-})
 
 export async function GET() {
   try {
@@ -34,7 +32,7 @@ export async function GET() {
         name: 'asc',
       },
     })
-    return NextResponse.json(people)
+    return NextResponse.json(people.map((p) => mapPersonPhoneForResponse(p)))
   } catch (error) {
     console.error('Error fetching people:', error)
     return NextResponse.json(
@@ -51,21 +49,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const validatedData = personSchema.parse(body)
+    const validatedData = parsePersonRequestBody(await request.json())
 
     const person = await prisma.person.create({
       data: {
         userId: session.user.id,
         name: validatedData.name,
-        email: validatedData.email || null,
-        phone: validatedData.phone || null,
-        notes: validatedData.notes || null,
+        email: validatedData.email,
+        phone: validatedData.phone,
+        notes: validatedData.notes,
       },
     })
 
-    return NextResponse.json(person, { status: 201 })
+    return NextResponse.json(mapPersonPhoneForResponse(person), { status: 201 })
   } catch (error) {
+    if (error instanceof PhoneValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: 'Validation error', details: error.issues },
