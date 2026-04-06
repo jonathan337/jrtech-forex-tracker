@@ -39,6 +39,7 @@ export default function PeoplePage() {
   const [saving, setSaving] = useState(false)
   const savingLockRef = useRef(false)
   const [formError, setFormError] = useState('')
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
     fetchPeople()
@@ -46,14 +47,25 @@ export default function PeoplePage() {
 
   const fetchPeople = async () => {
     setLoading(true)
+    setLoadError('')
     try {
       const response = await fetch('/api/people')
       if (response.ok) {
         const data = await response.json()
-        setPeople(data)
+        setPeople(Array.isArray(data) ? data : [])
+      } else {
+        const body = await response.json().catch(() => ({}))
+        const msg =
+          typeof body.error === 'string'
+            ? body.error
+            : `Could not load people (${response.status}).`
+        setLoadError(msg)
+        setPeople([])
       }
     } catch (error) {
       console.error('Error fetching people:', error)
+      setLoadError('Network error while loading people.')
+      setPeople([])
     } finally {
       setLoading(false)
     }
@@ -273,12 +285,27 @@ export default function PeoplePage() {
         </Card>
       )}
 
+      {loadError && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-md text-sm space-y-2">
+          <p className="font-medium">{loadError}</p>
+          <p className="text-amber-800 text-xs">
+            If you recently deployed database changes, run migrations against production
+            (e.g. <code className="bg-amber-100 px-1 rounded">npx prisma migrate deploy</code>
+            ). Also confirm each Person row&apos;s <code className="bg-amber-100 px-1 rounded">userId</code>{' '}
+            matches your logged-in account in the User table.
+          </p>
+          <Button type="button" variant="outline" size="sm" onClick={() => fetchPeople()}>
+            Retry
+          </Button>
+        </div>
+      )}
+
       {loading ? (
         <div className="text-center py-12">
           <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
           <p className="text-gray-500 mt-4">Loading people...</p>
         </div>
-      ) : people.length === 0 ? (
+      ) : people.length === 0 && !loadError ? (
         <Card className="shadow-md">
           <CardContent className="py-12 text-center">
             <User className="w-16 h-16 text-gray-300 mx-auto mb-4" />

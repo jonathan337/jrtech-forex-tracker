@@ -22,9 +22,12 @@ export async function GET() {
         userId: session.user.id,
       },
       include: {
+        // Only fields the People UI needs — avoids querying new Card columns until
+        // migrations are applied, and keeps the query light.
         cards: {
-          include: {
-            monthlyAvailability: true,
+          select: {
+            id: true,
+            cardNickname: true,
           },
         },
       },
