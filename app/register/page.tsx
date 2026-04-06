@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -19,9 +19,11 @@ export default function RegisterPage() {
     password: '',
     confirmPassword: '',
   })
+  const submitLockRef = useRef(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (submitLockRef.current) return
     setError('')
 
     if (formData.password !== formData.confirmPassword) {
@@ -34,6 +36,7 @@ export default function RegisterPage() {
       return
     }
 
+    submitLockRef.current = true
     setLoading(true)
 
     try {
@@ -50,15 +53,15 @@ export default function RegisterPage() {
       if (!response.ok) {
         const data = await response.json()
         setError(data.error || 'Failed to create account')
-        setLoading(false)
         return
       }
 
       // Redirect to verification page instead of auto sign-in
       router.push('/verify-email')
-      setLoading(false)
     } catch {
       setError('An error occurred. Please try again.')
+    } finally {
+      submitLockRef.current = false
       setLoading(false)
     }
   }

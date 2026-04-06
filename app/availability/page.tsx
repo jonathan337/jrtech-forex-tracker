@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Edit, Trash2, X, Calendar } from 'lucide-react'
+import { Plus, Edit, Trash2, X, Calendar, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 
 interface CardType {
@@ -41,6 +41,8 @@ export default function AvailabilityPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingAvailability, setEditingAvailability] = useState<Availability | null>(null)
   const [isRangeMode, setIsRangeMode] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const savingLockRef = useRef(false)
   
   const currentDate = new Date()
   const [formData, setFormData] = useState({
@@ -109,7 +111,10 @@ export default function AvailabilityPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+    if (savingLockRef.current) return
+    savingLockRef.current = true
+    setSaving(true)
+
     try {
       if (isRangeMode) {
         // Create multiple entries for date range
@@ -185,6 +190,9 @@ export default function AvailabilityPage() {
       }
     } catch (error) {
       console.error('Error saving availability:', error)
+    } finally {
+      savingLockRef.current = false
+      setSaving(false)
     }
   }
 
@@ -288,13 +296,23 @@ export default function AvailabilityPage() {
                   {editingAvailability ? 'Update availability details' : 'Add availability for a single month or date range'}
                 </CardDescription>
               </div>
-              <Button variant="ghost" size="sm" onClick={resetForm}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetForm}
+                disabled={saving}
+                aria-label="Close form"
+              >
                 <X className="w-4 h-4" />
               </Button>
             </div>
           </CardHeader>
           <CardContent className="pt-6">
             <form onSubmit={handleSubmit} className="space-y-6">
+              <fieldset
+                disabled={saving}
+                className="space-y-6 border-0 p-0 m-0 min-w-0"
+              >
               <div className="flex items-center gap-4 p-4 bg-blue-50 rounded-lg">
                 <Calendar className="w-5 h-5 text-blue-600" />
                 <div className="flex-1">
@@ -528,12 +546,24 @@ export default function AvailabilityPage() {
                   placeholder="Any special notes about fees, payment arrangements, etc."
                 />
               </div>
+              </fieldset>
 
               <div className="flex gap-2 pt-4 border-t">
-                <Button type="submit" className="px-8">
-                  {editingAvailability ? 'Update' : isRangeMode ? 'Create Range' : 'Create'}
+                <Button type="submit" className="px-8" disabled={saving}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving…
+                    </>
+                  ) : editingAvailability ? (
+                    'Update'
+                  ) : isRangeMode ? (
+                    'Create Range'
+                  ) : (
+                    'Create'
+                  )}
                 </Button>
-                <Button type="button" variant="outline" onClick={resetForm}>
+                <Button type="button" variant="outline" onClick={resetForm} disabled={saving}>
                   Cancel
                 </Button>
               </div>

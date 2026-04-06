@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Edit, Trash2, X, CreditCard as CreditCardIcon, User } from 'lucide-react'
+import { Plus, Edit, Trash2, X, CreditCard as CreditCardIcon, User, Loader2 } from 'lucide-react'
 
 interface Person {
   id: string
@@ -37,6 +37,8 @@ export default function CardsPage() {
     lastFourDigits: '',
     notes: '',
   })
+  const [saving, setSaving] = useState(false)
+  const savingLockRef = useRef(false)
 
   useEffect(() => {
     fetchCards()
@@ -72,6 +74,9 @@ export default function CardsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (savingLockRef.current) return
+    savingLockRef.current = true
+    setSaving(true)
     try {
       const url = editingCard ? `/api/cards/${editingCard.id}` : '/api/cards'
       const method = editingCard ? 'PUT' : 'POST'
@@ -88,6 +93,9 @@ export default function CardsPage() {
       }
     } catch (error) {
       console.error('Error saving card:', error)
+    } finally {
+      savingLockRef.current = false
+      setSaving(false)
     }
   }
 
@@ -151,7 +159,13 @@ export default function CardsPage() {
                   {editingCard ? 'Update card information' : 'Register a new credit card'}
                 </p>
               </div>
-              <Button variant="ghost" size="sm" onClick={resetForm}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetForm}
+                disabled={saving}
+                aria-label="Close form"
+              >
                 <X className="w-4 h-4" />
               </Button>
             </div>
@@ -167,7 +181,8 @@ export default function CardsPage() {
                     setFormData({ ...formData, personId: e.target.value })
                   }
                   required
-                  className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                  disabled={saving}
+                  className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <option value="">Select a person</option>
                   {people.map((person) => (
@@ -187,6 +202,7 @@ export default function CardsPage() {
                   }
                   placeholder="e.g., John's Visa"
                   required
+                  disabled={saving}
                 />
               </div>
               <div>
@@ -199,6 +215,7 @@ export default function CardsPage() {
                   }
                   placeholder="1234"
                   maxLength={4}
+                  disabled={saving}
                 />
               </div>
               <div>
@@ -209,15 +226,25 @@ export default function CardsPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, notes: e.target.value })
                   }
-                  className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                  className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="Payment arrangements, special conditions..."
+                  disabled={saving}
                 />
               </div>
               <div className="flex gap-2 pt-4 border-t">
-                <Button type="submit" className="px-8">
-                  {editingCard ? 'Update' : 'Create'}
+                <Button type="submit" className="px-8" disabled={saving}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      {editingCard ? 'Updating…' : 'Creating…'}
+                    </>
+                  ) : editingCard ? (
+                    'Update'
+                  ) : (
+                    'Create'
+                  )}
                 </Button>
-                <Button type="button" variant="outline" onClick={resetForm}>
+                <Button type="button" variant="outline" onClick={resetForm} disabled={saving}>
                   Cancel
                 </Button>
               </div>

@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Edit, Trash2, X, Mail, Phone, User } from 'lucide-react'
+import { Plus, Edit, Trash2, X, Mail, Phone, User, Loader2 } from 'lucide-react'
 
 interface Person {
   id: string
@@ -30,6 +30,8 @@ export default function PeoplePage() {
     phone: '',
     notes: '',
   })
+  const [saving, setSaving] = useState(false)
+  const savingLockRef = useRef(false)
 
   useEffect(() => {
     fetchPeople()
@@ -52,6 +54,9 @@ export default function PeoplePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (savingLockRef.current) return
+    savingLockRef.current = true
+    setSaving(true)
     try {
       const url = editingPerson ? `/api/people/${editingPerson.id}` : '/api/people'
       const method = editingPerson ? 'PUT' : 'POST'
@@ -68,6 +73,9 @@ export default function PeoplePage() {
       }
     } catch (error) {
       console.error('Error saving person:', error)
+    } finally {
+      savingLockRef.current = false
+      setSaving(false)
     }
   }
 
@@ -131,7 +139,13 @@ export default function PeoplePage() {
                   {editingPerson ? 'Update person information' : 'Add a new currency provider'}
                 </p>
               </div>
-              <Button variant="ghost" size="sm" onClick={resetForm}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetForm}
+                disabled={saving}
+                aria-label="Close form"
+              >
                 <X className="w-4 h-4" />
               </Button>
             </div>
@@ -148,6 +162,7 @@ export default function PeoplePage() {
                   }
                   placeholder="John Doe"
                   required
+                  disabled={saving}
                 />
               </div>
               <div>
@@ -160,6 +175,7 @@ export default function PeoplePage() {
                     setFormData({ ...formData, email: e.target.value })
                   }
                   placeholder="john@example.com"
+                  disabled={saving}
                 />
               </div>
               <div>
@@ -171,6 +187,7 @@ export default function PeoplePage() {
                     setFormData({ ...formData, phone: e.target.value })
                   }
                   placeholder="+1 868 555 1234"
+                  disabled={saving}
                 />
               </div>
               <div>
@@ -181,15 +198,25 @@ export default function PeoplePage() {
                   onChange={(e) =>
                     setFormData({ ...formData, notes: e.target.value })
                   }
-                  className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                  className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="Any special arrangements or notes..."
+                  disabled={saving}
                 />
               </div>
               <div className="flex gap-2 pt-4 border-t">
-                <Button type="submit" className="px-8">
-                  {editingPerson ? 'Update' : 'Create'}
+                <Button type="submit" className="px-8" disabled={saving}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      {editingPerson ? 'Updating…' : 'Creating…'}
+                    </>
+                  ) : editingPerson ? (
+                    'Update'
+                  ) : (
+                    'Create'
+                  )}
                 </Button>
-                <Button type="button" variant="outline" onClick={resetForm}>
+                <Button type="button" variant="outline" onClick={resetForm} disabled={saving}>
                   Cancel
                 </Button>
               </div>

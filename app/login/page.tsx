@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,9 +18,12 @@ export default function LoginPage() {
     email: '',
     password: '',
   })
+  const submitLockRef = useRef(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (submitLockRef.current) return
+    submitLockRef.current = true
     setError('')
     setLoading(true)
 
@@ -44,6 +47,7 @@ export default function LoginPage() {
     } catch {
       setError('An error occurred. Please try again.')
     } finally {
+      submitLockRef.current = false
       setLoading(false)
     }
   }

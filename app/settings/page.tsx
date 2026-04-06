@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,7 @@ import { Settings as SettingsIcon, Save } from 'lucide-react'
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const savingLockRef = useRef(false)
   const [success, setSuccess] = useState(false)
   const [defaultRate, setDefaultRate] = useState('6.7993')
 
@@ -33,6 +34,8 @@ export default function SettingsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (savingLockRef.current) return
+    savingLockRef.current = true
     setSaving(true)
     setSuccess(false)
 
@@ -52,6 +55,7 @@ export default function SettingsPage() {
     } catch (error) {
       console.error('Error saving settings:', error)
     } finally {
+      savingLockRef.current = false
       setSaving(false)
     }
   }
