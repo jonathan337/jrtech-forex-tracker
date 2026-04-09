@@ -1,11 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, Fragment } from 'react'
 import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2, Trash2 } from 'lucide-react'
+import { Loader2, Trash2, Pencil, CheckCircle2 } from 'lucide-react'
+import { usageAmountPaidSync } from '@/lib/usage-paid-sync'
 
 const MONTHS = [
   'Jan',
@@ -28,6 +29,7 @@ export interface UsageEntryRow {
   year: number
   month: number
   amountUSD: number
+  paidToOwnerUSD: number
   usageDate: string
   notes: string | null
 }
@@ -54,9 +56,20 @@ export function CardUsagePanel({
   const [error, setError] = useState('')
   const [form, setForm] = useState({
     amountUSD: '',
+    paidToOwnerUSD: '',
     usageDate: format(new Date(), 'yyyy-MM-dd'),
     notes: '',
   })
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState({
+    amountUSD: '',
+    paidToOwnerUSD: '',
+    usageDate: '',
+    notes: '',
+  })
+  const [editRowError, setEditRowError] = useState('')
+  const [savingEntryId, setSavingEntryId] = useState<string | null>(null)
+  const [listActionError, setListActionError] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -86,6 +99,17 @@ export function CardUsagePanel({
     const amt = parseFloat(form.amountUSD)
     if (Number.isNaN(amt) || amt <= 0) return
 
+    const paidRaw = form.paidToOwnerUSD.trim()
+    const paidToOwner = paidRaw === '' ? 0 : parseFloat(paidRaw)
+    if (Number.isNaN(paidToOwner) || paidToOwner < 0) {
+      setError('Paid to owner must be a valid non-negative amount.')
+      return
+    }
+    if (paidToOwner - amt > 1e-6) {
+      setError('Paid to owner cannot be more than the usage amount.')
+      return
+    }
+
     setSaving(true)
     setError('')
     try {
@@ -99,6 +123,7 @@ export function CardUsagePanel({
           year,
           month,
           amountUSD: amt,
+          paidToOwnerUSD: paidToOwner,
           usageDate,
           notes: form.notes.trim() || undefined,
         }),
@@ -107,6 +132,7 @@ export function CardUsagePanel({
       if (res.ok) {
         setForm({
           amountUSD: '',
+          paidToOwnerUSD: '',
           usageDate: format(new Date(), 'yyyy-MM-dd'),
           notes: '',
         })
@@ -129,11 +155,108 @@ export function CardUsagePanel({
     try {
       const res = await fetch(`/api/usage/${id}`, { method: 'DELETE' })
       if (res.ok) {
+        setEditingEntryId((eid) => (eid === id ? null : eid))
         await load()
         onUsageChanged()
       }
     } catch {
       console.error('Delete usage failed')
+    }
+  }
+
+  const openEntryEdit = (row: UsageEntryRow) => {
+    setEditRowError('')
+    setListActionError('')
+    setEditingEntryId(row.id)
+    setEditDraft({
+      amountUSD: String(row.amountUSD),
+      paidToOwnerUSD: String(row.paidToOwnerUSD),
+      usageDate: format(new Date(row.usageDate), 'yyyy-MM-dd'),
+      notes: row.notes ?? '',
+    })
+  }
+
+  const cancelEntryEdit = () => {
+    setEditingEntryId(null)
+    setEditRowError('')
+  }
+
+  const markEntrySettled = async (row: UsageEntryRow) => {
+    if (row.amountUSD - row.paidToOwnerUSD <= 1e-6) return
+    setSavingEntryId(row.id)
+    setEditRowError('')
+    setListActionError('')
+    try {
+      const res = await fetch(`/api/usage/${row.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ paidToOwnerUSD: row.amountUSD }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        if (editingEntryId === row.id) cancelEntryEdit()
+        await load()
+        onUsageChanged()
+      } else {
+        setListActionError(
+          typeof data.error === 'string' ? data.error : 'Could not update entry.'
+        )
+      }
+    } catch {
+      setListActionError('Network error. Try again.')
+    } finally {
+      setSavingEntryId(null)
+    }
+  }
+
+  const saveEntryEdit = async () => {
+    if (!editingEntryId) return
+    const amt = parseFloat(editDraft.amountUSD)
+    if (Number.isNaN(amt) || amt <= 0) {
+      setEditRowError('Amount must be a positive number.')
+      return
+    }
+    const paidRaw = editDraft.paidToOwnerUSD.trim()
+    const paidToOwner = paidRaw === '' ? 0 : parseFloat(paidRaw)
+    if (Number.isNaN(paidToOwner) || paidToOwner < 0) {
+      setEditRowError('Paid to owner must be a valid non-negative amount.')
+      return
+    }
+    if (paidToOwner - amt > 1e-6) {
+      setEditRowError('Paid to owner cannot be more than the usage amount.')
+      return
+    }
+
+    setSavingEntryId(editingEntryId)
+    setEditRowError('')
+    try {
+      const usageDate = new Date(`${editDraft.usageDate}T12:00:00`).toISOString()
+      const res = await fetch(`/api/usage/${editingEntryId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          amountUSD: amt,
+          paidToOwnerUSD: paidToOwner,
+          usageDate,
+          notes: editDraft.notes.trim() || null,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        cancelEntryEdit()
+        await load()
+        onUsageChanged()
+      } else {
+        setEditRowError(
+          typeof data.error === 'string' ? data.error : 'Could not save changes.'
+        )
+      }
+    } catch {
+      setEditRowError('Network error. Try again.')
+    } finally {
+      setSavingEntryId(null)
     }
   }
 
@@ -146,7 +269,7 @@ export function CardUsagePanel({
           Usage history — {cardLabel}
         </h4>
         <p className="text-xs text-gray-500">
-          All logged amounts for this card (any month)
+          Click a row or Edit to update paid-to-owner; Settled marks full payment in one step.
         </p>
       </div>
 
@@ -159,7 +282,12 @@ export function CardUsagePanel({
         <p className="text-sm text-gray-500 py-2">No usage logged yet.</p>
       ) : (
         <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
-          <table className="w-full text-sm">
+          {listActionError && (
+            <div className="px-3 py-2 text-sm text-red-800 bg-red-50 border-b border-red-100">
+              {listActionError}
+            </div>
+          )}
+          <table className="w-full text-sm min-w-[34rem]">
             <thead>
               <tr className="border-b bg-slate-50 text-left">
                 <th className="py-2 px-3 font-medium text-gray-700">Date</th>
@@ -167,38 +295,214 @@ export function CardUsagePanel({
                 <th className="py-2 px-3 font-medium text-gray-700 text-right">
                   Amount (USD)
                 </th>
+                <th className="py-2 px-3 font-medium text-gray-700 text-right whitespace-nowrap">
+                  Paid owner
+                </th>
                 <th className="py-2 px-3 font-medium text-gray-700">Notes</th>
-                <th className="py-2 px-3 w-12" />
+                <th className="py-2 px-3 font-medium text-gray-700 text-right whitespace-nowrap">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
               {entries.map((u) => (
-                <tr key={u.id} className="border-b border-slate-100 hover:bg-slate-50/80">
-                  <td className="py-2 px-3 text-gray-800 whitespace-nowrap">
-                    {format(new Date(u.usageDate), 'MMM d, yyyy')}
-                  </td>
-                  <td className="py-2 px-3 text-gray-600">
-                    {MONTHS[u.month - 1]} {u.year}
-                  </td>
-                  <td className="py-2 px-3 text-right font-medium text-amber-800">
-                    ${u.amountUSD.toFixed(2)}
-                  </td>
-                  <td className="py-2 px-3 text-gray-600 max-w-[200px] truncate" title={u.notes ?? ''}>
-                    {u.notes || '—'}
-                  </td>
-                  <td className="py-2 px-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 text-red-600 hover:bg-red-50"
-                      onClick={() => handleDelete(u.id)}
-                      aria-label="Delete usage entry"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </td>
-                </tr>
+                <Fragment key={u.id}>
+                  <tr
+                    className={`border-b border-slate-100 hover:bg-slate-50/80 ${
+                      editingEntryId === u.id ? 'bg-blue-50/50' : ''
+                    }`}
+                  >
+                    <td className="py-2 px-3 text-gray-800 whitespace-nowrap">
+                      <button
+                        type="button"
+                        className="hover:text-blue-800 hover:underline text-left"
+                        onClick={() => openEntryEdit(u)}
+                      >
+                        {format(new Date(u.usageDate), 'MMM d, yyyy')}
+                      </button>
+                    </td>
+                    <td className="py-2 px-3 text-gray-600">
+                      {MONTHS[u.month - 1]} {u.year}
+                    </td>
+                    <td className="py-2 px-3 text-right font-medium text-amber-800">
+                      ${u.amountUSD.toFixed(2)}
+                    </td>
+                    <td className="py-2 px-3 text-right text-gray-700 whitespace-nowrap">
+                      ${u.paidToOwnerUSD.toFixed(2)}
+                      {u.amountUSD - u.paidToOwnerUSD > 1e-6 && (
+                        <span className="block text-xs text-red-600 font-medium">
+                          Owed: ${(u.amountUSD - u.paidToOwnerUSD).toFixed(2)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 px-3 text-gray-600 max-w-[200px] truncate" title={u.notes ?? ''}>
+                      {u.notes || '—'}
+                    </td>
+                    <td className="py-2 px-2 text-right whitespace-nowrap">
+                      <div className="inline-flex items-center gap-0.5">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50"
+                          onClick={() => openEntryEdit(u)}
+                          title="Edit"
+                          aria-label="Edit usage entry"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        {u.amountUSD - u.paidToOwnerUSD > 1e-6 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2 inline-flex items-center gap-0.5 text-green-700 hover:bg-green-50 text-xs font-medium"
+                            disabled={savingEntryId === u.id}
+                            onClick={() => markEntrySettled(u)}
+                            title="Set paid to owner equal to usage"
+                          >
+                            {savingEntryId === u.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <>
+                                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                                Settled
+                              </>
+                            )}
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-red-600 hover:bg-red-50"
+                          onClick={() => handleDelete(u.id)}
+                          aria-label="Delete usage entry"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                  {editingEntryId === u.id && (
+                    <tr className="border-b border-blue-100 bg-blue-50/30">
+                      <td colSpan={6} className="p-3 sm:p-4">
+                        {editRowError && (
+                          <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded px-3 py-2 mb-3">
+                            {editRowError}
+                          </p>
+                        )}
+                        <p className="text-sm font-medium text-gray-800 mb-3">Edit usage entry</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+                          <div>
+                            <Label htmlFor={`panel-edit-amt-${u.id}`}>Amount (USD) *</Label>
+                            <Input
+                              id={`panel-edit-amt-${u.id}`}
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              value={editDraft.amountUSD}
+                              onChange={(e) =>
+                                setEditDraft((d) => ({
+                                  ...d,
+                                  amountUSD: e.target.value,
+                                  paidToOwnerUSD: usageAmountPaidSync(
+                                    d.amountUSD,
+                                    d.paidToOwnerUSD,
+                                    e.target.value
+                                  ),
+                                }))
+                              }
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`panel-edit-paid-${u.id}`}>Paid to owner (USD)</Label>
+                            <Input
+                              id={`panel-edit-paid-${u.id}`}
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={editDraft.paidToOwnerUSD}
+                              onChange={(e) =>
+                                setEditDraft((d) => ({
+                                  ...d,
+                                  paidToOwnerUSD: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`panel-edit-date-${u.id}`}>Date</Label>
+                            <Input
+                              id={`panel-edit-date-${u.id}`}
+                              type="date"
+                              value={editDraft.usageDate}
+                              onChange={(e) =>
+                                setEditDraft((d) => ({ ...d, usageDate: e.target.value }))
+                              }
+                            />
+                          </div>
+                          <div className="sm:col-span-2 lg:col-span-1">
+                            <Label htmlFor={`panel-edit-notes-${u.id}`}>Notes</Label>
+                            <Input
+                              id={`panel-edit-notes-${u.id}`}
+                              value={editDraft.notes}
+                              onChange={(e) =>
+                                setEditDraft((d) => ({ ...d, notes: e.target.value }))
+                              }
+                            />
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={saveEntryEdit}
+                            disabled={savingEntryId === u.id}
+                          >
+                            {savingEntryId === u.id ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Saving…
+                              </>
+                            ) : (
+                              'Save changes'
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={cancelEntryEdit}
+                            disabled={savingEntryId === u.id}
+                          >
+                            Cancel
+                          </Button>
+                          {parseFloat(editDraft.amountUSD) -
+                            parseFloat(editDraft.paidToOwnerUSD || '0') >
+                            1e-6 && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={savingEntryId === u.id}
+                              onClick={() => {
+                                const a = parseFloat(editDraft.amountUSD)
+                                if (!Number.isNaN(a))
+                                  setEditDraft((d) => ({
+                                    ...d,
+                                    paidToOwnerUSD: String(a),
+                                  }))
+                              }}
+                            >
+                              Match paid to full usage
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -217,7 +521,7 @@ export function CardUsagePanel({
             {error}
           </p>
         )}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
             <Label htmlFor={`usage-amt-${cardId}`}>Amount (USD) *</Label>
             <Input
@@ -227,11 +531,38 @@ export function CardUsagePanel({
               min="0.01"
               value={form.amountUSD}
               onChange={(e) =>
-                setForm((f) => ({ ...f, amountUSD: e.target.value }))
+                setForm((f) => ({
+                  ...f,
+                  amountUSD: e.target.value,
+                  paidToOwnerUSD: usageAmountPaidSync(
+                    f.amountUSD,
+                    f.paidToOwnerUSD,
+                    e.target.value
+                  ),
+                }))
               }
               required
               disabled={saving}
             />
+          </div>
+          <div>
+            <Label htmlFor={`usage-paid-${cardId}`}>Paid to owner (USD)</Label>
+            <Input
+              id={`usage-paid-${cardId}`}
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0 if not paid yet"
+              title="Leave 0 until you have paid the owner back for this usage."
+              value={form.paidToOwnerUSD}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, paidToOwnerUSD: e.target.value }))
+              }
+              disabled={saving}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              0 = still owed; increase when you reimburse.
+            </p>
           </div>
           <div>
             <Label htmlFor={`usage-date-${cardId}`}>Date</Label>
@@ -245,7 +576,7 @@ export function CardUsagePanel({
               disabled={saving}
             />
           </div>
-          <div className="sm:col-span-1">
+          <div className="sm:col-span-2 lg:col-span-1">
             <Label htmlFor={`usage-notes-${cardId}`}>Notes</Label>
             <Input
               id={`usage-notes-${cardId}`}

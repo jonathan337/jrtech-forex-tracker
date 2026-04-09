@@ -9,14 +9,27 @@ import {
 
 export const runtime = 'nodejs'
 
-const usageSchema = z.object({
-  cardId: z.string().min(1, 'Card is required'),
-  year: z.number().int().min(2000).max(2100),
-  month: z.number().int().min(1).max(12),
-  amountUSD: z.number().positive('Amount must be positive'),
-  usageDate: z.string().datetime().optional(),
-  notes: z.string().optional(),
-})
+const usageSchema = z
+  .object({
+    cardId: z.string().min(1, 'Card is required'),
+    year: z.number().int().min(2000).max(2100),
+    month: z.number().int().min(1).max(12),
+    amountUSD: z.number().positive('Amount must be positive'),
+    /** USD paid to card owner for this usage; omit for $0 (still owed until you record payment). */
+    paidToOwnerUSD: z.number().min(0).optional(),
+    usageDate: z.string().datetime().optional(),
+    notes: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const paid = data.paidToOwnerUSD ?? 0
+    if (paid - data.amountUSD > 1e-6) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Paid to owner cannot exceed the usage amount',
+        path: ['paidToOwnerUSD'],
+      })
+    }
+  })
 
 export async function GET(request: Request) {
   try {
@@ -102,12 +115,15 @@ export async function POST(request: Request) {
       )
     }
 
+    const paidToOwner = validatedData.paidToOwnerUSD ?? 0
+
     const entry = await prisma.cardUsage.create({
       data: {
         cardId: validatedData.cardId,
         year: validatedData.year,
         month: validatedData.month,
         amountUSD: validatedData.amountUSD,
+        paidToOwnerUSD: paidToOwner,
         usageDate: validatedData.usageDate
           ? new Date(validatedData.usageDate)
           : new Date(),

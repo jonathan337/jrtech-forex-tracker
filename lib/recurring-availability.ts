@@ -47,6 +47,7 @@ export function buildRecurringAvailabilityEntry(
     isRecurringTemplate: true as const,
     card: {
       cardNickname: card.cardNickname,
+      issuingBank: card.issuingBank,
       person: {
         id: card.person.id,
         name: card.person.name,

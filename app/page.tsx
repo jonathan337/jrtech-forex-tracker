@@ -5,28 +5,28 @@ import { CreditCard, Users, Calendar, TrendingUp, Shield, Globe } from 'lucide-r
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen min-w-0 overflow-x-clip">
       {/* Hero Section */}
-      <section className="py-20 px-4">
-        <div className="max-w-6xl mx-auto text-center">
+      <section className="py-14 sm:py-20 px-4">
+        <div className="max-w-6xl mx-auto text-center min-w-0">
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 mb-8">
             <span className="text-white font-bold text-3xl">FX</span>
           </div>
-          <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent px-1">
             Foreign Currency Payment Tracker
           </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+          <p className="text-lg sm:text-xl text-gray-600 mb-8 max-w-3xl mx-auto px-1">
             Streamline your foreign currency management for Trinidad businesses. Track credit card availability, 
             exchange rates, and payment schedules all in one place.
           </p>
-          <div className="flex gap-4 justify-center">
-            <Link href="/register">
-              <Button size="lg" className="text-lg px-8">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-stretch sm:items-center max-w-md sm:max-w-none mx-auto">
+            <Link href="/register" className="w-full sm:w-auto">
+              <Button size="lg" className="text-lg px-8 w-full sm:w-auto">
                 Get Started Free
               </Button>
             </Link>
-            <Link href="/login">
-              <Button size="lg" variant="outline" className="text-lg px-8">
+            <Link href="/login" className="w-full sm:w-auto">
+              <Button size="lg" variant="outline" className="text-lg px-8 w-full sm:w-auto">
                 Sign In
               </Button>
             </Link>

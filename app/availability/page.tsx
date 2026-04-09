@@ -368,15 +368,17 @@ export default function AvailabilityPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+    <div className="space-y-6 min-w-0">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
             Monthly Availability
           </h1>
-          <p className="text-gray-600 mt-1">Track card availability by month and manage payment schedules</p>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">
+            Track card availability by month and manage payment schedules
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
             <input
               type="checkbox"
@@ -386,7 +388,7 @@ export default function AvailabilityPage() {
             />
             Group by owner
           </label>
-          <Button onClick={openAddForm} className="shadow-lg">
+          <Button onClick={openAddForm} className="shadow-lg w-full sm:w-auto shrink-0">
             <Plus className="w-4 h-4 mr-2" />
             Add Availability
           </Button>
@@ -394,20 +396,21 @@ export default function AvailabilityPage() {
       </div>
 
       {showForm && (
-        <Card className="border-2 border-blue-200 shadow-xl">
+        <Card className="border-2 border-blue-200 shadow-xl min-w-0 overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between min-w-0">
+              <div className="min-w-0">
                 <CardTitle className="text-xl">
                   {editingAvailability ? 'Edit Availability' : 'Add New Availability'}
                 </CardTitle>
-                <CardDescription className="mt-1">
+                <CardDescription className="mt-1 break-words">
                   {editingAvailability ? 'Update availability details' : 'Add availability for a single month or date range'}
                 </CardDescription>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
+                className="shrink-0 self-end sm:self-auto"
                 onClick={resetForm}
                 disabled={saving}
                 aria-label="Close form"
@@ -422,10 +425,10 @@ export default function AvailabilityPage() {
                 disabled={saving}
                 className="space-y-6 border-0 p-0 m-0 min-w-0"
               >
-              <div className="flex items-center gap-4 p-4 bg-blue-50 rounded-lg">
-                <Calendar className="w-5 h-5 text-blue-600" />
-                <div className="flex-1">
-                  <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 bg-blue-50 rounded-lg min-w-0">
+                <Calendar className="w-5 h-5 text-blue-600 shrink-0 sm:mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="radio"
@@ -453,8 +456,8 @@ export default function AvailabilityPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
                   <Label htmlFor="cardId">Card *</Label>
                   <select
                     id="cardId"
@@ -537,9 +540,9 @@ export default function AvailabilityPage() {
                     </div>
                   </>
                 ) : (
-                  <div className="col-span-2">
+                  <div className="sm:col-span-2">
                     <Label>Month & Year *</Label>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <select
                         value={formData.month}
                         onChange={(e) =>
@@ -569,7 +572,7 @@ export default function AvailabilityPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="amountUSD">Amount (USD) *</Label>
                   <Input
@@ -713,8 +716,8 @@ export default function AvailabilityPage() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="pt-4">
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
+                      <div className="overflow-x-auto touch-pan-x -mx-1 sm:mx-0 [scrollbar-gutter:stable]">
+                        <table className="w-full min-w-[44rem] text-sm">
                           <thead>
                             <tr className="border-b bg-gray-50">
                               <th className="text-left py-3 px-4 font-medium text-gray-700">
@@ -826,8 +829,8 @@ export default function AvailabilityPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="pt-4">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
+                <div className="overflow-x-auto touch-pan-x -mx-1 sm:mx-0 [scrollbar-gutter:stable]">
+                  <table className="w-full min-w-[44rem] text-sm">
                     <thead>
                       <tr className="border-b bg-gray-50">
                         <th className="text-left py-3 px-4 font-medium text-gray-700">Month</th>

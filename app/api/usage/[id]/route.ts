@@ -9,14 +9,29 @@ import {
 
 export const runtime = 'nodejs'
 
-const usageUpdateSchema = z.object({
-  cardId: z.string().min(1).optional(),
-  year: z.number().int().min(2000).max(2100).optional(),
-  month: z.number().int().min(1).max(12).optional(),
-  amountUSD: z.number().positive('Amount must be positive').optional(),
-  usageDate: z.string().datetime().optional(),
-  notes: z.string().optional().nullable(),
-})
+const usageUpdateSchema = z
+  .object({
+    cardId: z.string().min(1).optional(),
+    year: z.number().int().min(2000).max(2100).optional(),
+    month: z.number().int().min(1).max(12).optional(),
+    amountUSD: z.number().positive('Amount must be positive').optional(),
+    paidToOwnerUSD: z.number().min(0).optional(),
+    usageDate: z.string().datetime().optional(),
+    notes: z.string().optional().nullable(),
+  })
+  .superRefine((data, ctx) => {
+    if (
+      data.amountUSD != null &&
+      data.paidToOwnerUSD != null &&
+      data.paidToOwnerUSD - data.amountUSD > 1e-6
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Paid to owner cannot exceed the usage amount',
+        path: ['paidToOwnerUSD'],
+      })
+    }
+  })
 
 async function ownershipWhere(sessionUserId: string, id: string) {
   return prisma.cardUsage.findFirst({
@@ -90,6 +105,23 @@ export async function PATCH(
       }
     }
 
+    const nextAmount = validatedData.amountUSD ?? existing.amountUSD
+    let paidToOwnerPatch: number | undefined
+    if (validatedData.paidToOwnerUSD !== undefined) {
+      paidToOwnerPatch = validatedData.paidToOwnerUSD
+    } else if (validatedData.amountUSD !== undefined) {
+      paidToOwnerPatch = Math.min(existing.paidToOwnerUSD, nextAmount)
+    }
+
+    const effectivePaid =
+      paidToOwnerPatch !== undefined ? paidToOwnerPatch : existing.paidToOwnerUSD
+    if (effectivePaid - nextAmount > 1e-6) {
+      return NextResponse.json(
+        { error: 'Paid to owner cannot exceed the usage amount' },
+        { status: 400 }
+      )
+    }
+
     const updated = await prisma.cardUsage.update({
       where: { id },
       data: {
@@ -98,6 +130,9 @@ export async function PATCH(
         ...(validatedData.month !== undefined && { month: validatedData.month }),
         ...(validatedData.amountUSD !== undefined && {
           amountUSD: validatedData.amountUSD,
+        }),
+        ...(paidToOwnerPatch !== undefined && {
+          paidToOwnerUSD: paidToOwnerPatch,
         }),
         ...(validatedData.usageDate !== undefined && {
           usageDate: new Date(validatedData.usageDate),

@@ -27,12 +27,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 overflow-x-clip`}
       >
         <SessionProvider>
-          <div className="min-h-screen">
+          <div className="min-h-screen min-w-0">
             <Navigation />
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <main className="max-w-7xl mx-auto w-full min-w-0 px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
               {children}
             </main>
           </div>

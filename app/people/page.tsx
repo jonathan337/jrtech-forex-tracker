@@ -8,13 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Edit, Trash2, X, Mail, Phone, User, Loader2 } from 'lucide-react'
+import { Plus, Edit, Trash2, X, Mail, Phone, User, Loader2, Banknote } from 'lucide-react'
 import {
   canonicalNanpFromNationalDigits,
   extractNanpNationalDigits,
   formatNanpNationalInput,
   isValidNanpNational,
 } from '@/lib/phone'
+import { issuingBankLabel } from '@/lib/card-bank'
 
 interface Person {
   id: string
@@ -22,9 +23,14 @@ interface Person {
   email: string | null
   phone: string | null
   notes: string | null
+  /** Unpaid usage in USD (usage − paid to owner). */
+  owedUSD: number
+  /** Estimated repayment in TTD: unpaid USD × exchange rate for each usage month (card rate, else Settings default). */
+  owedTTD: number
   cards: Array<{
     id: string
     cardNickname: string
+    issuingBank: string | null
   }>
 }
 
@@ -213,35 +219,38 @@ export default function PeoplePage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+    <div className="space-y-6 min-w-0">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
             People
           </h1>
-          <p className="text-gray-600 mt-1">Manage your foreign currency providers</p>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">
+            Manage your foreign currency providers
+          </p>
         </div>
-        <Button onClick={openAddForm} className="shadow-lg">
+        <Button onClick={openAddForm} className="shadow-lg w-full sm:w-auto shrink-0">
           <Plus className="w-4 h-4 mr-2" />
           Add Person
         </Button>
       </div>
 
       {showForm && (
-        <Card className="border-2 border-blue-200 shadow-xl">
+        <Card className="border-2 border-blue-200 shadow-xl min-w-0 overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between min-w-0">
+              <div className="min-w-0">
                 <CardTitle className="text-xl">
                   {editingPerson ? 'Edit Person' : 'Add New Person'}
                 </CardTitle>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-gray-600 mt-1 break-words">
                   {editingPerson ? 'Update person information' : 'Add a new currency provider'}
                 </p>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
+                className="shrink-0 self-end sm:self-auto"
                 onClick={resetForm}
                 disabled={saving}
                 aria-label="Close form"
@@ -385,17 +394,28 @@ export default function PeoplePage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {people.map((person) => (
-            <Card key={person.id} className="shadow-md hover:shadow-lg transition-shadow">
+          {people.map((person) => {
+            const owedUSD =
+              typeof person.owedUSD === 'number' && Number.isFinite(person.owedUSD)
+                ? person.owedUSD
+                : 0
+            const owedTTD =
+              typeof person.owedTTD === 'number' && Number.isFinite(person.owedTTD)
+                ? person.owedTTD
+                : 0
+            const hasOutstanding = owedUSD > 0.005
+            const showTTD = owedTTD > 0.005
+            return (
+            <Card key={person.id} className="shadow-md hover:shadow-lg transition-shadow min-w-0 overflow-hidden">
               <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                <div className="flex items-start justify-between gap-2 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0">
                       <span className="text-white font-bold text-lg">{person.name[0].toUpperCase()}</span>
                     </div>
-                    <div>
-                      <CardTitle className="text-lg">{person.name}</CardTitle>
-                      <div className="flex items-center gap-1 mt-1">
+                    <div className="min-w-0">
+                      <CardTitle className="text-lg truncate">{person.name}</CardTitle>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
                         <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">
                           {person.cards.length} {person.cards.length === 1 ? 'card' : 'cards'}
                         </span>
@@ -423,6 +443,65 @@ export default function PeoplePage() {
                 </div>
               </CardHeader>
               <CardContent className="pt-4">
+                <div
+                  className={`mb-4 rounded-lg border px-3 py-3 ${
+                    hasOutstanding
+                      ? 'border-amber-200 bg-amber-50/90'
+                      : 'border-gray-200 bg-white'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    <Banknote
+                      className={`w-5 h-5 shrink-0 mt-0.5 ${
+                        hasOutstanding ? 'text-amber-700' : 'text-green-600'
+                      }`}
+                      aria-hidden
+                    />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        You owe this person
+                      </p>
+                      <p
+                        className={`text-2xl font-bold tabular-nums ${
+                          hasOutstanding ? 'text-amber-900' : 'text-green-700'
+                        }`}
+                      >
+                        {showTTD ? (
+                          <>
+                            ${owedTTD.toFixed(2)}{' '}
+                            <span className="text-sm font-semibold text-gray-600">TTD</span>
+                          </>
+                        ) : hasOutstanding ? (
+                          <>
+                            ${owedUSD.toFixed(2)}{' '}
+                            <span className="text-sm font-semibold text-gray-600">USD</span>
+                          </>
+                        ) : (
+                          <>
+                            $0.00{' '}
+                            <span className="text-sm font-semibold text-gray-600">TTD</span>
+                          </>
+                        )}
+                      </p>
+                      {hasOutstanding && (
+                        <p className="text-xs text-gray-600 mt-0.5 tabular-nums">
+                          Unpaid usage: ${owedUSD.toFixed(2)} USD
+                          {showTTD && (
+                            <span className="text-gray-500">
+                              {' '}
+                              × card rate each month (Settings rate if a month has no saved rate)
+                            </span>
+                          )}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-500 mt-1">
+                        {hasOutstanding
+                          ? 'Based on the Usage page: amount you used minus “paid to owner”. New usage assumes nothing paid back until you enter it.'
+                          : 'No outstanding balance from logged usage, or usage is fully marked as paid back to them.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 {person.email && (
                   <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
                     <Mail className="w-4 h-4 text-gray-400" />
@@ -445,8 +524,15 @@ export default function PeoplePage() {
                     <p className="text-xs text-gray-500 mb-1 font-medium">Cards:</p>
                     <div className="flex flex-wrap gap-1">
                       {person.cards.map((card) => (
-                        <span key={card.id} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                        <span
+                          key={card.id}
+                          className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded"
+                          title={issuingBankLabel(card.issuingBank)}
+                        >
                           {card.cardNickname}
+                          {card.issuingBank ? (
+                            <span className="text-blue-600/80"> · {issuingBankLabel(card.issuingBank)}</span>
+                          ) : null}
                         </span>
                       ))}
                     </div>
@@ -454,7 +540,8 @@ export default function PeoplePage() {
                 )}
               </CardContent>
             </Card>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

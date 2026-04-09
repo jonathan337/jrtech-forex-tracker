@@ -1,9 +1,11 @@
 import { z } from 'zod'
+import { issuingBankSchema } from '@/lib/card-bank'
 
 export const cardBodySchema = z
   .object({
     personId: z.string().min(1, 'Person is required'),
     cardNickname: z.string().min(1, 'Card nickname is required'),
+    issuingBank: issuingBankSchema.optional().nullable(),
     lastFourDigits: z.string().optional(),
     notes: z.string().optional(),
     alwaysAvailable: z.boolean().optional().default(false),
@@ -44,6 +46,7 @@ export function prismaDataFromCardBody(data: CardBodyInput) {
   return {
     personId: data.personId,
     cardNickname: data.cardNickname,
+    issuingBank: data.issuingBank ?? null,
     lastFourDigits: data.lastFourDigits || null,
     notes: data.notes || null,
     alwaysAvailable: on,

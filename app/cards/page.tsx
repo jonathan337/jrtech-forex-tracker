@@ -18,6 +18,12 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { useGroupByOwner } from '@/hooks/use-group-by-owner'
+import {
+  ISSUING_BANK_CODES,
+  ISSUING_BANK_LABELS,
+  issuingBankLabel,
+  type IssuingBankCode,
+} from '@/lib/card-bank'
 
 interface Person {
   id: string
@@ -27,6 +33,7 @@ interface Person {
 interface CardType {
   id: string
   cardNickname: string
+  issuingBank: string | null
   lastFourDigits: string | null
   notes: string | null
   alwaysAvailable: boolean
@@ -45,6 +52,7 @@ interface CardType {
 const emptyForm = () => ({
   personId: '',
   cardNickname: '',
+  issuingBank: '' as '' | IssuingBankCode,
   lastFourDigits: '',
   notes: '',
   alwaysAvailable: false,
@@ -212,6 +220,9 @@ export default function CardsPage() {
     const base = {
       personId: formData.personId,
       cardNickname: formData.cardNickname,
+      issuingBank: formData.issuingBank
+        ? (formData.issuingBank as IssuingBankCode)
+        : null,
       lastFourDigits: formData.lastFourDigits || undefined,
       notes: formData.notes || undefined,
       alwaysAvailable: formData.alwaysAvailable,
@@ -234,6 +245,12 @@ export default function CardsPage() {
     savingLockRef.current = true
     setSaving(true)
     setFormError('')
+    if (!formData.issuingBank) {
+      setFormError('Please select the issuing bank.')
+      savingLockRef.current = false
+      setSaving(false)
+      return
+    }
     try {
       const url = editingCard ? `/api/cards/${editingCard.id}` : '/api/cards'
       const method = editingCard ? 'PUT' : 'POST'
@@ -276,6 +293,7 @@ export default function CardsPage() {
     setFormData({
       personId: card.person.id,
       cardNickname: card.cardNickname,
+      issuingBank: (card.issuingBank as IssuingBankCode | null) ?? '',
       lastFourDigits: card.lastFourDigits || '',
       notes: card.notes || '',
       alwaysAvailable: card.alwaysAvailable ?? false,
@@ -335,18 +353,20 @@ export default function CardsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0">
       {loadError && (
         <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-md text-sm">
           {loadError}
         </div>
       )}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
             Cards
           </h1>
-          <p className="text-gray-600 mt-1">Manage credit cards that provide foreign currency access</p>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">
+            Manage credit cards that provide foreign currency access
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
@@ -366,20 +386,21 @@ export default function CardsPage() {
       </div>
 
       {showForm && (
-        <Card className="border-2 border-blue-200 shadow-xl">
+        <Card className="border-2 border-blue-200 shadow-xl min-w-0 overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between min-w-0">
+              <div className="min-w-0">
                 <CardTitle className="text-xl">
                   {editingCard ? 'Edit Card' : 'Add New Card'}
                 </CardTitle>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-gray-600 mt-1 break-words">
                   {editingCard ? 'Update card information' : 'Register a new credit card'}
                 </p>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
+                className="shrink-0 self-end sm:self-auto"
                 onClick={resetForm}
                 disabled={saving}
                 aria-label="Close form"
@@ -427,6 +448,29 @@ export default function CardsPage() {
                   required
                   disabled={saving}
                 />
+              </div>
+              <div>
+                <Label htmlFor="issuingBank">Issuing bank *</Label>
+                <select
+                  id="issuingBank"
+                  value={formData.issuingBank}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      issuingBank: e.target.value as IssuingBankCode | '',
+                    })
+                  }
+                  required
+                  disabled={saving}
+                  className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">Select bank</option>
+                  {ISSUING_BANK_CODES.map((code) => (
+                    <option key={code} value={code}>
+                      {ISSUING_BANK_LABELS[code]}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <Label htmlFor="lastFourDigits">Last 4 Digits</Label>
@@ -636,7 +680,7 @@ export default function CardsPage() {
                         key={card.id}
                         role="button"
                         tabIndex={0}
-                        className="shadow-md hover:shadow-lg transition-shadow cursor-pointer group border border-transparent hover:border-blue-200/80"
+                        className="shadow-md hover:shadow-lg transition-shadow cursor-pointer group border border-transparent hover:border-blue-200/80 min-w-0 overflow-hidden"
                         onClick={() => router.push(`/cards/${card.id}`)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
@@ -652,9 +696,12 @@ export default function CardsPage() {
                                 <CreditCardIcon className="w-6 h-6 text-white" />
                               </div>
                               <div className="min-w-0">
-                                <CardTitle className="text-lg">
+                                <CardTitle className="text-lg truncate">
                                   {card.cardNickname}
                                 </CardTitle>
+                                <p className="text-xs text-gray-500">
+                                  {issuingBankLabel(card.issuingBank)}
+                                </p>
                                 {card.lastFourDigits && (
                                   <p className="text-sm text-gray-500 font-mono">
                                     •••• {card.lastFourDigits}
@@ -717,7 +764,7 @@ export default function CardsPage() {
                   key={card.id}
                   role="button"
                   tabIndex={0}
-                  className="shadow-md hover:shadow-lg transition-shadow cursor-pointer group border border-transparent hover:border-blue-200/80"
+                  className="shadow-md hover:shadow-lg transition-shadow cursor-pointer group border border-transparent hover:border-blue-200/80 min-w-0 overflow-hidden"
                   onClick={() => router.push(`/cards/${card.id}`)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
@@ -733,7 +780,10 @@ export default function CardsPage() {
                           <CreditCardIcon className="w-6 h-6 text-white" />
                         </div>
                         <div className="min-w-0">
-                          <CardTitle className="text-lg">{card.cardNickname}</CardTitle>
+                          <CardTitle className="text-lg truncate">{card.cardNickname}</CardTitle>
+                          <p className="text-xs text-gray-500">
+                            {issuingBankLabel(card.issuingBank)}
+                          </p>
                           {card.lastFourDigits && (
                             <p className="text-sm text-gray-500 font-mono">
                               •••• {card.lastFourDigits}

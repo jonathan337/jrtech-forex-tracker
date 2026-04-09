@@ -86,12 +86,14 @@ export default function AnalyticsPage() {
   ]
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+    <div className="space-y-6 min-w-0">
+      <div className="min-w-0">
+        <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
           Analytics & Insights
         </h1>
-        <p className="text-gray-600 mt-1">Track your foreign currency costs and premiums</p>
+        <p className="text-gray-600 mt-1 text-sm sm:text-base">
+          Track your foreign currency costs and premiums
+        </p>
       </div>
 
       {/* Summary Cards */}
@@ -151,13 +153,14 @@ export default function AnalyticsPage() {
 
       {/* Charts Row 1 */}
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="shadow-md">
+        <Card className="shadow-md min-w-0 overflow-hidden">
           <CardHeader>
             <CardTitle>Monthly USD Availability</CardTitle>
             <CardDescription>Total USD acquired per month</CardDescription>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+          <CardContent className="min-w-0">
+            <div className="h-[260px] w-full min-w-0 sm:h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
@@ -167,16 +170,18 @@ export default function AnalyticsPage() {
                 <Bar dataKey="USD" fill={COLORS[0]} name="USD Amount" />
               </BarChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="shadow-md">
+        <Card className="shadow-md min-w-0 overflow-hidden">
           <CardHeader>
             <CardTitle>Cost Breakdown</CardTitle>
             <CardDescription>Total cost composition in TTD</CardDescription>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+          <CardContent className="min-w-0">
+            <div className="h-[260px] w-full min-w-0 sm:h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={costBreakdown}
@@ -209,19 +214,21 @@ export default function AnalyticsPage() {
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Charts Row 2 */}
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="shadow-md">
+        <Card className="shadow-md min-w-0 overflow-hidden">
           <CardHeader>
             <CardTitle>Premium & Extra Costs</CardTitle>
             <CardDescription>Costs beyond the default exchange rate</CardDescription>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+          <CardContent className="min-w-0">
+            <div className="h-[260px] w-full min-w-0 sm:h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
@@ -232,16 +239,18 @@ export default function AnalyticsPage() {
                 <Bar dataKey="Fees" fill={COLORS[2]} name="Fees (USD)" />
               </BarChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="shadow-md">
+        <Card className="shadow-md min-w-0 overflow-hidden">
           <CardHeader>
             <CardTitle>Exchange Rate Trend</CardTitle>
             <CardDescription>Average rates paid over time</CardDescription>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+          <CardContent className="min-w-0">
+            <div className="h-[260px] w-full min-w-0 sm:h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
@@ -257,6 +266,7 @@ export default function AnalyticsPage() {
                 />
               </LineChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
       </div>

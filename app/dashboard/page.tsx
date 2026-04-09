@@ -27,6 +27,8 @@ import {
 } from 'lucide-react'
 import { useGroupByOwner } from '@/hooks/use-group-by-owner'
 import { CardUsagePanel } from '@/components/CardUsagePanel'
+import { usageAmountPaidSync } from '@/lib/usage-paid-sync'
+import { issuingBankLabel } from '@/lib/card-bank'
 
 interface Summary {
   year: number
@@ -54,6 +56,7 @@ interface Summary {
     impliedFeeUSD: number
     card: {
       cardNickname: string
+      issuingBank?: string | null
       person: {
         id: string
         name: string
@@ -71,6 +74,15 @@ interface ExchangeRate {
   note?: string
 }
 
+function dashboardCardOptionLabel(
+  card: Summary['availability'][number]['card']
+): string {
+  if (card.issuingBank) {
+    return `${card.cardNickname} (${issuingBankLabel(card.issuingBank)}) — ${card.person.name}`
+  }
+  return `${card.cardNickname} (${card.person.name})`
+}
+
 export default function Dashboard() {
   const router = useRouter()
   const { status } = useSession()
@@ -85,6 +97,7 @@ export default function Dashboard() {
   const [quickForm, setQuickForm] = useState({
     cardId: '',
     amountUSD: '',
+    paidToOwnerUSD: '',
     usageDate: format(new Date(), 'yyyy-MM-dd'),
     notes: '',
   })
@@ -127,10 +140,7 @@ export default function Dashboard() {
     const m = new Map<string, string>()
     for (const r of summary.availability) {
       if (!m.has(r.cardId)) {
-        m.set(
-          r.cardId,
-          `${r.card.cardNickname} (${r.card.person.name})`
-        )
+        m.set(r.cardId, dashboardCardOptionLabel(r.card))
       }
     }
     return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]))
@@ -223,6 +233,17 @@ export default function Dashboard() {
     const amt = parseFloat(quickForm.amountUSD)
     if (Number.isNaN(amt) || amt <= 0) return
 
+    const paidRaw = quickForm.paidToOwnerUSD.trim()
+    const paidToOwner = paidRaw === '' ? 0 : parseFloat(paidRaw)
+    if (Number.isNaN(paidToOwner) || paidToOwner < 0) {
+      setQuickError('Paid to owner must be a valid non-negative amount.')
+      return
+    }
+    if (paidToOwner - amt > 1e-6) {
+      setQuickError('Paid to owner cannot be more than the usage amount.')
+      return
+    }
+
     setQuickSaving(true)
     setQuickError('')
     try {
@@ -236,6 +257,7 @@ export default function Dashboard() {
           year,
           month,
           amountUSD: amt,
+          paidToOwnerUSD: paidToOwner,
           usageDate,
           notes: quickForm.notes.trim() || undefined,
         }),
@@ -245,6 +267,7 @@ export default function Dashboard() {
         setQuickForm({
           cardId: '',
           amountUSD: '',
+          paidToOwnerUSD: '',
           usageDate: format(new Date(), 'yyyy-MM-dd'),
           notes: '',
         })
@@ -267,6 +290,7 @@ export default function Dashboard() {
       ...f,
       cardId,
       amountUSD: '',
+      paidToOwnerUSD: '',
       usageDate: format(new Date(), 'yyyy-MM-dd'),
     }))
     setQuickError('')
@@ -310,7 +334,7 @@ export default function Dashboard() {
   const renderAvailabilityPair = (item: AvailRow, zebraClass: string) => (
     <Fragment key={item.id}>
       <tr className={`hover:bg-blue-50 transition-colors ${zebraClass}`}>
-        <td className="py-4 px-6 font-medium text-gray-900">
+        <td className="py-3 px-3 sm:py-4 sm:px-6 font-medium text-gray-900 max-w-[140px] sm:max-w-none">
           <button
             type="button"
             onClick={() =>
@@ -320,13 +344,18 @@ export default function Dashboard() {
             }
             className="text-left inline-flex items-center gap-1.5 flex-wrap rounded hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           >
-            <span className="inline-flex items-center gap-2 flex-wrap">
-              {item.card.cardNickname}
-              {item.isRecurringTemplate && (
-                <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
-                  Every month
-                </span>
-              )}
+            <span className="inline-flex flex-col items-start gap-0.5">
+              <span className="inline-flex items-center gap-2 flex-wrap">
+                {item.card.cardNickname}
+                {item.isRecurringTemplate && (
+                  <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                    Every month
+                  </span>
+                )}
+              </span>
+              <span className="text-xs font-normal text-gray-500">
+                {issuingBankLabel(item.card.issuingBank)}
+              </span>
             </span>
             {expandedCardId === item.cardId ? (
               <ChevronUp className="w-4 h-4 shrink-0 text-gray-500" />
@@ -335,18 +364,20 @@ export default function Dashboard() {
             )}
           </button>
         </td>
-        <td className="py-4 px-6 text-gray-600">{item.card.person.name}</td>
-        <td className="py-4 px-6 text-right">
+        <td className="py-3 px-3 sm:py-4 sm:px-6 text-gray-600 whitespace-nowrap">
+          {item.card.person.name}
+        </td>
+        <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
           <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-700">
             ${item.amountUSD.toFixed(2)}
           </span>
         </td>
-        <td className="py-4 px-6 text-right">
+        <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
           <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-amber-100 text-amber-800">
             ${item.usageUSD.toFixed(2)}
           </span>
         </td>
-        <td className="py-4 px-6 text-right">
+        <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
           <span
             className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
               item.balanceUSD < 0
@@ -357,17 +388,17 @@ export default function Dashboard() {
             ${item.balanceUSD.toFixed(2)}
           </span>
         </td>
-        <td className="py-4 px-6 text-right">
+        <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
           <span className="font-mono text-gray-700">
             {item.exchangeRate.toFixed(2)}
           </span>
         </td>
-        <td className="py-4 px-6 text-right">
+        <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
           <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-700">
             ${(item.amountUSD * item.exchangeRate).toFixed(2)}
           </span>
         </td>
-        <td className="py-4 px-6 text-right">
+        <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
           <span
             className={`font-medium ${
               item.impliedFeeTTD > 0
@@ -380,10 +411,10 @@ export default function Dashboard() {
             {item.impliedFeeTTD.toFixed(2)} TTD
           </span>
         </td>
-        <td className="py-4 px-6 text-gray-600">
+        <td className="py-3 px-3 sm:py-4 sm:px-6 text-gray-600 whitespace-nowrap">
           {format(new Date(item.paymentDate), 'MMM dd, yyyy')}
         </td>
-        <td className="py-4 px-6 text-right">
+        <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
           <Button
             type="button"
             variant="outline"
@@ -401,7 +432,7 @@ export default function Dashboard() {
           <td colSpan={10} className="p-0 border-0">
             <CardUsagePanel
               cardId={item.cardId}
-              cardLabel={`${item.card.cardNickname} (${item.card.person.name})`}
+              cardLabel={dashboardCardOptionLabel(item.card)}
               year={year}
               month={month}
               onUsageChanged={afterUsageChange}
@@ -414,48 +445,55 @@ export default function Dashboard() {
   )
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+    <div className="space-y-6 min-w-0">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
             Dashboard
           </h1>
-          <p className="text-gray-600 mt-1">Track your foreign currency availability</p>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">
+            Track your foreign currency availability
+          </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          <Link href="/usage">
-            <Button variant="outline" size="sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end w-full lg:w-auto min-w-0">
+          <Link href="/usage" className="sm:shrink-0">
+            <Button variant="outline" size="sm" className="w-full sm:w-auto">
               <History className="w-4 h-4 mr-1" />
               Usage page
             </Button>
           </Link>
-          <Button onClick={previousMonth} variant="outline" size="sm">
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <span className="text-lg font-medium min-w-[150px] text-center">
-            {monthName}
-          </span>
-          <Button onClick={nextMonth} variant="outline" size="sm">
-            <ChevronRight className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center justify-center gap-1 sm:justify-end w-full sm:w-auto">
+            <Button onClick={previousMonth} variant="outline" size="sm" aria-label="Previous month">
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <span className="text-base sm:text-lg font-medium min-w-0 flex-1 sm:flex-initial sm:min-w-[9rem] text-center px-1 truncate">
+              {monthName}
+            </span>
+            <Button onClick={nextMonth} variant="outline" size="sm" aria-label="Next month">
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Default Exchange Rate Card */}
       {exchangeRate && (
-        <Card className="border-l-4 border-l-blue-500 shadow-md bg-gradient-to-r from-blue-50/50 to-indigo-50/50">
+        <Card className="border-l-4 border-l-blue-500 shadow-md bg-gradient-to-r from-blue-50/50 to-indigo-50/50 min-w-0 overflow-hidden">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between min-w-0">
+              <div className="min-w-0">
                 <CardTitle className="text-lg">Default Exchange Rate</CardTitle>
-                <CardDescription className="flex items-center gap-2 mt-1">
-                  <span>{exchangeRate.source} - Used for cost calculations</span>
+                <CardDescription className="mt-1 break-words">
+                  <span className="text-gray-600">
+                    {exchangeRate.source} — used for cost calculations
+                  </span>
                 </CardDescription>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => window.location.href = '/settings'}
+                className="shrink-0 self-start sm:self-auto"
+                onClick={() => (window.location.href = '/settings')}
                 title="Configure in Settings"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -603,7 +641,7 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          <Card className="shadow-md border-t-4 border-t-blue-500">
+          <Card className="shadow-md border-t-4 border-t-blue-500 min-w-0 overflow-hidden">
             <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -709,7 +747,7 @@ export default function Dashboard() {
                             {quickError}
                           </p>
                         )}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
                           <div className="md:col-span-2">
                             <Label htmlFor="quick-usage-card">Card *</Label>
                             <select
@@ -745,9 +783,33 @@ export default function Dashboard() {
                                 setQuickForm((f) => ({
                                   ...f,
                                   amountUSD: e.target.value,
+                                  paidToOwnerUSD: usageAmountPaidSync(
+                                    f.amountUSD,
+                                    f.paidToOwnerUSD,
+                                    e.target.value
+                                  ),
                                 }))
                               }
                               required
+                              disabled={quickSaving}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="quick-usage-paid">Paid to owner (USD)</Label>
+                            <Input
+                              id="quick-usage-paid"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0 if not paid yet"
+                              title="Leave 0 until you have paid the card owner back."
+                              value={quickForm.paidToOwnerUSD}
+                              onChange={(e) =>
+                                setQuickForm((f) => ({
+                                  ...f,
+                                  paidToOwnerUSD: e.target.value,
+                                }))
+                              }
                               disabled={quickSaving}
                             />
                           </div>
@@ -795,38 +857,38 @@ export default function Dashboard() {
                       </form>
                     )}
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
+                  <div className="-mx-1 overflow-x-auto sm:mx-0 [scrollbar-gutter:stable] touch-pan-x">
+                    <table className="w-full min-w-[56rem] text-sm">
                       <thead>
                         <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-blue-200">
-                          <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                          <th className="text-left py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
                             Card
                           </th>
-                          <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                          <th className="text-left py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
                             Owner
                           </th>
-                          <th className="text-right py-4 px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
                             Available
                           </th>
-                          <th className="text-right py-4 px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
                             Used
                           </th>
-                          <th className="text-right py-4 px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
                             Balance
                           </th>
-                          <th className="text-right py-4 px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
                             Rate
                           </th>
-                          <th className="text-right py-4 px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
                             TTD Value
                           </th>
-                          <th className="text-right py-4 px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
                             Fee (TTD)
                           </th>
-                          <th className="text-left py-4 px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
-                            Payment Date
+                          <th className="text-left py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider whitespace-nowrap">
+                            Pay date
                           </th>
-                          <th className="text-right py-4 px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
                             Actions
                           </th>
                         </tr>
@@ -840,7 +902,7 @@ export default function Dashboard() {
                               >
                                 <td
                                   colSpan={10}
-                                  className="py-2.5 px-6 font-semibold text-gray-800"
+                                  className="py-2.5 px-3 sm:px-6 font-semibold text-gray-800"
                                 >
                                   <span className="inline-flex items-center gap-2">
                                     <User className="w-4 h-4 text-slate-600" />

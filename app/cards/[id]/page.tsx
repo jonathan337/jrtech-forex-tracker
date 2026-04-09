@@ -15,6 +15,7 @@ import {
   Calendar,
   Wallet,
 } from 'lucide-react'
+import { issuingBankLabel } from '@/lib/card-bank'
 
 const MONTHS = [
   'January',
@@ -44,6 +45,7 @@ interface MonthlyEntry {
 interface CardDetail {
   id: string
   cardNickname: string
+  issuingBank: string | null
   lastFourDigits: string | null
   notes: string | null
   alwaysAvailable: boolean
@@ -60,6 +62,7 @@ interface UsageRow {
   year: number
   month: number
   amountUSD: number
+  paidToOwnerUSD: number
   usageDate: string
   notes: string | null
 }
@@ -146,9 +149,9 @@ export default function CardDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
+    <div className="space-y-6 min-w-0">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
           <Button
             variant="outline"
             size="sm"
@@ -158,8 +161,8 @@ export default function CardDetailPage() {
             <ArrowLeft className="w-4 h-4 mr-1" />
             Cards
           </Button>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent truncate">
               {loading ? 'Card' : card?.cardNickname ?? 'Card'}
             </h1>
             {card && (
@@ -196,6 +199,9 @@ export default function CardDetailPage() {
                 </div>
                 <div className="min-w-0">
                   <CardTitle className="text-xl">{card.cardNickname}</CardTitle>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {issuingBankLabel(card.issuingBank)}
+                  </p>
                   <div className="text-sm text-gray-500 mt-1 space-y-1">
                     {card.lastFourDigits && (
                       <span className="block font-mono text-gray-600">
@@ -260,11 +266,11 @@ export default function CardDetailPage() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-md">
+          <Card className="shadow-md min-w-0 overflow-hidden">
             <CardHeader>
-              <div className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-purple-600" />
-                <CardTitle className="text-lg">Monthly availability entries</CardTitle>
+              <div className="flex items-center gap-2 min-w-0">
+                <Calendar className="w-5 h-5 text-purple-600 shrink-0" />
+                <CardTitle className="text-lg min-w-0">Monthly availability entries</CardTitle>
               </div>
               <CardDescription>
                 Explicit months added under Availability (not the recurring template itself).
@@ -280,8 +286,8 @@ export default function CardDetailPage() {
                   .
                 </p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                <div className="overflow-x-auto touch-pan-x [scrollbar-gutter:stable]">
+                  <table className="w-full min-w-[36rem] text-sm">
                     <thead>
                       <tr className="border-b bg-gray-50 text-left">
                         <th className="py-3 px-4 font-medium text-gray-700">Month</th>
@@ -330,11 +336,11 @@ export default function CardDetailPage() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-md">
+          <Card className="shadow-md min-w-0 overflow-hidden">
             <CardHeader>
-              <div className="flex items-center gap-2">
-                <Wallet className="w-5 h-5 text-amber-600" />
-                <CardTitle className="text-lg">Usage history</CardTitle>
+              <div className="flex items-center gap-2 min-w-0">
+                <Wallet className="w-5 h-5 text-amber-600 shrink-0" />
+                <CardTitle className="text-lg min-w-0">Usage history</CardTitle>
               </div>
               <CardDescription>
                 All logged USD usage for this card.{' '}
@@ -350,14 +356,17 @@ export default function CardDetailPage() {
                   No usage logged yet for this card.
                 </p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                <div className="overflow-x-auto touch-pan-x [scrollbar-gutter:stable]">
+                  <table className="w-full min-w-[32rem] text-sm">
                     <thead>
                       <tr className="border-b bg-gray-50 text-left">
                         <th className="py-3 px-4 font-medium text-gray-700">Date</th>
                         <th className="py-3 px-4 font-medium text-gray-700">Period</th>
                         <th className="py-3 px-4 font-medium text-gray-700 text-right">
                           Amount (USD)
+                        </th>
+                        <th className="py-3 px-4 font-medium text-gray-700 text-right whitespace-nowrap">
+                          Paid owner
                         </th>
                         <th className="py-3 px-4 font-medium text-gray-700">Notes</th>
                       </tr>
@@ -373,6 +382,9 @@ export default function CardDetailPage() {
                           </td>
                           <td className="py-3 px-4 text-right font-medium text-amber-800">
                             ${u.amountUSD.toFixed(2)}
+                          </td>
+                          <td className="py-3 px-4 text-right text-gray-700 whitespace-nowrap">
+                            ${u.paidToOwnerUSD.toFixed(2)}
                           </td>
                           <td className="py-3 px-4 text-gray-600 max-w-[240px] truncate" title={u.notes ?? ''}>
                             {u.notes || '—'}
