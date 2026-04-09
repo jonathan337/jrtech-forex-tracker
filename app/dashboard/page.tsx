@@ -671,7 +671,7 @@ export default function Dashboard() {
                   ${summary.totalTTD.toFixed(2)}
                 </div>
                 <p className="text-xs text-gray-500">
-                  TTD needed to cover all logged USD usage at each card's rate
+                  TTD needed to cover all logged USD usage at each card&apos;s rate
                 </p>
               </CardContent>
             </Card>
