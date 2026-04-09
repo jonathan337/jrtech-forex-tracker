@@ -63,18 +63,21 @@ model Card {
 }
 
 model CardUsage {
-  id              String   @id @default(cuid())
-  cardId          String
-  year            Int
-  month           Int
-  amountUSD       Float
-  /** USD paid back to the card owner for this usage (0 = still owed until you record payment). */
-  paidToOwnerUSD  Float    @default(0)
-  usageDate       DateTime @default(now())
-  notes           String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  card       Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  id             String   @id @default(cuid())
+  cardId         String
+  year           Int
+  month          Int
+  /** USD usage captured at entry time; does not change when Settings rate changes later. */
+  amountUSD      Float?
+  /** TTD spend for this usage row (same basis as availability × rate for the month). */
+  amountTTD      Float
+  /** TTD paid back to the card owner (0 = still owed until you record payment). */
+  paidToOwnerTTD Float    @default(0)
+  usageDate      DateTime @default(now())
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  card           Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
   @@index([cardId, year, month])
 }

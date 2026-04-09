@@ -14,21 +14,11 @@ const usageSchema = z
     cardId: z.string().min(1, 'Card is required'),
     year: z.number().int().min(2000).max(2100),
     month: z.number().int().min(1).max(12),
-    amountUSD: z.number().positive('Amount must be positive'),
-    /** USD paid to card owner for this usage; omit for $0 (still owed until you record payment). */
-    paidToOwnerUSD: z.number().min(0).optional(),
+    amountUSD: z.number().positive('Amount must be positive').optional(),
+    amountTTD: z.number().positive('Amount must be positive').optional(),
+    paidToOwnerTTD: z.number().min(0).optional(),
     usageDate: z.string().datetime().optional(),
     notes: z.string().optional(),
-  })
-  .superRefine((data, ctx) => {
-    const paid = data.paidToOwnerUSD ?? 0
-    if (paid - data.amountUSD > 1e-6) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Paid to owner cannot exceed the usage amount',
-        path: ['paidToOwnerUSD'],
-      })
-    }
   })
 
 export async function GET(request: Request) {
@@ -115,15 +105,35 @@ export async function POST(request: Request) {
       )
     }
 
-    const paidToOwner = validatedData.paidToOwnerUSD ?? 0
+    const paidToOwner = validatedData.paidToOwnerTTD ?? 0
+    const amountUSDInput =
+      typeof validatedData.amountUSD === 'number'
+        ? validatedData.amountUSD
+        : validatedData.amountTTD ?? 0
+    const amountTTD = validatedData.amountTTD ?? amountUSDInput
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { defaultExchangeRate: true },
+    })
+    const fallbackRate =
+      typeof user?.defaultExchangeRate === 'number' &&
+      Number.isFinite(user.defaultExchangeRate) &&
+      user.defaultExchangeRate > 0
+        ? user.defaultExchangeRate
+        : null
+    const amountUSD =
+      validatedData.amountUSD ??
+      (fallbackRate ? amountTTD / fallbackRate : null)
 
     const entry = await prisma.cardUsage.create({
       data: {
         cardId: validatedData.cardId,
         year: validatedData.year,
         month: validatedData.month,
-        amountUSD: validatedData.amountUSD,
-        paidToOwnerUSD: paidToOwner,
+        amountUSD,
+        amountTTD,
+        paidToOwnerTTD: paidToOwner,
         usageDate: validatedData.usageDate
           ? new Date(validatedData.usageDate)
           : new Date(),
@@ -146,7 +156,17 @@ export async function POST(request: Request) {
         { status: 400 }
       )
     }
-    console.error('Error creating usage:', error)
+    const msg = error instanceof Error ? error.message : String(error)
+    if (msg.includes('amountUSD')) {
+      return NextResponse.json(
+        {
+          error:
+            'Database missing CardUsage.amountUSD. Run: ALTER TABLE "CardUsage" ADD COLUMN IF NOT EXISTS "amountUSD" DOUBLE PRECISION;',
+        },
+        { status: 500 }
+      )
+    }
+    console.error('Error creating usage entry:', error)
     return NextResponse.json(
       { error: 'Failed to create usage entry' },
       { status: 500 }

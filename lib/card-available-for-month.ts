@@ -1,5 +1,28 @@
+import type { Card, MonthlyAvailability, Person } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { buildRecurringAvailabilityEntry } from '@/lib/recurring-availability'
+
+export type CardWithMonthlyAvailability = Card & {
+  person: Person
+  monthlyAvailability: MonthlyAvailability[]
+}
+
+/**
+ * Same rules as {@link cardHasAvailabilityForMonth}, using data already loaded on the card
+ * (no extra DB round-trips). Use from list endpoints that include `monthlyAvailability`.
+ */
+export function cardHasAvailabilityForMonthFromLoadedCard(
+  card: CardWithMonthlyAvailability,
+  year: number,
+  month: number
+): boolean {
+  if (
+    card.monthlyAvailability.some((a) => a.year === year && a.month === month)
+  ) {
+    return true
+  }
+  return buildRecurringAvailabilityEntry(card, year, month) !== null
+}
 
 /**
  * Matches dashboard/summary: a card is available for a month if there is an explicit

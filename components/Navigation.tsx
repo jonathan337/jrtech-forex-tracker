@@ -43,14 +43,14 @@ export default function Navigation() {
   }
 
   return (
-    <nav className="bg-white border-b border-gray-200 shadow-sm">
+    <nav className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16 gap-2 min-w-0">
           <div className="flex items-center min-w-0 flex-1">
             <div className="flex-shrink-0 flex items-center min-w-0">
               <Link
                 href={session ? '/dashboard' : '/'}
-                className="flex items-center gap-2 min-w-0"
+                className="touch-manipulation flex items-center gap-2 min-w-0"
               >
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shrink-0">
                   <span className="text-white font-bold text-sm">FX</span>
@@ -77,7 +77,7 @@ export default function Navigation() {
                     <Link
                       key={link.href}
                       href={link.href}
-                      className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors whitespace-nowrap ${
+                      className={`touch-manipulation inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors whitespace-nowrap ${
                         isActive
                           ? 'border-blue-500 text-gray-900'
                           : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
@@ -144,7 +144,7 @@ export default function Navigation() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium ${
+                  className={`touch-manipulation flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium ${
                     isActive
                       ? 'bg-blue-50 text-blue-800'
                       : 'text-gray-700 hover:bg-gray-50'

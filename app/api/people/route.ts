@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { z } from 'zod'
 import { serverErrorResponse } from '@/lib/api-error'
+import { exchangeRateForUsageMonth } from '@/lib/exchange-rate-for-usage'
 import {
   mapPersonPhoneForResponse,
   parsePersonRequestBody,
@@ -46,7 +47,8 @@ export async function GET() {
         },
         select: {
           amountUSD: true,
-          paidToOwnerUSD: true,
+          amountTTD: true,
+          paidToOwnerTTD: true,
           year: true,
           month: true,
           cardId: true,
@@ -101,23 +103,27 @@ export async function GET() {
 
     for (const row of usageRows) {
       const pid = row.card.personId
-      const unpaid = row.amountUSD - row.paidToOwnerUSD
-      if (unpaid <= 0) continue
+      const rate = exchangeRateForUsageMonth(
+        row.cardId,
+        row.year,
+        row.month,
+        row.card,
+        rateByCardMonth,
+        baseline
+      )
+      if (rate == null || rate <= 0) continue
 
-      owedUSDByPerson.set(pid, (owedUSDByPerson.get(pid) ?? 0) + unpaid)
+      // Canonical owed formula:
+      // owedTTD = (usageUSD * card-rate-for-month) - paidToOwnerTTD
+      const usageUSD =
+        typeof row.amountUSD === 'number' && Number.isFinite(row.amountUSD)
+          ? row.amountUSD
+          : row.amountTTD / rate
+      const owedTTD = usageUSD * rate - row.paidToOwnerTTD
+      if (owedTTD <= 0.005) continue
 
-      const k = `${row.cardId}\t${row.year}\t${row.month}`
-      let rate = rateByCardMonth.get(k)
-      if (rate == null && row.card.alwaysAvailable) {
-        const r = row.card.recurringExchangeRate
-        if (r != null) rate = r
-      }
-      if (rate == null && baseline > 0) {
-        rate = baseline
-      }
-      if (rate != null) {
-        owedTTDByPerson.set(pid, (owedTTDByPerson.get(pid) ?? 0) + unpaid * rate)
-      }
+      owedTTDByPerson.set(pid, (owedTTDByPerson.get(pid) ?? 0) + owedTTD)
+      owedUSDByPerson.set(pid, (owedUSDByPerson.get(pid) ?? 0) + owedTTD / rate)
     }
 
     const round2 = (n: number) => Math.round(n * 100) / 100

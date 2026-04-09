@@ -86,7 +86,12 @@ export async function GET(request: Request) {
         new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()
     )
 
-    let usageRows: { cardId: string; amountUSD: number }[] = []
+    let usageRows: {
+      cardId: string
+      amountTTD: number
+      amountUSD: number | null
+      paidToOwnerTTD: number
+    }[] = []
     try {
       usageRows = await prisma.cardUsage.findMany({
         where: {
@@ -94,26 +99,55 @@ export async function GET(request: Request) {
           month: m,
           cardId: { in: cardIds },
         },
-        select: { cardId: true, amountUSD: true },
+        select: {
+          cardId: true,
+          amountTTD: true,
+          amountUSD: true,
+          paidToOwnerTTD: true,
+        },
       })
     } catch (usageErr) {
       // e.g. migration not applied yet — treat as no usage so availability still loads
       console.error('[summary] CardUsage query failed:', usageErr)
     }
 
-    const usageByCard = new Map<string, number>()
+    const usageTTDByCard = new Map<string, number>()
     for (const u of usageRows) {
-      usageByCard.set(
+      usageTTDByCard.set(
         u.cardId,
-        (usageByCard.get(u.cardId) ?? 0) + u.amountUSD
+        (usageTTDByCard.get(u.cardId) ?? 0) + u.amountTTD
       )
     }
 
-    const totalUsedUSD = usageRows.reduce((sum, u) => sum + u.amountUSD, 0)
+    const totalUsedTTD = usageRows.reduce((sum, u) => sum + u.amountTTD, 0)
 
     const availabilityWithUsage = availability.map((item) => {
       const cid = item.cardId
-      const usageUSD = usageByCard.get(cid) ?? 0
+      const usageTTD = usageTTDByCard.get(cid) ?? 0
+      const availableTTD = item.amountUSD * item.exchangeRate
+      const balanceTTD = availableTTD - usageTTD
+      const usageUSDForCard = usageRows
+        .filter((u) => u.cardId === cid)
+        .reduce(
+          (sum, u) =>
+            sum +
+            (typeof u.amountUSD === 'number' && Number.isFinite(u.amountUSD)
+              ? u.amountUSD
+              : u.amountTTD / item.exchangeRate),
+          0
+        )
+      const owedTTDForCard = usageRows
+        .filter((u) => u.cardId === cid)
+        .reduce((sum, u) => {
+          const usageUSD =
+            typeof u.amountUSD === 'number' && Number.isFinite(u.amountUSD)
+              ? u.amountUSD
+              : u.amountTTD / item.exchangeRate
+          const owed = usageUSD * item.exchangeRate - u.paidToOwnerTTD
+          return sum + Math.max(0, owed)
+        }, 0)
+      const ttdValue = item.amountUSD * item.exchangeRate
+      const balanceUSD = item.amountUSD - usageUSDForCard
       const impliedFeeTTD = ratePremiumTtd(
         item.amountUSD,
         item.exchangeRate,
@@ -126,14 +160,26 @@ export async function GET(request: Request) {
       )
       return {
         ...item,
-        usageUSD,
-        balanceUSD: item.amountUSD - usageUSD,
+        usageTTD,
+        owedTTD: owedTTDForCard,
+        balanceTTD,
+        usageUSD: usageUSDForCard,
+        ttdValue,
+        balanceUSD,
         impliedFeeTTD,
         impliedFeeUSD,
       }
     })
 
     const totalUSD = availability.reduce((sum, item) => sum + item.amountUSD, 0)
+    const totalUsedUSD = usageRows.reduce(
+      (sum, u) =>
+        sum +
+        (typeof u.amountUSD === 'number' && Number.isFinite(u.amountUSD)
+          ? u.amountUSD
+          : 0),
+      0
+    )
     const totalFeesTTD = availabilityWithUsage.reduce(
       (sum, item) => sum + item.impliedFeeTTD,
       0
@@ -148,13 +194,11 @@ export async function GET(request: Request) {
           availability.length
         : 0
 
-    const totalTTD = availability.reduce(
-      (sum, item) => sum + item.amountUSD * item.exchangeRate,
-      0
-    )
+    const totalTTD = availabilityWithUsage.reduce((sum, item) => sum + item.ttdValue, 0)
 
     const netUSD = totalUSD - totalFeesUSD
     const balanceUSD = totalUSD - totalUsedUSD
+    const balanceTTD = totalTTD - totalUsedTTD
 
     const summary = {
       year: y,
@@ -167,7 +211,9 @@ export async function GET(request: Request) {
       totalTTD,
       netUSD,
       totalUsedUSD,
+      totalUsedTTD,
       balanceUSD,
+      balanceTTD,
       availability: availabilityWithUsage,
     }
 

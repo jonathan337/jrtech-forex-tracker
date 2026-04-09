@@ -61,8 +61,8 @@ interface UsageRow {
   id: string
   year: number
   month: number
-  amountUSD: number
-  paidToOwnerUSD: number
+  amountTTD: number
+  paidToOwnerTTD: number
   usageDate: string
   notes: string | null
 }
@@ -363,7 +363,7 @@ export default function CardDetailPage() {
                         <th className="py-3 px-4 font-medium text-gray-700">Date</th>
                         <th className="py-3 px-4 font-medium text-gray-700">Period</th>
                         <th className="py-3 px-4 font-medium text-gray-700 text-right">
-                          Amount (USD)
+                          Amount (TTD)
                         </th>
                         <th className="py-3 px-4 font-medium text-gray-700 text-right whitespace-nowrap">
                           Paid owner
@@ -381,10 +381,10 @@ export default function CardDetailPage() {
                             {MONTHS[u.month - 1]} {u.year}
                           </td>
                           <td className="py-3 px-4 text-right font-medium text-amber-800">
-                            ${u.amountUSD.toFixed(2)}
+                            ${u.amountTTD.toFixed(2)}
                           </td>
                           <td className="py-3 px-4 text-right text-gray-700 whitespace-nowrap">
-                            ${u.paidToOwnerUSD.toFixed(2)}
+                            ${u.paidToOwnerTTD.toFixed(2)}
                           </td>
                           <td className="py-3 px-4 text-gray-600 max-w-[240px] truncate" title={u.notes ?? ''}>
                             {u.notes || '—'}

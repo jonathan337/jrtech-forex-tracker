@@ -8,7 +8,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Edit, Trash2, X, Mail, Phone, User, Loader2, Banknote } from 'lucide-react'
+import {
+  Plus,
+  Edit,
+  Trash2,
+  X,
+  Mail,
+  Phone,
+  User,
+  Loader2,
+  Banknote,
+  Wallet,
+} from 'lucide-react'
+import { PersonLogUsagePanel } from '@/components/PersonLogUsagePanel'
+import { PersonAddPaymentPanel } from '@/components/PersonAddPaymentPanel'
 import {
   canonicalNanpFromNationalDigits,
   extractNanpNationalDigits,
@@ -52,6 +65,12 @@ export default function PeoplePage() {
   const savingLockRef = useRef(false)
   const [formError, setFormError] = useState('')
   const [loadError, setLoadError] = useState('')
+  const [logUsageForPersonId, setLogUsageForPersonId] = useState<string | null>(
+    null
+  )
+  const [addPaymentForPersonId, setAddPaymentForPersonId] = useState<
+    string | null
+  >(null)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -393,7 +412,7 @@ export default function PeoplePage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-stretch">
           {people.map((person) => {
             const owedUSD =
               typeof person.owedUSD === 'number' && Number.isFinite(person.owedUSD)
@@ -403,46 +422,104 @@ export default function PeoplePage() {
               typeof person.owedTTD === 'number' && Number.isFinite(person.owedTTD)
                 ? person.owedTTD
                 : 0
-            const hasOutstanding = owedUSD > 0.005
+            const hasOutstanding = owedTTD > 0.005 || owedUSD > 0.005
             const showTTD = owedTTD > 0.005
             return (
-            <Card key={person.id} className="shadow-md hover:shadow-lg transition-shadow min-w-0 overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b">
-                <div className="flex items-start justify-between gap-2 min-w-0">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0">
-                      <span className="text-white font-bold text-lg">{person.name[0].toUpperCase()}</span>
-                    </div>
-                    <div className="min-w-0">
-                      <CardTitle className="text-lg truncate">{person.name}</CardTitle>
-                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                        <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">
-                          {person.cards.length} {person.cards.length === 1 ? 'card' : 'cards'}
-                        </span>
-                      </div>
-                    </div>
+            <Card key={person.id} className="shadow-md hover:shadow-lg transition-shadow min-w-0 overflow-hidden flex flex-col h-full">
+              <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b space-y-3">
+                <div className="flex gap-3 min-w-0">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0">
+                    <span className="text-white font-bold text-lg">{person.name[0]?.toUpperCase() ?? '?'}</span>
                   </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEdit(person)}
-                      className="hover:bg-purple-100"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(person.id)}
-                      className="hover:bg-red-100"
-                    >
-                      <Trash2 className="w-4 h-4 text-red-600" />
-                    </Button>
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="text-lg font-semibold leading-snug text-gray-900 break-words hyphens-auto">
+                      {person.name}
+                    </CardTitle>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">
+                        {person.cards.length} {person.cards.length === 1 ? 'card' : 'cards'}
+                      </span>
+                    </div>
                   </div>
                 </div>
+                <div
+                  className="flex flex-wrap items-center gap-2 pt-2 border-t border-purple-200/60 -mb-1"
+                  role="toolbar"
+                  aria-label={`Actions for ${person.name}`}
+                >
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setAddPaymentForPersonId((id) =>
+                        id === person.id ? null : person.id
+                      )
+                      setLogUsageForPersonId(null)
+                    }}
+                    className={
+                      addPaymentForPersonId === person.id
+                        ? 'bg-violet-700 hover:bg-violet-800 text-white shrink-0'
+                        : 'bg-violet-600 hover:bg-violet-700 text-white shrink-0'
+                    }
+                    title="Record a payment to this person (applied to oldest unpaid usage first)"
+                    aria-label={
+                      addPaymentForPersonId === person.id
+                        ? 'Hide add payment'
+                        : 'Add payment'
+                    }
+                  >
+                    <Banknote className="w-4 h-4 mr-1.5 shrink-0" aria-hidden />
+                    <span>
+                      {addPaymentForPersonId === person.id
+                        ? 'Hide payment'
+                        : 'Add payment'}
+                    </span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setLogUsageForPersonId((id) =>
+                        id === person.id ? null : person.id
+                      )
+                      setAddPaymentForPersonId(null)
+                    }}
+                    className={
+                      logUsageForPersonId === person.id
+                        ? 'border-emerald-300 bg-emerald-100 text-emerald-900 hover:bg-emerald-200 shrink-0'
+                        : 'border-emerald-200 text-emerald-800 hover:bg-emerald-50 shrink-0'
+                    }
+                    title="Log new card usage (spend) for this person"
+                    aria-label={
+                      logUsageForPersonId === person.id
+                        ? 'Hide log usage'
+                        : 'Log usage'
+                    }
+                  >
+                    <Wallet className="w-4 h-4 mr-1.5 shrink-0" aria-hidden />
+                    <span>{logUsageForPersonId === person.id ? 'Hide' : 'Log usage'}</span>
+                  </Button>
+                  <span className="hidden sm:block w-px h-6 bg-purple-200/90 shrink-0" aria-hidden />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEdit(person)}
+                    className="hover:bg-purple-100 shrink-0"
+                    title="Edit person"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDelete(person.id)}
+                    className="hover:bg-red-100 shrink-0"
+                    title="Delete person"
+                  >
+                    <Trash2 className="w-4 h-4 text-red-600" />
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent className="pt-4">
+              <CardContent className="pt-4 flex-1 flex flex-col min-w-0">
                 <div
                   className={`mb-4 rounded-lg border px-3 py-3 ${
                     hasOutstanding
@@ -485,23 +562,38 @@ export default function PeoplePage() {
                       </p>
                       {hasOutstanding && (
                         <p className="text-xs text-gray-600 mt-0.5 tabular-nums">
-                          Unpaid usage: ${owedUSD.toFixed(2)} USD
-                          {showTTD && (
-                            <span className="text-gray-500">
-                              {' '}
-                              × card rate each month (Settings rate if a month has no saved rate)
-                            </span>
+                          {showTTD ? (
+                            <>
+                              Unpaid (TTD): ${owedTTD.toFixed(2)} TTD
+                              <span className="text-gray-500">
+                                {' '}
+                                ≈ ${owedUSD.toFixed(2)} USD at each month’s rate
+                              </span>
+                            </>
+                          ) : (
+                            <>Unpaid (USD eq.): ${owedUSD.toFixed(2)} USD — add rates to see TTD</>
                           )}
                         </p>
                       )}
                       <p className="text-xs text-gray-500 mt-1">
                         {hasOutstanding
-                          ? 'Based on the Usage page: amount you used minus “paid to owner”. New usage assumes nothing paid back until you enter it.'
+                          ? 'Usage is logged in TTD; “paid to owner” reduces what you still owe them.'
                           : 'No outstanding balance from logged usage, or usage is fully marked as paid back to them.'}
                       </p>
                     </div>
                   </div>
                 </div>
+                {addPaymentForPersonId === person.id && (
+                  <PersonAddPaymentPanel
+                    personId={person.id}
+                    personName={person.name}
+                    owedUSD={owedUSD}
+                    owedTTD={owedTTD}
+                    onApplied={() => {
+                      void fetchPeople()
+                    }}
+                  />
+                )}
                 {person.email && (
                   <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
                     <Mail className="w-4 h-4 text-gray-400" />
@@ -537,6 +629,14 @@ export default function PeoplePage() {
                       ))}
                     </div>
                   </div>
+                )}
+                {logUsageForPersonId === person.id && (
+                  <PersonLogUsagePanel
+                    personId={person.id}
+                    onLogged={() => {
+                      void fetchPeople()
+                    }}
+                  />
                 )}
               </CardContent>
             </Card>

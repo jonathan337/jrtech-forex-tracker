@@ -28,8 +28,8 @@ export interface UsageEntryRow {
   cardId: string
   year: number
   month: number
-  amountUSD: number
-  paidToOwnerUSD: number
+  amountTTD: number
+  paidToOwnerTTD: number
   usageDate: string
   notes: string | null
 }
@@ -55,15 +55,15 @@ export function CardUsagePanel({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({
-    amountUSD: '',
-    paidToOwnerUSD: '',
+    amountTTD: '',
+    paidToOwnerTTD: '',
     usageDate: format(new Date(), 'yyyy-MM-dd'),
     notes: '',
   })
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState({
-    amountUSD: '',
-    paidToOwnerUSD: '',
+    amountTTD: '',
+    paidToOwnerTTD: '',
     usageDate: '',
     notes: '',
   })
@@ -96,10 +96,10 @@ export function CardUsagePanel({
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
-    const amt = parseFloat(form.amountUSD)
+    const amt = parseFloat(form.amountTTD)
     if (Number.isNaN(amt) || amt <= 0) return
 
-    const paidRaw = form.paidToOwnerUSD.trim()
+    const paidRaw = form.paidToOwnerTTD.trim()
     const paidToOwner = paidRaw === '' ? 0 : parseFloat(paidRaw)
     if (Number.isNaN(paidToOwner) || paidToOwner < 0) {
       setError('Paid to owner must be a valid non-negative amount.')
@@ -122,8 +122,8 @@ export function CardUsagePanel({
           cardId,
           year,
           month,
-          amountUSD: amt,
-          paidToOwnerUSD: paidToOwner,
+          amountTTD: amt,
+          paidToOwnerTTD: paidToOwner,
           usageDate,
           notes: form.notes.trim() || undefined,
         }),
@@ -131,8 +131,8 @@ export function CardUsagePanel({
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
         setForm({
-          amountUSD: '',
-          paidToOwnerUSD: '',
+          amountTTD: '',
+          paidToOwnerTTD: '',
           usageDate: format(new Date(), 'yyyy-MM-dd'),
           notes: '',
         })
@@ -169,8 +169,8 @@ export function CardUsagePanel({
     setListActionError('')
     setEditingEntryId(row.id)
     setEditDraft({
-      amountUSD: String(row.amountUSD),
-      paidToOwnerUSD: String(row.paidToOwnerUSD),
+      amountTTD: String(row.amountTTD),
+      paidToOwnerTTD: String(row.paidToOwnerTTD),
       usageDate: format(new Date(row.usageDate), 'yyyy-MM-dd'),
       notes: row.notes ?? '',
     })
@@ -182,7 +182,7 @@ export function CardUsagePanel({
   }
 
   const markEntrySettled = async (row: UsageEntryRow) => {
-    if (row.amountUSD - row.paidToOwnerUSD <= 1e-6) return
+    if (row.amountTTD - row.paidToOwnerTTD <= 1e-6) return
     setSavingEntryId(row.id)
     setEditRowError('')
     setListActionError('')
@@ -191,7 +191,7 @@ export function CardUsagePanel({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ paidToOwnerUSD: row.amountUSD }),
+        body: JSON.stringify({ paidToOwnerTTD: row.amountTTD }),
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
@@ -212,12 +212,12 @@ export function CardUsagePanel({
 
   const saveEntryEdit = async () => {
     if (!editingEntryId) return
-    const amt = parseFloat(editDraft.amountUSD)
+    const amt = parseFloat(editDraft.amountTTD)
     if (Number.isNaN(amt) || amt <= 0) {
       setEditRowError('Amount must be a positive number.')
       return
     }
-    const paidRaw = editDraft.paidToOwnerUSD.trim()
+    const paidRaw = editDraft.paidToOwnerTTD.trim()
     const paidToOwner = paidRaw === '' ? 0 : parseFloat(paidRaw)
     if (Number.isNaN(paidToOwner) || paidToOwner < 0) {
       setEditRowError('Paid to owner must be a valid non-negative amount.')
@@ -237,8 +237,8 @@ export function CardUsagePanel({
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          amountUSD: amt,
-          paidToOwnerUSD: paidToOwner,
+          amountTTD: amt,
+          paidToOwnerTTD: paidToOwner,
           usageDate,
           notes: editDraft.notes.trim() || null,
         }),
@@ -293,7 +293,7 @@ export function CardUsagePanel({
                 <th className="py-2 px-3 font-medium text-gray-700">Date</th>
                 <th className="py-2 px-3 font-medium text-gray-700">Period</th>
                 <th className="py-2 px-3 font-medium text-gray-700 text-right">
-                  Amount (USD)
+                  Amount (TTD)
                 </th>
                 <th className="py-2 px-3 font-medium text-gray-700 text-right whitespace-nowrap">
                   Paid owner
@@ -325,13 +325,13 @@ export function CardUsagePanel({
                       {MONTHS[u.month - 1]} {u.year}
                     </td>
                     <td className="py-2 px-3 text-right font-medium text-amber-800">
-                      ${u.amountUSD.toFixed(2)}
+                      ${u.amountTTD.toFixed(2)}
                     </td>
                     <td className="py-2 px-3 text-right text-gray-700 whitespace-nowrap">
-                      ${u.paidToOwnerUSD.toFixed(2)}
-                      {u.amountUSD - u.paidToOwnerUSD > 1e-6 && (
+                      ${u.paidToOwnerTTD.toFixed(2)}
+                      {u.amountTTD - u.paidToOwnerTTD > 1e-6 && (
                         <span className="block text-xs text-red-600 font-medium">
-                          Owed: ${(u.amountUSD - u.paidToOwnerUSD).toFixed(2)}
+                          Owed: ${(u.amountTTD - u.paidToOwnerTTD).toFixed(2)}
                         </span>
                       )}
                     </td>
@@ -351,7 +351,7 @@ export function CardUsagePanel({
                         >
                           <Pencil className="w-4 h-4" />
                         </Button>
-                        {u.amountUSD - u.paidToOwnerUSD > 1e-6 && (
+                        {u.amountTTD - u.paidToOwnerTTD > 1e-6 && (
                           <Button
                             type="button"
                             variant="ghost"
@@ -395,20 +395,20 @@ export function CardUsagePanel({
                         <p className="text-sm font-medium text-gray-800 mb-3">Edit usage entry</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
                           <div>
-                            <Label htmlFor={`panel-edit-amt-${u.id}`}>Amount (USD) *</Label>
+                            <Label htmlFor={`panel-edit-amt-${u.id}`}>Amount (TTD) *</Label>
                             <Input
                               id={`panel-edit-amt-${u.id}`}
                               type="number"
                               step="0.01"
                               min="0.01"
-                              value={editDraft.amountUSD}
+                              value={editDraft.amountTTD}
                               onChange={(e) =>
                                 setEditDraft((d) => ({
                                   ...d,
-                                  amountUSD: e.target.value,
-                                  paidToOwnerUSD: usageAmountPaidSync(
-                                    d.amountUSD,
-                                    d.paidToOwnerUSD,
+                                  amountTTD: e.target.value,
+                                  paidToOwnerTTD: usageAmountPaidSync(
+                                    d.amountTTD,
+                                    d.paidToOwnerTTD,
                                     e.target.value
                                   ),
                                 }))
@@ -416,17 +416,17 @@ export function CardUsagePanel({
                             />
                           </div>
                           <div>
-                            <Label htmlFor={`panel-edit-paid-${u.id}`}>Paid to owner (USD)</Label>
+                            <Label htmlFor={`panel-edit-paid-${u.id}`}>Paid to owner (TTD)</Label>
                             <Input
                               id={`panel-edit-paid-${u.id}`}
                               type="number"
                               step="0.01"
                               min="0"
-                              value={editDraft.paidToOwnerUSD}
+                              value={editDraft.paidToOwnerTTD}
                               onChange={(e) =>
                                 setEditDraft((d) => ({
                                   ...d,
-                                  paidToOwnerUSD: e.target.value,
+                                  paidToOwnerTTD: e.target.value,
                                 }))
                               }
                             />
@@ -478,8 +478,8 @@ export function CardUsagePanel({
                           >
                             Cancel
                           </Button>
-                          {parseFloat(editDraft.amountUSD) -
-                            parseFloat(editDraft.paidToOwnerUSD || '0') >
+                          {parseFloat(editDraft.amountTTD) -
+                            parseFloat(editDraft.paidToOwnerTTD || '0') >
                             1e-6 && (
                             <Button
                               type="button"
@@ -487,11 +487,11 @@ export function CardUsagePanel({
                               size="sm"
                               disabled={savingEntryId === u.id}
                               onClick={() => {
-                                const a = parseFloat(editDraft.amountUSD)
+                                const a = parseFloat(editDraft.amountTTD)
                                 if (!Number.isNaN(a))
                                   setEditDraft((d) => ({
                                     ...d,
-                                    paidToOwnerUSD: String(a),
+                                    paidToOwnerTTD: String(a),
                                   }))
                               }}
                             >
@@ -523,20 +523,20 @@ export function CardUsagePanel({
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
-            <Label htmlFor={`usage-amt-${cardId}`}>Amount (USD) *</Label>
+            <Label htmlFor={`usage-amt-${cardId}`}>Amount (TTD) *</Label>
             <Input
               id={`usage-amt-${cardId}`}
               type="number"
               step="0.01"
               min="0.01"
-              value={form.amountUSD}
+              value={form.amountTTD}
               onChange={(e) =>
                 setForm((f) => ({
                   ...f,
-                  amountUSD: e.target.value,
-                  paidToOwnerUSD: usageAmountPaidSync(
-                    f.amountUSD,
-                    f.paidToOwnerUSD,
+                  amountTTD: e.target.value,
+                  paidToOwnerTTD: usageAmountPaidSync(
+                    f.amountTTD,
+                    f.paidToOwnerTTD,
                     e.target.value
                   ),
                 }))
@@ -546,7 +546,7 @@ export function CardUsagePanel({
             />
           </div>
           <div>
-            <Label htmlFor={`usage-paid-${cardId}`}>Paid to owner (USD)</Label>
+            <Label htmlFor={`usage-paid-${cardId}`}>Paid to owner (TTD)</Label>
             <Input
               id={`usage-paid-${cardId}`}
               type="number"
@@ -554,9 +554,9 @@ export function CardUsagePanel({
               min="0"
               placeholder="0 if not paid yet"
               title="Leave 0 until you have paid the owner back for this usage."
-              value={form.paidToOwnerUSD}
+              value={form.paidToOwnerTTD}
               onChange={(e) =>
-                setForm((f) => ({ ...f, paidToOwnerUSD: e.target.value }))
+                setForm((f) => ({ ...f, paidToOwnerTTD: e.target.value }))
               }
               disabled={saving}
             />

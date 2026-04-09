@@ -378,10 +378,12 @@ export default function CardsPage() {
             />
             Group by owner
           </label>
-          <Button onClick={openAddForm} className="shadow-lg">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Card
-          </Button>
+          {!showForm && (
+            <Button onClick={openAddForm} className="shadow-lg">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Card
+            </Button>
+          )}
         </div>
       </div>
 

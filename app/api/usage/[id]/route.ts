@@ -15,22 +15,10 @@ const usageUpdateSchema = z
     year: z.number().int().min(2000).max(2100).optional(),
     month: z.number().int().min(1).max(12).optional(),
     amountUSD: z.number().positive('Amount must be positive').optional(),
-    paidToOwnerUSD: z.number().min(0).optional(),
+    amountTTD: z.number().positive('Amount must be positive').optional(),
+    paidToOwnerTTD: z.number().min(0).optional(),
     usageDate: z.string().datetime().optional(),
     notes: z.string().optional().nullable(),
-  })
-  .superRefine((data, ctx) => {
-    if (
-      data.amountUSD != null &&
-      data.paidToOwnerUSD != null &&
-      data.paidToOwnerUSD - data.amountUSD > 1e-6
-    ) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Paid to owner cannot exceed the usage amount',
-        path: ['paidToOwnerUSD'],
-      })
-    }
   })
 
 async function ownershipWhere(sessionUserId: string, id: string) {
@@ -105,42 +93,55 @@ export async function PATCH(
       }
     }
 
-    const nextAmount = validatedData.amountUSD ?? existing.amountUSD
-    let paidToOwnerPatch: number | undefined
-    if (validatedData.paidToOwnerUSD !== undefined) {
-      paidToOwnerPatch = validatedData.paidToOwnerUSD
-    } else if (validatedData.amountUSD !== undefined) {
-      paidToOwnerPatch = Math.min(existing.paidToOwnerUSD, nextAmount)
-    }
+    const nextAmountUSDBase =
+      validatedData.amountUSD ??
+      existing.amountUSD ??
+      validatedData.amountTTD ??
+      existing.amountTTD
+    const nextAmount = validatedData.amountTTD ?? nextAmountUSDBase
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { defaultExchangeRate: true },
+    })
+    const fallbackRate =
+      typeof user?.defaultExchangeRate === 'number' &&
+      Number.isFinite(user.defaultExchangeRate) &&
+      user.defaultExchangeRate > 0
+        ? user.defaultExchangeRate
+        : null
+    const nextAmountUSD =
+      validatedData.amountUSD ??
+      existing.amountUSD ??
+      (fallbackRate ? nextAmount / fallbackRate : null)
+    const paidToOwnerPatch =
+      validatedData.paidToOwnerTTD !== undefined
+        ? validatedData.paidToOwnerTTD
+        : undefined
 
-    const effectivePaid =
-      paidToOwnerPatch !== undefined ? paidToOwnerPatch : existing.paidToOwnerUSD
-    if (effectivePaid - nextAmount > 1e-6) {
-      return NextResponse.json(
-        { error: 'Paid to owner cannot exceed the usage amount' },
-        { status: 400 }
-      )
+    const updateData = {
+      ...(validatedData.cardId !== undefined && { cardId: validatedData.cardId }),
+      ...(validatedData.year !== undefined && { year: validatedData.year }),
+      ...(validatedData.month !== undefined && { month: validatedData.month }),
+      ...(validatedData.amountTTD !== undefined && {
+        amountTTD: validatedData.amountTTD,
+      }),
+      ...(validatedData.amountTTD !== undefined || validatedData.amountUSD !== undefined
+        ? { amountUSD: nextAmountUSD }
+        : {}),
+      ...(paidToOwnerPatch !== undefined && {
+        paidToOwnerTTD: paidToOwnerPatch,
+      }),
+      ...(validatedData.usageDate !== undefined && {
+        usageDate: new Date(validatedData.usageDate),
+      }),
+      ...(validatedData.notes !== undefined && {
+        notes: validatedData.notes,
+      }),
     }
 
     const updated = await prisma.cardUsage.update({
       where: { id },
-      data: {
-        ...(validatedData.cardId !== undefined && { cardId: validatedData.cardId }),
-        ...(validatedData.year !== undefined && { year: validatedData.year }),
-        ...(validatedData.month !== undefined && { month: validatedData.month }),
-        ...(validatedData.amountUSD !== undefined && {
-          amountUSD: validatedData.amountUSD,
-        }),
-        ...(paidToOwnerPatch !== undefined && {
-          paidToOwnerUSD: paidToOwnerPatch,
-        }),
-        ...(validatedData.usageDate !== undefined && {
-          usageDate: new Date(validatedData.usageDate),
-        }),
-        ...(validatedData.notes !== undefined && {
-          notes: validatedData.notes,
-        }),
-      },
+      data: updateData,
       include: {
         card: {
           include: {
@@ -156,6 +157,16 @@ export async function PATCH(
       return NextResponse.json(
         { error: 'Validation error', details: error.issues },
         { status: 400 }
+      )
+    }
+    const msg = error instanceof Error ? error.message : String(error)
+    if (msg.includes('amountUSD')) {
+      return NextResponse.json(
+        {
+          error:
+            'Database missing CardUsage.amountUSD. Run: ALTER TABLE "CardUsage" ADD COLUMN IF NOT EXISTS "amountUSD" DOUBLE PRECISION;',
+        },
+        { status: 500 }
       )
     }
     console.error('Error updating usage:', error)

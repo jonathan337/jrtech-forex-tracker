@@ -41,7 +41,9 @@ interface Summary {
   totalTTD: number
   netUSD: number
   totalUsedUSD: number
+  totalUsedTTD: number
   balanceUSD: number
+  balanceTTD: number
   availability: Array<{
     id: string
     cardId: string
@@ -51,7 +53,11 @@ interface Summary {
     notes: string | null
     isRecurringTemplate?: boolean
     usageUSD: number
+    usageTTD: number
+    owedTTD: number
+    ttdValue: number
     balanceUSD: number
+    balanceTTD: number
     impliedFeeTTD: number
     impliedFeeUSD: number
     card: {
@@ -96,14 +102,15 @@ export default function Dashboard() {
   const [showQuickUsage, setShowQuickUsage] = useState(false)
   const [quickForm, setQuickForm] = useState({
     cardId: '',
-    amountUSD: '',
-    paidToOwnerUSD: '',
+    amountTTD: '',
+    paidToOwnerTTD: '',
     usageDate: format(new Date(), 'yyyy-MM-dd'),
     notes: '',
   })
   const [quickError, setQuickError] = useState('')
   const [quickSaving, setQuickSaving] = useState(false)
   const [usageRevision, setUsageRevision] = useState(0)
+  const [totalOwedToPeopleTTD, setTotalOwedToPeopleTTD] = useState(0)
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth() + 1
@@ -111,7 +118,7 @@ export default function Dashboard() {
   const filteredRows = useMemo(() => {
     if (!summary?.availability.length) return []
     if (!onlyWithBalance) return summary.availability
-    return summary.availability.filter((r) => r.balanceUSD > 0)
+    return summary.availability.filter((r) => r.balanceTTD > 0)
   }, [summary?.availability, onlyWithBalance])
 
   const availabilityByOwner = useMemo(() => {
@@ -172,6 +179,7 @@ export default function Dashboard() {
     if (status === 'authenticated') {
       fetchSummary()
       fetchDefaultRate()
+      fetchPeopleOwed()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, month, status])
@@ -229,11 +237,11 @@ export default function Dashboard() {
 
   const handleQuickUsageSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!quickForm.cardId || !quickForm.amountUSD) return
-    const amt = parseFloat(quickForm.amountUSD)
+    if (!quickForm.cardId || !quickForm.amountTTD) return
+    const amt = parseFloat(quickForm.amountTTD)
     if (Number.isNaN(amt) || amt <= 0) return
 
-    const paidRaw = quickForm.paidToOwnerUSD.trim()
+    const paidRaw = quickForm.paidToOwnerTTD.trim()
     const paidToOwner = paidRaw === '' ? 0 : parseFloat(paidRaw)
     if (Number.isNaN(paidToOwner) || paidToOwner < 0) {
       setQuickError('Paid to owner must be a valid non-negative amount.')
@@ -256,8 +264,8 @@ export default function Dashboard() {
           cardId: quickForm.cardId,
           year,
           month,
-          amountUSD: amt,
-          paidToOwnerUSD: paidToOwner,
+          amountTTD: amt,
+          paidToOwnerTTD: paidToOwner,
           usageDate,
           notes: quickForm.notes.trim() || undefined,
         }),
@@ -266,8 +274,8 @@ export default function Dashboard() {
       if (res.ok) {
         setQuickForm({
           cardId: '',
-          amountUSD: '',
-          paidToOwnerUSD: '',
+          amountTTD: '',
+          paidToOwnerTTD: '',
           usageDate: format(new Date(), 'yyyy-MM-dd'),
           notes: '',
         })
@@ -289,8 +297,8 @@ export default function Dashboard() {
     setQuickForm((f) => ({
       ...f,
       cardId,
-      amountUSD: '',
-      paidToOwnerUSD: '',
+      amountTTD: '',
+      paidToOwnerTTD: '',
       usageDate: format(new Date(), 'yyyy-MM-dd'),
     }))
     setQuickError('')
@@ -316,6 +324,33 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Error fetching default rate:', error)
+    }
+  }
+
+  const fetchPeopleOwed = async () => {
+    try {
+      const url = new URL('/api/people', window.location.origin).toString()
+      const response = await fetch(url, {
+        credentials: 'include',
+        cache: 'no-store',
+      })
+      if (!response.ok) {
+        setTotalOwedToPeopleTTD(0)
+        return
+      }
+      const data: unknown = await response.json().catch(() => null)
+      if (!Array.isArray(data)) {
+        setTotalOwedToPeopleTTD(0)
+        return
+      }
+      const total = data.reduce((sum, p) => {
+        const owed = (p as { owedTTD?: unknown }).owedTTD
+        return sum + (typeof owed === 'number' && Number.isFinite(owed) ? owed : 0)
+      }, 0)
+      setTotalOwedToPeopleTTD(total)
+    } catch (error) {
+      console.error('Error fetching people owed:', error)
+      setTotalOwedToPeopleTTD(0)
     }
   }
 
@@ -380,12 +415,12 @@ export default function Dashboard() {
         <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
           <span
             className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
-              item.balanceUSD < 0
+              item.owedTTD > 0
                 ? 'bg-red-100 text-red-800'
                 : 'bg-teal-100 text-teal-800'
             }`}
           >
-            ${item.balanceUSD.toFixed(2)}
+            ${item.owedTTD.toFixed(2)}
           </span>
         </td>
         <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
@@ -395,7 +430,7 @@ export default function Dashboard() {
         </td>
         <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
           <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-700">
-            ${(item.amountUSD * item.exchangeRate).toFixed(2)}
+            ${item.ttdValue.toFixed(2)}
           </span>
         </td>
         <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
@@ -539,7 +574,7 @@ export default function Dashboard() {
                   ${summary.totalUSD.toFixed(2)}
                 </div>
                 <p className="text-xs text-gray-500">
-                  Net after fees: ${summary.netUSD.toFixed(2)}
+                  Sum of all card availability amounts in USD
                 </p>
               </CardContent>
             </Card>
@@ -547,7 +582,7 @@ export default function Dashboard() {
             <Card className="shadow-md hover:shadow-lg transition-shadow border-l-4 border-l-amber-500">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Total USD used
+                  Total USD balance
                 </CardTitle>
                 <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
                   <Wallet className="h-4 w-4 text-amber-700" />
@@ -555,16 +590,18 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-amber-700">
-                  ${summary.totalUsedUSD.toFixed(2)}
+                  ${(summary.totalUSD - summary.totalUsedUSD).toFixed(2)}
                 </div>
-                <p className="text-xs text-gray-500">Logged usage this month</p>
+                <p className="text-xs text-gray-500">
+                  USD available minus USD usage this month
+                </p>
               </CardContent>
             </Card>
 
             <Card className="shadow-md hover:shadow-lg transition-shadow border-l-4 border-l-teal-500">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Balance (remaining)
+                  Total TTD owed to people
                 </CardTitle>
                 <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
                   <Scale className="h-4 w-4 text-teal-700" />
@@ -573,12 +610,14 @@ export default function Dashboard() {
               <CardContent>
                 <div
                   className={`text-2xl font-bold ${
-                    summary.balanceUSD < 0 ? 'text-red-600' : 'text-teal-700'
+                    totalOwedToPeopleTTD > 0 ? 'text-red-600' : 'text-teal-700'
                   }`}
                 >
-                  ${summary.balanceUSD.toFixed(2)}
+                  ${totalOwedToPeopleTTD.toFixed(2)}
                 </div>
-                <p className="text-xs text-gray-500">Total USD available minus usage</p>
+                <p className="text-xs text-gray-500">
+                  Sum of all people balances (TTD only)
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -621,7 +660,7 @@ export default function Dashboard() {
             <Card className="shadow-md hover:shadow-lg transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Total TTD value
+                  Total TTD required
                 </CardTitle>
                 <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
                   <DollarSign className="h-4 w-4 text-indigo-600" />
@@ -632,10 +671,7 @@ export default function Dashboard() {
                   ${summary.totalTTD.toFixed(2)}
                 </div>
                 <p className="text-xs text-gray-500">
-                  Total fees (TTD value minus TTD at baseline rate):{' '}
-                  <span className="font-medium text-gray-700">
-                    {summary.totalFeesTTD.toFixed(2)} TTD
-                  </span>
+                  TTD needed to cover all logged USD usage at each card's rate
                 </p>
               </CardContent>
             </Card>
@@ -772,20 +808,20 @@ export default function Dashboard() {
                             </select>
                           </div>
                           <div>
-                            <Label htmlFor="quick-usage-amt">Amount (USD) *</Label>
+                            <Label htmlFor="quick-usage-amt">Amount (TTD) *</Label>
                             <Input
                               id="quick-usage-amt"
                               type="number"
                               step="0.01"
                               min="0.01"
-                              value={quickForm.amountUSD}
+                              value={quickForm.amountTTD}
                               onChange={(e) =>
                                 setQuickForm((f) => ({
                                   ...f,
-                                  amountUSD: e.target.value,
-                                  paidToOwnerUSD: usageAmountPaidSync(
-                                    f.amountUSD,
-                                    f.paidToOwnerUSD,
+                                  amountTTD: e.target.value,
+                                  paidToOwnerTTD: usageAmountPaidSync(
+                                    f.amountTTD,
+                                    f.paidToOwnerTTD,
                                     e.target.value
                                   ),
                                 }))
@@ -795,7 +831,7 @@ export default function Dashboard() {
                             />
                           </div>
                           <div>
-                            <Label htmlFor="quick-usage-paid">Paid to owner (USD)</Label>
+                            <Label htmlFor="quick-usage-paid">Paid to owner (TTD)</Label>
                             <Input
                               id="quick-usage-paid"
                               type="number"
@@ -803,11 +839,11 @@ export default function Dashboard() {
                               min="0"
                               placeholder="0 if not paid yet"
                               title="Leave 0 until you have paid the card owner back."
-                              value={quickForm.paidToOwnerUSD}
+                              value={quickForm.paidToOwnerTTD}
                               onChange={(e) =>
                                 setQuickForm((f) => ({
                                   ...f,
-                                  paidToOwnerUSD: e.target.value,
+                                  paidToOwnerTTD: e.target.value,
                                 }))
                               }
                               disabled={quickSaving}
@@ -868,13 +904,13 @@ export default function Dashboard() {
                             Owner
                           </th>
                           <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
-                            Available
+                            Available (USD)
                           </th>
                           <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
-                            Used
+                            Used (USD)
                           </th>
                           <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
-                            Balance
+                            Owed (TTD)
                           </th>
                           <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
                             Rate

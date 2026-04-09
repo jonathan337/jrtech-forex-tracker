@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { z } from 'zod'
 import { cardBodySchema, prismaDataFromCardBody } from '@/lib/card-payload'
-import { cardHasAvailabilityForMonth } from '@/lib/card-available-for-month'
+import { cardHasAvailabilityForMonthFromLoadedCard } from '@/lib/card-available-for-month'
 import { serverErrorResponse } from '@/lib/api-error'
 
 export const runtime = 'nodejs'
@@ -25,11 +25,13 @@ export async function GET(request: NextRequest) {
       monthParam !== ''
     const y = filterByMonth ? parseInt(yearParam, 10) : 0
     const m = filterByMonth ? parseInt(monthParam, 10) : 0
+    const personIdParam = request.nextUrl.searchParams.get('personId')
 
     const cards = await prisma.card.findMany({
       where: {
         person: {
           userId: session.user.id,
+          ...(personIdParam ? { id: personIdParam } : {}),
         },
       },
       include: {
@@ -52,13 +54,43 @@ export async function GET(request: NextRequest) {
       m >= 1 &&
       m <= 12
     ) {
-      const allowed = await Promise.all(
-        cards.map(async (c) => ({
-          card: c,
-          ok: await cardHasAvailabilityForMonth(c.id, y, m),
-        }))
+      const userSettings = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { defaultExchangeRate: true },
+      })
+      const fallbackRate =
+        typeof userSettings?.defaultExchangeRate === 'number'
+          ? userSettings.defaultExchangeRate
+          : null
+
+      const filtered = cards.filter((c) =>
+        cardHasAvailabilityForMonthFromLoadedCard(c, y, m)
       )
-      return NextResponse.json(allowed.filter((x) => x.ok).map((x) => x.card))
+      filtered.sort((a, b) => {
+        const byPerson = a.person.name.localeCompare(b.person.name, undefined, {
+          sensitivity: 'base',
+        })
+        if (byPerson !== 0) return byPerson
+        return a.cardNickname.localeCompare(b.cardNickname, undefined, {
+          sensitivity: 'base',
+        })
+      })
+      const slim = filtered.map((c) => {
+        const monthRate =
+          c.monthlyAvailability.find((ma) => ma.year === y && ma.month === m)
+            ?.exchangeRate ?? null
+        const effectiveExchangeRate =
+          monthRate ??
+          (c.alwaysAvailable ? c.recurringExchangeRate ?? null : null) ??
+          fallbackRate
+        const { monthlyAvailability, ...rest } = c
+        void monthlyAvailability
+        return {
+          ...rest,
+          effectiveExchangeRate,
+        }
+      })
+      return NextResponse.json(slim)
     }
 
     return NextResponse.json(cards)
