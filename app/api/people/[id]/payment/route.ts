@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { z } from 'zod'
 import { serverErrorResponse } from '@/lib/api-error'
+import { exchangeRateForUsageMonth } from '@/lib/exchange-rate-for-usage'
 
 export const runtime = 'nodejs'
 
@@ -15,6 +16,37 @@ const EPS = 1e-6
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100
+}
+
+/** Same basis as GET /api/people owedTTD — not raw row.amountTTD (which can be wrong if USD was stored as TTD). */
+function canonicalUsageTtd(
+  row: {
+    amountUSD: number | null
+    amountTTD: number
+    cardId: string
+    year: number
+    month: number
+    card: { alwaysAvailable: boolean; recurringExchangeRate: number | null }
+  },
+  rateByCardMonth: Map<string, number>,
+  baseline: number
+): number {
+  const rate = exchangeRateForUsageMonth(
+    row.cardId,
+    row.year,
+    row.month,
+    row.card,
+    rateByCardMonth,
+    baseline
+  )
+  if (rate == null || rate <= 0) {
+    return round2(row.amountTTD)
+  }
+  const usageUSD =
+    typeof row.amountUSD === 'number' && Number.isFinite(row.amountUSD)
+      ? row.amountUSD
+      : row.amountTTD / rate
+  return round2(usageUSD * rate)
 }
 
 export async function POST(
@@ -40,30 +72,71 @@ export async function POST(
     const body = await request.json()
     const { amountTTD } = bodySchema.parse(body)
 
-    const usages = await prisma.cardUsage.findMany({
-      where: {
-        card: {
-          personId,
-          person: { userId: session.user.id },
-        },
-      },
-      include: {
-        card: {
-          select: {
-            cardNickname: true,
+    const [usages, baselineRow] = await Promise.all([
+      prisma.cardUsage.findMany({
+        where: {
+          card: {
+            personId,
+            person: { userId: session.user.id },
           },
         },
-      },
-      orderBy: [{ usageDate: 'asc' }, { createdAt: 'asc' }],
-    })
+        include: {
+          card: {
+            select: {
+              cardNickname: true,
+              alwaysAvailable: true,
+              recurringExchangeRate: true,
+            },
+          },
+        },
+        orderBy: [{ usageDate: 'asc' }, { createdAt: 'asc' }],
+      }),
+      prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { defaultExchangeRate: true },
+      }),
+    ])
+
+    const baseline = baselineRow?.defaultExchangeRate ?? 0
+
+    const monthKeys = [
+      ...new Map(
+        usages.map((u) => [
+          `${u.cardId}\t${u.year}\t${u.month}`,
+          { cardId: u.cardId, year: u.year, month: u.month },
+        ])
+      ).values(),
+    ]
+
+    const monthlyRates =
+      monthKeys.length === 0
+        ? []
+        : await prisma.monthlyAvailability.findMany({
+            where: { OR: monthKeys },
+            select: {
+              cardId: true,
+              year: true,
+              month: true,
+              exchangeRate: true,
+            },
+          })
+
+    const rateByCardMonth = new Map(
+      monthlyRates.map((m) => [
+        `${m.cardId}\t${m.year}\t${m.month}`,
+        m.exchangeRate,
+      ])
+    )
 
     type Row = (typeof usages)[number]
 
-    const unpaidRows: { row: Row; unpaidTTD: number }[] = []
+    const unpaidRows: { row: Row; unpaidTTD: number; usageTtdTotal: number }[] =
+      []
     for (const row of usages) {
-      const unpaidTTD = round2(row.amountTTD - row.paidToOwnerTTD)
+      const usageTtdTotal = canonicalUsageTtd(row, rateByCardMonth, baseline)
+      const unpaidTTD = round2(usageTtdTotal - row.paidToOwnerTTD)
       if (unpaidTTD > EPS) {
-        unpaidRows.push({ row, unpaidTTD })
+        unpaidRows.push({ row, unpaidTTD, usageTtdTotal })
       }
     }
 
@@ -78,7 +151,12 @@ export async function POST(
     }
 
     let remainingTTD = round2(amountTTD)
-    const updates: { id: string; newPaid: number }[] = []
+    const updates: {
+      id: string
+      newPaid: number
+      /** Align stored amountTTD with Usage / People when legacy row had USD stored as TTD. */
+      syncAmountTTD?: number
+    }[] = []
     const allocations: Array<{
       usageId: string
       amountAppliedTTD: number
@@ -86,21 +164,26 @@ export async function POST(
       usageDate: string
     }> = []
 
-    for (const { row, unpaidTTD } of unpaidRows) {
+    for (const { row, unpaidTTD, usageTtdTotal } of unpaidRows) {
       if (remainingTTD <= EPS) break
 
       const applyTTD = round2(Math.min(remainingTTD, unpaidTTD))
       if (applyTTD <= EPS) continue
 
       const newPaid = round2(row.paidToOwnerTTD + applyTTD)
-      if (newPaid - row.amountTTD > EPS) {
+      if (newPaid - usageTtdTotal > EPS) {
         return NextResponse.json(
           { error: 'Internal error: payment would exceed usage amount.' },
           { status: 500 }
         )
       }
 
-      updates.push({ id: row.id, newPaid })
+      const syncAmountTTD =
+        Math.abs(usageTtdTotal - row.amountTTD) > EPS
+          ? usageTtdTotal
+          : undefined
+
+      updates.push({ id: row.id, newPaid, syncAmountTTD })
       allocations.push({
         usageId: row.id,
         amountAppliedTTD: applyTTD,
@@ -122,7 +205,12 @@ export async function POST(
       updates.map((u) =>
         prisma.cardUsage.update({
           where: { id: u.id },
-          data: { paidToOwnerTTD: u.newPaid },
+          data: {
+            paidToOwnerTTD: u.newPaid,
+            ...(u.syncAmountTTD !== undefined
+              ? { amountTTD: u.syncAmountTTD }
+              : {}),
+          },
         })
       )
     )

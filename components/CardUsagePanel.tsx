@@ -28,10 +28,30 @@ export interface UsageEntryRow {
   cardId: string
   year: number
   month: number
+  /** TTD spend; may be wrong for older rows logged from USD-only forms (stored USD as TTD). */
   amountTTD: number
+  /** When set, canonical TTD is amountUSD × month rate when a rate is available. */
+  amountUSD?: number | null
   paidToOwnerTTD: number
   usageDate: string
   notes: string | null
+}
+
+/** Prefer USD × monthly rate when both exist (fixes legacy rows where amountTTD duplicated USD). */
+function usageAmountTtd(
+  row: UsageEntryRow,
+  monthExchangeRate: number | null | undefined
+): number {
+  const rate = monthExchangeRate
+  if (
+    typeof row.amountUSD === 'number' &&
+    Number.isFinite(row.amountUSD) &&
+    rate != null &&
+    rate > 0
+  ) {
+    return row.amountUSD * rate
+  }
+  return row.amountTTD
 }
 
 export function CardUsagePanel({
@@ -41,6 +61,8 @@ export function CardUsagePanel({
   month,
   onUsageChanged,
   usageRevision = 0,
+  /** Card/month TTD per USD from availability; used to derive TTD from stored USD for legacy rows. */
+  monthExchangeRate,
 }: {
   cardId: string
   cardLabel: string
@@ -49,6 +71,7 @@ export function CardUsagePanel({
   onUsageChanged: () => void
   /** Increment when usage may have changed from outside this panel (e.g. dashboard quick log). */
   usageRevision?: number
+  monthExchangeRate?: number | null
 }) {
   const [entries, setEntries] = useState<UsageEntryRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -169,7 +192,7 @@ export function CardUsagePanel({
     setListActionError('')
     setEditingEntryId(row.id)
     setEditDraft({
-      amountTTD: String(row.amountTTD),
+      amountTTD: String(usageAmountTtd(row, monthExchangeRate)),
       paidToOwnerTTD: String(row.paidToOwnerTTD),
       usageDate: format(new Date(row.usageDate), 'yyyy-MM-dd'),
       notes: row.notes ?? '',
@@ -182,7 +205,8 @@ export function CardUsagePanel({
   }
 
   const markEntrySettled = async (row: UsageEntryRow) => {
-    if (row.amountTTD - row.paidToOwnerTTD <= 1e-6) return
+    const usageTtd = usageAmountTtd(row, monthExchangeRate)
+    if (usageTtd - row.paidToOwnerTTD <= 1e-6) return
     setSavingEntryId(row.id)
     setEditRowError('')
     setListActionError('')
@@ -191,7 +215,12 @@ export function CardUsagePanel({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ paidToOwnerTTD: row.amountTTD }),
+        body: JSON.stringify({
+          paidToOwnerTTD: usageTtd,
+          ...(usageTtd !== row.amountTTD
+            ? { amountTTD: usageTtd }
+            : {}),
+        }),
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
@@ -296,7 +325,7 @@ export function CardUsagePanel({
                   Amount (TTD)
                 </th>
                 <th className="py-2 px-3 font-medium text-gray-700 text-right whitespace-nowrap">
-                  Paid owner
+                  Paid owner (TTD)
                 </th>
                 <th className="py-2 px-3 font-medium text-gray-700">Notes</th>
                 <th className="py-2 px-3 font-medium text-gray-700 text-right whitespace-nowrap">
@@ -325,13 +354,18 @@ export function CardUsagePanel({
                       {MONTHS[u.month - 1]} {u.year}
                     </td>
                     <td className="py-2 px-3 text-right font-medium text-amber-800">
-                      ${u.amountTTD.toFixed(2)}
+                      TTD ${usageAmountTtd(u, monthExchangeRate).toFixed(2)}
                     </td>
                     <td className="py-2 px-3 text-right text-gray-700 whitespace-nowrap">
-                      ${u.paidToOwnerTTD.toFixed(2)}
-                      {u.amountTTD - u.paidToOwnerTTD > 1e-6 && (
+                      TTD ${u.paidToOwnerTTD.toFixed(2)}
+                      {usageAmountTtd(u, monthExchangeRate) - u.paidToOwnerTTD >
+                        1e-6 && (
                         <span className="block text-xs text-red-600 font-medium">
-                          Owed: ${(u.amountTTD - u.paidToOwnerTTD).toFixed(2)}
+                          Owed: TTD $
+                          {(
+                            usageAmountTtd(u, monthExchangeRate) -
+                            u.paidToOwnerTTD
+                          ).toFixed(2)}
                         </span>
                       )}
                     </td>
@@ -351,7 +385,8 @@ export function CardUsagePanel({
                         >
                           <Pencil className="w-4 h-4" />
                         </Button>
-                        {u.amountTTD - u.paidToOwnerTTD > 1e-6 && (
+                        {usageAmountTtd(u, monthExchangeRate) - u.paidToOwnerTTD >
+                          1e-6 && (
                           <Button
                             type="button"
                             variant="ghost"

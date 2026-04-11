@@ -174,12 +174,23 @@ export default function UsagePage() {
     if (!form.cardId || !form.amountUSD) return
     const usageUSD = parseFloat(form.amountUSD)
     if (Number.isNaN(usageUSD) || usageUSD <= 0) return
-    const amt = usageUSD
+    const cardRate = rateForCardId(form.cardId)
+    if (cardRate == null || cardRate <= 0) {
+      setFormError(
+        'This card has no exchange rate for this month. Add availability for this month first.'
+      )
+      return
+    }
+    const amountTTD = usageUSD * cardRate
 
     const paidRaw = form.paidToOwnerTTD.trim()
     const paidToOwner = paidRaw === '' ? 0 : parseFloat(paidRaw)
     if (Number.isNaN(paidToOwner) || paidToOwner < 0) {
       setFormError('Paid to owner must be a valid non-negative amount.')
+      return
+    }
+    if (paidToOwner - amountTTD > 1e-6) {
+      setFormError('Paid to owner (TTD) cannot be more than usage in TTD for this month.')
       return
     }
 
@@ -196,7 +207,7 @@ export default function UsagePage() {
           year,
           month,
           amountUSD: usageUSD,
-          amountTTD: amt,
+          amountTTD,
           paidToOwnerTTD: paidToOwner,
           usageDate,
           notes: form.notes.trim() || undefined,
@@ -292,20 +303,28 @@ export default function UsagePage() {
 
   const saveEntryEdit = async () => {
     if (!editingEntryId) return
+    const row = entries.find((e) => e.id === editingEntryId)
     const usageUSD = parseFloat(editDraft.amountUSD)
     if (Number.isNaN(usageUSD) || usageUSD <= 0) {
       setEditEntryError('Usage amount (USD) must be a positive number.')
       return
     }
-    const amt = usageUSD
-    if (Number.isNaN(amt) || amt <= 0) {
-      setEditEntryError('Amount must be a positive number.')
+    const cardRate = row ? rateForCardId(row.cardId) : null
+    if (cardRate == null || cardRate <= 0) {
+      setEditEntryError(
+        'This card has no exchange rate for this month. Add availability for this month first.'
+      )
       return
     }
+    const amountTTD = usageUSD * cardRate
     const paidRaw = editDraft.paidToOwnerTTD.trim()
     const paidToOwner = paidRaw === '' ? 0 : parseFloat(paidRaw)
     if (Number.isNaN(paidToOwner) || paidToOwner < 0) {
       setEditEntryError('Paid to owner must be a valid non-negative amount.')
+      return
+    }
+    if (paidToOwner - amountTTD > 1e-6) {
+      setEditEntryError('Paid to owner (TTD) cannot be more than usage in TTD for this month.')
       return
     }
 
@@ -319,7 +338,7 @@ export default function UsagePage() {
         credentials: 'include',
         body: JSON.stringify({
           amountUSD: usageUSD,
-          amountTTD: amt,
+          amountTTD,
           paidToOwnerTTD: paidToOwner,
           usageDate,
           notes: editDraft.notes.trim() || null,

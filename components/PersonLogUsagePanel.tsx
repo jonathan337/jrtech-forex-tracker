@@ -84,12 +84,25 @@ export function PersonLogUsagePanel({ personId, onLogged }: Props) {
     setFormError('')
   }, [year, month, personId])
 
+  const rateForCardId = (cardId: string): number | null => {
+    const card = cards.find((c) => c.id === cardId)
+    if (!card || typeof card.effectiveExchangeRate !== 'number') return null
+    return card.effectiveExchangeRate
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.cardId || !form.amountUSD) return
     const usageUSD = parseFloat(form.amountUSD)
     if (Number.isNaN(usageUSD) || usageUSD <= 0) return
-    const amt = usageUSD
+    const cardRate = rateForCardId(form.cardId)
+    if (cardRate == null || cardRate <= 0) {
+      setFormError(
+        'This card has no exchange rate for this month. Add availability for this month first.'
+      )
+      return
+    }
+    const amountTTD = usageUSD * cardRate
 
     const paidRaw = form.paidToOwnerTTD.trim()
     const paidToOwner = paidRaw === '' ? 0 : parseFloat(paidRaw)
@@ -97,8 +110,8 @@ export function PersonLogUsagePanel({ personId, onLogged }: Props) {
       setFormError('Paid to owner must be a valid non-negative amount.')
       return
     }
-    if (paidToOwner - amt > 1e-6) {
-      setFormError('Paid to owner cannot be more than the usage amount.')
+    if (paidToOwner - amountTTD > 1e-6) {
+      setFormError('Paid to owner (TTD) cannot be more than usage in TTD for this month.')
       return
     }
 
@@ -115,7 +128,7 @@ export function PersonLogUsagePanel({ personId, onLogged }: Props) {
           year,
           month,
           amountUSD: usageUSD,
-          amountTTD: amt,
+          amountTTD,
           paidToOwnerTTD: paidToOwner,
           usageDate,
           notes: form.notes.trim() || undefined,

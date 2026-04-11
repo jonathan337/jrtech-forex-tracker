@@ -472,6 +472,7 @@ export default function Dashboard() {
               month={month}
               onUsageChanged={afterUsageChange}
               usageRevision={usageRevision}
+              monthExchangeRate={item.exchangeRate}
             />
           </td>
         </tr>

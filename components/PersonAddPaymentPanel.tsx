@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -24,7 +24,9 @@ export function PersonAddPaymentPanel({
   owedTTD,
   onApplied,
 }: Props) {
-  const [amount, setAmount] = useState('')
+  const [amount, setAmount] = useState(() =>
+    owedTTD > 0.005 ? owedTTD.toFixed(2) : ''
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState<{
@@ -37,6 +39,14 @@ export function PersonAddPaymentPanel({
       usageDate: string
     }>
   } | null>(null)
+
+  useEffect(() => {
+    if (owedTTD > 0.005) {
+      setAmount(owedTTD.toFixed(2))
+    } else {
+      setAmount('')
+    }
+  }, [owedTTD, personId])
 
   const hasOutstandingTTD = owedTTD > 0.005
   const hasUnpaidUSDButNoTTDDisplay =
@@ -76,7 +86,6 @@ export function PersonAddPaymentPanel({
             typeof data.surplusTTD === 'number' ? data.surplusTTD : 0,
           allocations: data.allocations,
         })
-        setAmount('')
         onApplied?.()
       } else {
         setError('Unexpected response from server.')
