@@ -72,7 +72,10 @@ export default function Navigation() {
               <div className="hidden sm:ml-8 sm:flex sm:space-x-6 lg:space-x-8">
                 {links.map((link) => {
                   const Icon = link.icon
-                  const isActive = pathname === link.href
+                  const isActive =
+                    pathname === link.href ||
+                    (link.href === '/people' &&
+                      pathname.startsWith('/people/'))
                   return (
                     <Link
                       key={link.href}
@@ -139,7 +142,10 @@ export default function Navigation() {
           <div className="sm:hidden border-t border-gray-100 py-3 space-y-1 pb-4">
             {links.map((link) => {
               const Icon = link.icon
-              const isActive = pathname === link.href
+              const isActive =
+                pathname === link.href ||
+                (link.href === '/people' &&
+                  pathname.startsWith('/people/'))
               return (
                 <Link
                   key={link.href}

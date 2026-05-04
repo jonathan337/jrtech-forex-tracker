@@ -48,6 +48,7 @@ export function buildRecurringAvailabilityEntry(
     card: {
       cardNickname: card.cardNickname,
       issuingBank: card.issuingBank,
+      lastFourDigits: card.lastFourDigits,
       person: {
         id: card.person.id,
         name: card.person.name,

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 import { loadMonthAvailabilityWithUsage } from '@/lib/month-availability-with-usage'
 
 export const runtime = 'nodejs'
@@ -28,40 +29,54 @@ export async function GET(request: Request) {
     const { usageRows, availabilityWithUsage } =
       await loadMonthAvailabilityWithUsage(session.user.id, y, m)
 
-    const totalUSD = availabilityWithUsage.reduce(
-      (sum, item) => sum + item.amountUSD,
-      0
-    )
-    const totalUsedUSD = usageRows.reduce(
-      (sum, u) =>
-        sum +
-        (typeof u.amountUSD === 'number' && Number.isFinite(u.amountUSD)
-          ? u.amountUSD
-          : 0),
-      0
-    )
-    const totalFeesTTD = availabilityWithUsage.reduce(
+    let rows = availabilityWithUsage
+    let personMeta: { id: string; name: string } | null = null
+
+    const personIdParam = searchParams.get('personId')?.trim()
+    if (personIdParam) {
+      const person = await prisma.person.findFirst({
+        where: { id: personIdParam, userId: session.user.id },
+        select: { id: true, name: true },
+      })
+      if (!person) {
+        return NextResponse.json({ error: 'Person not found' }, { status: 404 })
+      }
+      personMeta = person
+      rows = availabilityWithUsage.filter(
+        (row) => row.card.person.id === person.id
+      )
+    }
+
+    const totalUSD = rows.reduce((sum, item) => sum + item.amountUSD, 0)
+    const totalUsedUSD = personIdParam
+      ? rows.reduce((sum, item) => sum + item.usageUSD, 0)
+      : usageRows.reduce(
+          (sum, u) =>
+            sum +
+            (typeof u.amountUSD === 'number' && Number.isFinite(u.amountUSD)
+              ? u.amountUSD
+              : 0),
+          0
+        )
+    const totalFeesTTD = rows.reduce(
       (sum, item) => sum + item.impliedFeeTTD,
       0
     )
-    const totalFeesUSD = availabilityWithUsage.reduce(
+    const totalFeesUSD = rows.reduce(
       (sum, item) => sum + item.impliedFeeUSD,
       0
     )
     const averageRate =
-      availabilityWithUsage.length > 0
-        ? availabilityWithUsage.reduce(
-            (sum, item) => sum + item.exchangeRate,
-            0
-          ) / availabilityWithUsage.length
+      rows.length > 0
+        ? rows.reduce((sum, item) => sum + item.exchangeRate, 0) /
+          rows.length
         : 0
 
-    const totalUsedTTD = usageRows.reduce((sum, u) => sum + u.amountTTD, 0)
+    const totalUsedTTD = personIdParam
+      ? rows.reduce((sum, item) => sum + item.usageTTD, 0)
+      : usageRows.reduce((sum, u) => sum + u.amountTTD, 0)
 
-    const totalTTD = availabilityWithUsage.reduce(
-      (sum, item) => sum + item.ttdValue,
-      0
-    )
+    const totalTTD = rows.reduce((sum, item) => sum + item.ttdValue, 0)
 
     const netUSD = totalUSD - totalFeesUSD
     const balanceUSD = totalUSD - totalUsedUSD
@@ -70,7 +85,7 @@ export async function GET(request: Request) {
     const summary = {
       year: y,
       month: m,
-      totalCards: availabilityWithUsage.length,
+      totalCards: rows.length,
       totalUSD,
       totalFeesTTD,
       totalFeesUSD,
@@ -81,10 +96,12 @@ export async function GET(request: Request) {
       totalUsedTTD,
       balanceUSD,
       balanceTTD,
-      availability: availabilityWithUsage,
+      availability: rows,
     }
 
-    return NextResponse.json(summary)
+    return NextResponse.json(
+      personMeta ? { ...summary, person: personMeta } : summary
+    )
   } catch (error) {
     console.error('Error fetching summary:', error)
     return NextResponse.json(

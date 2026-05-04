@@ -464,12 +464,21 @@ export default function PeoplePage() {
             <Card key={person.id} className="shadow-md hover:shadow-lg transition-shadow min-w-0 overflow-hidden flex flex-col h-full">
               <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b space-y-3">
                 <div className="flex gap-3 min-w-0">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0">
-                    <span className="text-white font-bold text-lg">{person.name[0]?.toUpperCase() ?? '?'}</span>
-                  </div>
+                  <Link
+                    href={`/people/${person.id}?year=${budgetYear}&month=${budgetMonth}`}
+                    className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0 text-white font-bold text-lg hover:ring-2 hover:ring-purple-300 hover:ring-offset-2 transition-shadow"
+                    aria-label={`Open dashboard for ${person.name}`}
+                  >
+                    {person.name[0]?.toUpperCase() ?? '?'}
+                  </Link>
                   <div className="min-w-0 flex-1">
                     <CardTitle className="text-lg font-semibold leading-snug text-gray-900 break-words hyphens-auto">
-                      {person.name}
+                      <Link
+                        href={`/people/${person.id}?year=${budgetYear}&month=${budgetMonth}`}
+                        className="hover:text-purple-900 hover:underline decoration-purple-400 underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 rounded-sm"
+                      >
+                        {person.name}
+                      </Link>
                     </CardTitle>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                       <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">

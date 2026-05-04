@@ -1,7 +1,12 @@
 'use client'
 
 import { useState, useEffect, useMemo, Fragment } from 'react'
-import { useRouter } from 'next/navigation'
+import {
+  useParams,
+  useRouter,
+  useSearchParams,
+  usePathname,
+} from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -21,12 +26,10 @@ import {
   Loader2,
   Wallet,
   Scale,
-  User,
   Plus,
   History,
-  Search,
+  ArrowLeft,
 } from 'lucide-react'
-import { useGroupByOwner } from '@/hooks/use-group-by-owner'
 import { CardUsagePanel } from '@/components/CardUsagePanel'
 import { usageAmountPaidSync } from '@/lib/usage-paid-sync'
 import { issuingBankLabel } from '@/lib/card-bank'
@@ -45,6 +48,7 @@ interface Summary {
   totalUsedTTD: number
   balanceUSD: number
   balanceTTD: number
+  person?: { id: string; name: string }
   availability: Array<{
     id: string
     cardId: string
@@ -64,7 +68,6 @@ interface Summary {
     card: {
       cardNickname: string
       issuingBank?: string | null
-      lastFourDigits?: string | null
       person: {
         id: string
         name: string
@@ -78,78 +81,54 @@ interface ExchangeRate {
   buying: number
   source: string
   timestamp: string
-  url?: string
-  note?: string
 }
 
-function dashboardCardOptionLabel(
+function personCardOptionLabel(
   card: Summary['availability'][number]['card']
 ): string {
   if (card.issuingBank) {
-    return `${card.cardNickname} (${issuingBankLabel(card.issuingBank)}) — ${card.person.name}`
+    return `${card.cardNickname} (${issuingBankLabel(card.issuingBank)})`
   }
-  return `${card.cardNickname} (${card.person.name})`
+  return card.cardNickname
 }
 
-/** Tokens (split on whitespace) must all match person name, card nickname, stored last-4, or digits embedded in the nickname. */
-function rowMatchesDashboardSearch(
-  row: Summary['availability'][number],
-  raw: string
-): boolean {
-  const q = raw.trim().toLowerCase()
-  if (!q) return true
-
-  const tokens = q.split(/\s+/).filter(Boolean)
-  const person = row.card.person.name.toLowerCase()
-  const nick = row.card.cardNickname.toLowerCase()
-  const last4Norm = (row.card.lastFourDigits ?? '').replace(/\D/g, '')
-  const nickDigits = nick.replace(/\D/g, '')
-
-  return tokens.every((tok) => {
-    const t = tok.toLowerCase()
-    const digitsOnly = t.replace(/\D/g, '')
-
-    if (person.includes(t) || nick.includes(t)) return true
-
-    if (digitsOnly.length > 0) {
-      if (last4Norm.includes(digitsOnly) || nickDigits.includes(digitsOnly)) {
-        return true
-      }
-    }
-
-    return false
-  })
-}
-
-function sumOwnerTotals(items: Summary['availability']) {
-  return items.reduce(
-    (acc, i) => ({
-      amountUSD: acc.amountUSD + i.amountUSD,
-      balanceUSD: acc.balanceUSD + i.balanceUSD,
-      usageUSD: acc.usageUSD + i.usageUSD,
-      owedTTD: acc.owedTTD + i.owedTTD,
-      ttdValue: acc.ttdValue + i.ttdValue,
-    }),
-    {
-      amountUSD: 0,
-      balanceUSD: 0,
-      usageUSD: 0,
-      owedTTD: 0,
-      ttdValue: 0,
-    }
-  )
-}
-
-export default function Dashboard() {
+export default function PersonDashboardPage() {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const params = useParams()
+  const personId = typeof params.id === 'string' ? params.id : ''
   const { status } = useSession()
-  const [currentDate, setCurrentDate] = useState(new Date())
+
+  const initialDate = useMemo(() => {
+    const y = searchParams.get('year')
+    const m = searchParams.get('month')
+    const yi = y ? parseInt(y, 10) : NaN
+    const mi = m ? parseInt(m, 10) : NaN
+    if (
+      Number.isFinite(yi) &&
+      Number.isFinite(mi) &&
+      yi >= 2000 &&
+      yi <= 2100 &&
+      mi >= 1 &&
+      mi <= 12
+    ) {
+      return new Date(yi, mi - 1, 1)
+    }
+    return new Date()
+  }, [searchParams])
+
+  const [currentDate, setCurrentDate] = useState(initialDate)
+
+  useEffect(() => {
+    setCurrentDate(initialDate)
+  }, [initialDate])
+
   const [summary, setSummary] = useState<Summary | null>(null)
   const [exchangeRate, setExchangeRate] = useState<ExchangeRate | null>(null)
   const [loading, setLoading] = useState(true)
-  const [groupByOwner, setGroupByOwner] = useGroupByOwner()
+  const [loadError, setLoadError] = useState('')
   const [onlyWithBalance, setOnlyWithBalance] = useState(false)
-  const [tableSearch, setTableSearch] = useState('')
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
   const [showQuickUsage, setShowQuickUsage] = useState(false)
   const [quickForm, setQuickForm] = useState({
@@ -162,56 +141,27 @@ export default function Dashboard() {
   const [quickError, setQuickError] = useState('')
   const [quickSaving, setQuickSaving] = useState(false)
   const [usageRevision, setUsageRevision] = useState(0)
-  const [totalOwedToPeopleTTD, setTotalOwedToPeopleTTD] = useState(0)
+  const [owedToPersonTTD, setOwedToPersonTTD] = useState(0)
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth() + 1
 
-  const balanceFilteredRows = useMemo(() => {
+  const filteredRows = useMemo(() => {
     if (!summary?.availability.length) return []
     if (!onlyWithBalance) return summary.availability
     return summary.availability.filter((r) => r.balanceTTD > 0)
   }, [summary?.availability, onlyWithBalance])
 
-  const filteredRows = useMemo(() => {
-    if (!balanceFilteredRows.length) return []
-    const q = tableSearch.trim()
-    if (!q) return balanceFilteredRows
-    return balanceFilteredRows.filter((r) => rowMatchesDashboardSearch(r, q))
-  }, [balanceFilteredRows, tableSearch])
-
-  const availabilityByOwner = useMemo(() => {
-    if (!filteredRows.length) return []
-    type Row = Summary['availability'][number]
-    const map = new Map<string, { personName: string; items: Row[] }>()
-    for (const item of filteredRows) {
-      const pid = item.card.person.id
-      if (!map.has(pid)) {
-        map.set(pid, { personName: item.card.person.name, items: [] })
-      }
-      map.get(pid)!.items.push(item)
-    }
-    for (const g of map.values()) {
-      g.items.sort((a, b) =>
-        a.card.cardNickname.localeCompare(b.card.cardNickname)
-      )
-    }
-    return [...map.entries()]
-      .map(([ownerId, g]) => ({ ownerId, personName: g.personName, items: g.items }))
-      .sort((a, b) => a.personName.localeCompare(b.personName))
-  }, [filteredRows])
-
   const quickCardOptions = useMemo(() => {
-    const source = tableSearch.trim() ? filteredRows : balanceFilteredRows
-    if (!source.length) return []
+    if (!summary?.availability.length) return []
     const m = new Map<string, string>()
-    for (const r of source) {
+    for (const r of summary.availability) {
       if (!m.has(r.cardId)) {
-        m.set(r.cardId, dashboardCardOptionLabel(r.card))
+        m.set(r.cardId, personCardOptionLabel(r.card))
       }
     }
     return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]))
-  }, [balanceFilteredRows, filteredRows, tableSearch])
+  }, [summary?.availability])
 
   useEffect(() => {
     setQuickForm((f) => {
@@ -226,8 +176,14 @@ export default function Dashboard() {
   useEffect(() => {
     setQuickError('')
     setExpandedCardId(null)
-    setTableSearch('')
   }, [year, month])
+
+  useEffect(() => {
+    const qs = new URLSearchParams()
+    qs.set('year', String(year))
+    qs.set('month', String(month))
+    router.replace(`${pathname}?${qs.toString()}`, { scroll: false })
+  }, [year, month, pathname, router])
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -236,63 +192,79 @@ export default function Dashboard() {
   }, [status, router])
 
   useEffect(() => {
-    // Only fetch data if authenticated
-    if (status === 'authenticated') {
-      fetchSummary()
-      fetchDefaultRate()
-      fetchPeopleOwed()
-    }
+    if (status !== 'authenticated' || !personId) return
+    fetchSummary()
+    fetchDefaultRate()
+    fetchPersonOwed()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year, month, status])
-
-  // Show loading while checking authentication
-  if (status === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Don't render dashboard content if not authenticated (middleware should redirect)
-  if (status === 'unauthenticated') {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-gray-600">Redirecting...</p>
-        </div>
-      </div>
-    )
-  }
+  }, [year, month, status, personId])
 
   const fetchSummary = async () => {
     setLoading(true)
+    setLoadError('')
     try {
       const url = new URL(
-        `/api/summary?year=${year}&month=${month}`,
+        `/api/summary?year=${year}&month=${month}&personId=${encodeURIComponent(personId)}`,
         window.location.origin
       ).toString()
       const response = await fetch(url, {
         credentials: 'include',
         cache: 'no-store',
       })
+      if (response.status === 404) {
+        setSummary(null)
+        setLoadError('Person not found.')
+        return
+      }
       if (response.ok) {
         const data = await response.json()
         setSummary(data)
+      } else {
+        setLoadError('Could not load availability for this person.')
       }
     } catch (error) {
       console.error('Error fetching summary:', error)
+      setLoadError('Could not load availability for this person.')
     } finally {
       setLoading(false)
     }
   }
 
+  const fetchPersonOwed = async () => {
+    try {
+      const url = new URL(
+        `/api/people?year=${year}&month=${month}`,
+        window.location.origin
+      ).toString()
+      const response = await fetch(url, {
+        credentials: 'include',
+        cache: 'no-store',
+      })
+      if (!response.ok) {
+        setOwedToPersonTTD(0)
+        return
+      }
+      const data: unknown = await response.json().catch(() => null)
+      if (!Array.isArray(data)) {
+        setOwedToPersonTTD(0)
+        return
+      }
+      const row = data.find(
+        (p) => typeof p === 'object' && p !== null && (p as { id?: string }).id === personId
+      ) as { owedTTD?: unknown } | undefined
+      const owed = row?.owedTTD
+      setOwedToPersonTTD(
+        typeof owed === 'number' && Number.isFinite(owed) ? owed : 0
+      )
+    } catch (error) {
+      console.error('Error fetching person owed:', error)
+      setOwedToPersonTTD(0)
+    }
+  }
+
   const afterUsageChange = async () => {
     await fetchSummary()
+    await fetchPersonOwed()
     setUsageRevision((n) => n + 1)
   }
 
@@ -388,33 +360,6 @@ export default function Dashboard() {
     }
   }
 
-  const fetchPeopleOwed = async () => {
-    try {
-      const url = new URL('/api/people', window.location.origin).toString()
-      const response = await fetch(url, {
-        credentials: 'include',
-        cache: 'no-store',
-      })
-      if (!response.ok) {
-        setTotalOwedToPeopleTTD(0)
-        return
-      }
-      const data: unknown = await response.json().catch(() => null)
-      if (!Array.isArray(data)) {
-        setTotalOwedToPeopleTTD(0)
-        return
-      }
-      const total = data.reduce((sum, p) => {
-        const owed = (p as { owedTTD?: unknown }).owedTTD
-        return sum + (typeof owed === 'number' && Number.isFinite(owed) ? owed : 0)
-      }, 0)
-      setTotalOwedToPeopleTTD(total)
-    } catch (error) {
-      console.error('Error fetching people owed:', error)
-      setTotalOwedToPeopleTTD(0)
-    }
-  }
-
   const previousMonth = () => {
     setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))
   }
@@ -424,19 +369,18 @@ export default function Dashboard() {
   }
 
   const monthName = format(currentDate, 'MMMM yyyy')
+  const displayName = summary?.person?.name ?? '…'
 
   type AvailRow = Summary['availability'][number]
 
-  const renderAvailabilityPair = (item: AvailRow, zebraClass: string) => (
+  const renderRow = (item: AvailRow, zebraClass: string) => (
     <Fragment key={item.id}>
       <tr className={`hover:bg-blue-50 transition-colors ${zebraClass}`}>
         <td className="py-3 px-3 sm:py-4 sm:px-6 font-medium text-gray-900 max-w-[140px] sm:max-w-none">
           <button
             type="button"
             onClick={() =>
-              setExpandedCardId((id) =>
-                id === item.cardId ? null : item.cardId
-              )
+              setExpandedCardId((id) => (id === item.cardId ? null : item.cardId))
             }
             className="text-left inline-flex items-center gap-1.5 flex-wrap rounded hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           >
@@ -459,9 +403,6 @@ export default function Dashboard() {
               <ChevronDown className="w-4 h-4 shrink-0 text-gray-500" />
             )}
           </button>
-        </td>
-        <td className="py-3 px-3 sm:py-4 sm:px-6 text-gray-600 whitespace-nowrap">
-          {item.card.person.name}
         </td>
         <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
           <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-700">
@@ -538,10 +479,10 @@ export default function Dashboard() {
       </tr>
       {expandedCardId === item.cardId ? (
         <tr className="bg-transparent">
-          <td colSpan={11} className="p-0 border-0">
+          <td colSpan={10} className="p-0 border-0">
             <CardUsagePanel
               cardId={item.cardId}
-              cardLabel={dashboardCardOptionLabel(item.card)}
+              cardLabel={personCardOptionLabel(item.card)}
               year={year}
               month={month}
               onUsageChanged={afterUsageChange}
@@ -554,22 +495,50 @@ export default function Dashboard() {
     </Fragment>
   )
 
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (status === 'unauthenticated') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-600">Redirecting...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6 min-w-0">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between min-w-0">
-        <div className="min-w-0">
+        <div className="min-w-0 space-y-2">
+          <Link
+            href="/people"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-700 hover:text-blue-900 hover:underline"
+          >
+            <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden />
+            People
+          </Link>
           <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-            Dashboard
+            {loadError ? 'Person' : displayName}
           </h1>
-          <p className="text-gray-600 mt-1 text-sm sm:text-base">
-            Track your foreign currency availability
+          <p className="text-gray-600 text-sm sm:text-base">
+            Card availability and usage for this provider ({monthName})
           </p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end w-full lg:w-auto min-w-0">
-          <Link href="/usage" className="sm:shrink-0">
+          <Link href="/dashboard" className="sm:shrink-0">
             <Button variant="outline" size="sm" className="w-full sm:w-auto">
-              <History className="w-4 h-4 mr-1" />
-              Usage page
+              Full dashboard
             </Button>
           </Link>
           <div className="flex items-center justify-center gap-1 sm:justify-end w-full sm:w-auto">
@@ -586,7 +555,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Default Exchange Rate Card */}
       {exchangeRate && (
         <Card className="border-l-4 border-l-blue-500 shadow-md bg-gradient-to-r from-blue-50/50 to-indigo-50/50 min-w-0 overflow-hidden">
           <CardHeader className="pb-3">
@@ -603,7 +571,9 @@ export default function Dashboard() {
                 variant="ghost"
                 size="sm"
                 className="shrink-0 self-start sm:self-auto"
-                onClick={() => (window.location.href = '/settings')}
+                onClick={() => {
+                  window.location.href = '/settings'
+                }}
                 title="Configure in Settings"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -618,21 +588,24 @@ export default function Dashboard() {
               </p>
               <p className="text-sm text-gray-500">TTD per USD</p>
             </div>
-            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-xs text-blue-800">
-                💡 This is your baseline rate. Any rate above this represents a premium/extra cost for obtaining USD.
-                You can update this in Settings.
-              </p>
-            </div>
           </CardContent>
         </Card>
+      )}
+
+      {loadError && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p className="font-medium">{loadError}</p>
+          <Link href="/people" className="mt-2 inline-block text-blue-700 font-medium underline">
+            Back to People
+          </Link>
+        </div>
       )}
 
       {loading ? (
         <div className="text-center py-12">
           <p className="text-gray-500">Loading...</p>
         </div>
-      ) : summary ? (
+      ) : summary && !loadError ? (
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Card className="shadow-md hover:shadow-lg transition-shadow border-l-4 border-l-green-500">
@@ -649,7 +622,7 @@ export default function Dashboard() {
                   ${summary.totalUSD.toFixed(2)}
                 </div>
                 <p className="text-xs text-gray-500">
-                  Sum of all card availability amounts in USD
+                  Sum of USD availability for this person&apos;s cards this month
                 </p>
               </CardContent>
             </Card>
@@ -668,7 +641,7 @@ export default function Dashboard() {
                   ${(summary.totalUSD - summary.totalUsedUSD).toFixed(2)}
                 </div>
                 <p className="text-xs text-gray-500">
-                  USD available minus USD usage this month
+                  USD available minus USD usage logged this month (their cards only)
                 </p>
               </CardContent>
             </Card>
@@ -676,7 +649,7 @@ export default function Dashboard() {
             <Card className="shadow-md hover:shadow-lg transition-shadow border-l-4 border-l-teal-500">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Total TTD owed to people
+                  Outstanding to this person
                 </CardTitle>
                 <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
                   <Scale className="h-4 w-4 text-teal-700" />
@@ -685,13 +658,13 @@ export default function Dashboard() {
               <CardContent>
                 <div
                   className={`text-2xl font-bold ${
-                    totalOwedToPeopleTTD > 0 ? 'text-red-600' : 'text-teal-700'
+                    owedToPersonTTD > 0 ? 'text-red-600' : 'text-teal-700'
                   }`}
                 >
-                  ${totalOwedToPeopleTTD.toFixed(2)}
+                  ${owedToPersonTTD.toFixed(2)}
                 </div>
                 <p className="text-xs text-gray-500">
-                  Sum of all people balances (TTD only)
+                  Unpaid usage owed to them (TTD), same basis as the People page
                 </p>
               </CardContent>
             </Card>
@@ -701,7 +674,7 @@ export default function Dashboard() {
             <Card className="shadow-md hover:shadow-lg transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Total cards available
+                  Cards available
                 </CardTitle>
                 <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
                   <CreditCard className="h-4 w-4 text-purple-600" />
@@ -709,9 +682,7 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-purple-600">{summary.totalCards}</div>
-                <p className="text-xs text-gray-500">
-                  Cards with availability this month
-                </p>
+                <p className="text-xs text-gray-500">Cards with availability this month</p>
               </CardContent>
             </Card>
 
@@ -728,7 +699,7 @@ export default function Dashboard() {
                 <div className="text-2xl font-bold text-blue-600">
                   {summary.averageRate.toFixed(2)}
                 </div>
-                <p className="text-xs text-gray-500">TTD per USD</p>
+                <p className="text-xs text-gray-500">TTD per USD (their cards this month)</p>
               </CardContent>
             </Card>
 
@@ -746,7 +717,7 @@ export default function Dashboard() {
                   ${summary.totalTTD.toFixed(2)}
                 </div>
                 <p className="text-xs text-gray-500">
-                  TTD needed to cover all logged USD usage at each card&apos;s rate
+                  TTD to cover logged USD at each card&apos;s rate (their cards only)
                 </p>
               </CardContent>
             </Card>
@@ -757,71 +728,32 @@ export default function Dashboard() {
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
-                    <CardTitle className="text-xl">Card Availability Details</CardTitle>
+                    <CardTitle className="text-xl">Card availability details</CardTitle>
                     <CardDescription>
-                      All cards available for {monthName}
+                      {displayName}&apos;s cards for {monthName}
                       {onlyWithBalance &&
                       summary.availability.length > 0 &&
-                      balanceFilteredRows.length !== summary.availability.length ? (
+                      filteredRows.length !== summary.availability.length ? (
                         <span className="text-gray-600">
                           {' '}
-                          · Showing {balanceFilteredRows.length} with remaining USD balance
-                        </span>
-                      ) : null}
-                      {tableSearch.trim() &&
-                      filteredRows.length > 0 &&
-                      filteredRows.length !== balanceFilteredRows.length ? (
-                        <span className="text-gray-600">
-                          {' '}
-                          · {filteredRows.length} match search
+                          · Showing {filteredRows.length} with remaining USD balance
                         </span>
                       ) : null}
                     </CardDescription>
                   </div>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-                    <div className="relative w-full sm:max-w-xs lg:w-56">
-                      <Label htmlFor="dashboard-table-search" className="sr-only">
-                        Search by person or card digits
-                      </Label>
-                      <Search
-                        className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none"
-                        aria-hidden
-                      />
-                      <Input
-                        id="dashboard-table-search"
-                        type="search"
-                        placeholder="Person or last 4 digits…"
-                        value={tableSearch}
-                        onChange={(e) => setTableSearch(e.target.value)}
-                        className="pl-9 h-9"
-                        autoComplete="off"
-                      />
-                    </div>
-                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={onlyWithBalance}
-                        onChange={(e) => setOnlyWithBalance(e.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                      />
-                      Only cards with balance left (USD)
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={groupByOwner}
-                        onChange={(e) => setGroupByOwner(e.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                      />
-                      Group by owner
-                    </label>
-                  </div>
+                  <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={onlyWithBalance}
+                      onChange={(e) => setOnlyWithBalance(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    Only cards with balance left (USD)
+                  </label>
                 </div>
                 <p className="text-xs text-gray-500">
-                  Search narrows the table and quick-log card list by owner name or card digits
-                  (stored last 4 or digits in the nickname). Click a card name to expand full usage
-                  history (all months). Use Log to add usage for {monthName} without leaving the
-                  dashboard.
+                  Click a card name to expand full usage history. Use Log to add usage for{' '}
+                  {monthName}.
                 </p>
               </div>
             </CardHeader>
@@ -831,37 +763,26 @@ export default function Dashboard() {
                   <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
                     <CreditCard className="w-8 h-8 text-gray-400" />
                   </div>
-                  <p className="text-gray-500 text-lg">No cards available for this month</p>
+                  <p className="text-gray-500 text-lg">
+                    No cards with availability for this person this month
+                  </p>
+                  <p className="text-gray-500 text-sm mt-2">
+                    Add availability under Availability or open their card on the Cards page.
+                  </p>
                 </div>
               ) : filteredRows.length === 0 ? (
                 <div className="text-center py-12 px-6 space-y-3">
-                  {balanceFilteredRows.length > 0 && tableSearch.trim() ? (
-                    <>
-                      <p className="text-gray-600">No cards match your search.</p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setTableSearch('')}
-                      >
-                        Clear search
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-gray-600">
-                        No cards match the filter (no remaining USD balance).
-                      </p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setOnlyWithBalance(false)}
-                      >
-                        Show all cards
-                      </Button>
-                    </>
-                  )}
+                  <p className="text-gray-600">
+                    No cards match the filter (no remaining USD balance).
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setOnlyWithBalance(false)}
+                  >
+                    Show all cards
+                  </Button>
                 </div>
               ) : (
                 <>
@@ -904,9 +825,9 @@ export default function Dashboard() {
                         )}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
                           <div className="md:col-span-2">
-                            <Label htmlFor="quick-usage-card">Card *</Label>
+                            <Label htmlFor="person-quick-card">Card *</Label>
                             <select
-                              id="quick-usage-card"
+                              id="person-quick-card"
                               value={quickForm.cardId}
                               onChange={(e) =>
                                 setQuickForm((f) => ({
@@ -927,9 +848,9 @@ export default function Dashboard() {
                             </select>
                           </div>
                           <div>
-                            <Label htmlFor="quick-usage-amt">Amount (TTD) *</Label>
+                            <Label htmlFor="person-quick-amt">Amount (TTD) *</Label>
                             <Input
-                              id="quick-usage-amt"
+                              id="person-quick-amt"
                               type="number"
                               step="0.01"
                               min="0.01"
@@ -950,9 +871,9 @@ export default function Dashboard() {
                             />
                           </div>
                           <div>
-                            <Label htmlFor="quick-usage-paid">Paid to owner (TTD)</Label>
+                            <Label htmlFor="person-quick-paid">Paid to owner (TTD)</Label>
                             <Input
-                              id="quick-usage-paid"
+                              id="person-quick-paid"
                               type="number"
                               step="0.01"
                               min="0"
@@ -969,9 +890,9 @@ export default function Dashboard() {
                             />
                           </div>
                           <div>
-                            <Label htmlFor="quick-usage-date">Date</Label>
+                            <Label htmlFor="person-quick-date">Date</Label>
                             <Input
-                              id="quick-usage-date"
+                              id="person-quick-date"
                               type="date"
                               value={quickForm.usageDate}
                               onChange={(e) =>
@@ -984,9 +905,9 @@ export default function Dashboard() {
                             />
                           </div>
                           <div className="md:col-span-2">
-                            <Label htmlFor="quick-usage-notes">Notes</Label>
+                            <Label htmlFor="person-quick-notes">Notes</Label>
                             <Input
-                              id="quick-usage-notes"
+                              id="person-quick-notes"
                               value={quickForm.notes}
                               onChange={(e) =>
                                 setQuickForm((f) => ({
@@ -1013,14 +934,11 @@ export default function Dashboard() {
                     )}
                   </div>
                   <div className="-mx-1 overflow-x-auto sm:mx-0 [scrollbar-gutter:stable] touch-pan-x">
-                    <table className="w-full min-w-[62rem] text-sm">
+                    <table className="w-full min-w-[56rem] text-sm">
                       <thead>
                         <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-blue-200">
                           <th className="text-left py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
                             Card
-                          </th>
-                          <th className="text-left py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
-                            Owner
                           </th>
                           <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
                             Available (USD)
@@ -1052,69 +970,12 @@ export default function Dashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {groupByOwner
-                          ? availabilityByOwner.flatMap((owner) => {
-                              const ot = sumOwnerTotals(owner.items)
-                              return [
-                              <tr
-                                key={`owner-${owner.ownerId}`}
-                                className="bg-slate-100/95 border-y border-slate-200"
-                              >
-                                <td
-                                  colSpan={11}
-                                  className="py-2.5 px-3 sm:px-6 text-gray-800"
-                                >
-                                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-4 sm:gap-y-1">
-                                    <span className="inline-flex items-center gap-2 font-semibold">
-                                      <User className="w-4 h-4 shrink-0 text-slate-600" aria-hidden />
-                                      {owner.personName}
-                                      <span className="font-normal text-gray-500">
-                                        ({owner.items.length} card
-                                        {owner.items.length !== 1 ? 's' : ''})
-                                      </span>
-                                    </span>
-                                    <span className="text-xs sm:text-sm font-normal text-slate-700 tabular-nums leading-relaxed border-t border-slate-200/90 pt-2 sm:border-0 sm:pt-0 sm:pl-1">
-                                      <span className="text-slate-500">Totals · </span>
-                                      Bal{' '}
-                                      <strong className="text-slate-900">
-                                        ${ot.balanceUSD.toFixed(2)}
-                                      </strong>
-                                      <span className="text-slate-400"> / </span>
-                                      Avail{' '}
-                                      <strong className="text-slate-900">
-                                        ${ot.amountUSD.toFixed(2)}
-                                      </strong>
-                                      USD · Used{' '}
-                                      <strong className="text-slate-900">
-                                        ${ot.usageUSD.toFixed(2)}
-                                      </strong>
-                                      USD · TTD value{' '}
-                                      <strong className="text-slate-900">
-                                        ${ot.ttdValue.toFixed(2)}
-                                      </strong>
-                                      · Owed{' '}
-                                      <strong className="text-slate-900">
-                                        ${ot.owedTTD.toFixed(2)}
-                                      </strong>
-                                      TTD
-                                    </span>
-                                  </div>
-                                </td>
-                              </tr>,
-                              ...owner.items.map((item, ii) =>
-                                renderAvailabilityPair(
-                                  item,
-                                  ii % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
-                                )
-                              ),
-                            ]
-                            })
-                          : filteredRows.map((item, index) =>
-                              renderAvailabilityPair(
-                                item,
-                                index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
-                              )
-                            )}
+                        {filteredRows.map((item, index) =>
+                          renderRow(
+                            item,
+                            index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
+                          )
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -1123,11 +984,11 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </>
-      ) : (
+      ) : !loadError ? (
         <div className="text-center py-12">
           <p className="text-gray-500">No data available</p>
         </div>
-      )}
+      ) : null}
     </div>
   )
 }
