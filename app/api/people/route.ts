@@ -143,6 +143,7 @@ export async function GET(request: Request) {
 
     const headroomTTDByPerson = new Map<string, number>()
     const headroomUSDByPerson = new Map<string, number>()
+    const monthTotalAvailabilityUSDByPerson = new Map<string, number>()
     for (const row of monthBundle.availabilityWithUsage) {
       const pid = row.card.person.id
       headroomTTDByPerson.set(
@@ -153,6 +154,14 @@ export async function GET(request: Request) {
         pid,
         (headroomUSDByPerson.get(pid) ?? 0) + row.balanceUSD
       )
+      const capUsd =
+        typeof row.amountUSD === 'number' && Number.isFinite(row.amountUSD)
+          ? row.amountUSD
+          : 0
+      monthTotalAvailabilityUSDByPerson.set(
+        pid,
+        (monthTotalAvailabilityUSDByPerson.get(pid) ?? 0) + capUsd
+      )
     }
 
     return NextResponse.json(
@@ -162,6 +171,9 @@ export async function GET(request: Request) {
         owedTTD: round2(owedTTDByPerson.get(p.id) ?? 0),
         spendHeadroomTTD: round2(headroomTTDByPerson.get(p.id) ?? 0),
         spendHeadroomUSD: round2(headroomUSDByPerson.get(p.id) ?? 0),
+        monthTotalAvailabilityUSD: round2(
+          monthTotalAvailabilityUSDByPerson.get(p.id) ?? 0
+        ),
         budgetYear,
         budgetMonth,
       }))

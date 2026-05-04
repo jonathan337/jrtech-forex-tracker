@@ -45,6 +45,8 @@ interface Person {
   /** This month: sum of (availability − usage) in TTD across this person’s cards (Dashboard logic). */
   spendHeadroomTTD?: number
   spendHeadroomUSD?: number
+  /** This month: sum of recorded USD availability across this person’s cards (before subtracting usage). */
+  monthTotalAvailabilityUSD?: number
   budgetYear?: number
   budgetMonth?: number
   cards: Array<{
@@ -444,6 +446,11 @@ export default function PeoplePage() {
               Number.isFinite(person.spendHeadroomUSD)
                 ? person.spendHeadroomUSD
                 : 0
+            const monthTotalAvailUSD =
+              typeof person.monthTotalAvailabilityUSD === 'number' &&
+              Number.isFinite(person.monthTotalAvailabilityUSD)
+                ? person.monthTotalAvailabilityUSD
+                : 0
             const budgetYear = person.budgetYear ?? new Date().getFullYear()
             const budgetMonth = person.budgetMonth ?? new Date().getMonth() + 1
             const budgetLabel = format(
@@ -581,13 +588,17 @@ export default function PeoplePage() {
                             spendOverspent ? 'text-red-900' : 'text-emerald-900'
                           }`}
                         >
-                          ${spendUSD.toFixed(2)}{' '}
+                          ${spendUSD.toFixed(2)}
+                          <span className="font-semibold text-gray-500"> / </span>
+                          ${monthTotalAvailUSD.toFixed(2)}{' '}
                           <span className="text-sm font-semibold text-gray-600">USD</span>
                         </span>
                       </p>
                       <p className="text-xs text-gray-600 mt-1">
                         This month’s card availability minus usage you logged (same figures as
-                        Dashboard). Negative means usage exceeded what was recorded as available.
+                        Dashboard). USD shows what’s left after usage, then total recorded USD for
+                        their cards this month. Negative means usage exceeded what was recorded as
+                        available.
                       </p>
                     </div>
                   </div>
