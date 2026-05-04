@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { format } from 'date-fns'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +19,7 @@ import {
   User,
   Loader2,
   Banknote,
+  CircleDollarSign,
   Wallet,
 } from 'lucide-react'
 import { PersonLogUsagePanel } from '@/components/PersonLogUsagePanel'
@@ -40,6 +42,11 @@ interface Person {
   owedUSD: number
   /** Estimated repayment in TTD: unpaid USD × exchange rate for each usage month (card rate, else Settings default). */
   owedTTD: number
+  /** This month: sum of (availability − usage) in TTD across this person’s cards (Dashboard logic). */
+  spendHeadroomTTD?: number
+  spendHeadroomUSD?: number
+  budgetYear?: number
+  budgetMonth?: number
   cards: Array<{
     id: string
     cardNickname: string
@@ -101,10 +108,15 @@ export default function PeoplePage() {
     setLoading(true)
     setLoadError('')
     try {
+      const d = new Date()
+      const qs = new URLSearchParams({
+        year: String(d.getFullYear()),
+        month: String(d.getMonth() + 1),
+      })
       const url =
         typeof window !== 'undefined'
-          ? new URL('/api/people', window.location.origin).toString()
-          : '/api/people'
+          ? new URL(`/api/people?${qs}`, window.location.origin).toString()
+          : `/api/people?${qs}`
       const response = await fetch(url, {
         credentials: 'include',
         cache: 'no-store',
@@ -422,8 +434,25 @@ export default function PeoplePage() {
               typeof person.owedTTD === 'number' && Number.isFinite(person.owedTTD)
                 ? person.owedTTD
                 : 0
+            const spendTTD =
+              typeof person.spendHeadroomTTD === 'number' &&
+              Number.isFinite(person.spendHeadroomTTD)
+                ? person.spendHeadroomTTD
+                : 0
+            const spendUSD =
+              typeof person.spendHeadroomUSD === 'number' &&
+              Number.isFinite(person.spendHeadroomUSD)
+                ? person.spendHeadroomUSD
+                : 0
+            const budgetYear = person.budgetYear ?? new Date().getFullYear()
+            const budgetMonth = person.budgetMonth ?? new Date().getMonth() + 1
+            const budgetLabel = format(
+              new Date(budgetYear, budgetMonth - 1, 1),
+              'MMMM yyyy'
+            )
             const hasOutstanding = owedTTD > 0.005 || owedUSD > 0.005
             const showTTD = owedTTD > 0.005
+            const spendOverspent = spendTTD < -0.005 || spendUSD < -0.005
             return (
             <Card key={person.id} className="shadow-md hover:shadow-lg transition-shadow min-w-0 overflow-hidden flex flex-col h-full">
               <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b space-y-3">
@@ -521,32 +550,86 @@ export default function PeoplePage() {
               </CardHeader>
               <CardContent className="pt-4 flex-1 flex flex-col min-w-0">
                 <div
+                  className={`mb-3 rounded-lg border px-3 py-3 ${
+                    spendOverspent
+                      ? 'border-red-200 bg-red-50/90'
+                      : 'border-emerald-200 bg-emerald-50/85'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    <CircleDollarSign
+                      className={`w-5 h-5 shrink-0 mt-0.5 ${
+                        spendOverspent ? 'text-red-700' : 'text-emerald-700'
+                      }`}
+                      aria-hidden
+                    />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-emerald-950 uppercase tracking-wide">
+                        Available to spend · {budgetLabel}
+                      </p>
+                      <p
+                        className={`mt-0.5 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-2xl font-bold tabular-nums ${
+                          spendOverspent ? 'text-red-900' : 'text-emerald-950'
+                        }`}
+                      >
+                        <span>
+                          ${spendTTD.toFixed(2)}{' '}
+                          <span className="text-sm font-semibold text-gray-600">TTD</span>
+                        </span>
+                        <span
+                          className={`text-xl font-bold tabular-nums sm:text-2xl ${
+                            spendOverspent ? 'text-red-900' : 'text-emerald-900'
+                          }`}
+                        >
+                          ${spendUSD.toFixed(2)}{' '}
+                          <span className="text-sm font-semibold text-gray-600">USD</span>
+                        </span>
+                      </p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        This month’s card availability minus usage you logged (same figures as
+                        Dashboard). Negative means usage exceeded what was recorded as available.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div
                   className={`mb-4 rounded-lg border px-3 py-3 ${
                     hasOutstanding
                       ? 'border-amber-200 bg-amber-50/90'
-                      : 'border-gray-200 bg-white'
+                      : 'border-slate-200 bg-slate-50/90'
                   }`}
                 >
                   <div className="flex items-start gap-2">
                     <Banknote
                       className={`w-5 h-5 shrink-0 mt-0.5 ${
-                        hasOutstanding ? 'text-amber-700' : 'text-green-600'
+                        hasOutstanding ? 'text-amber-800' : 'text-slate-500'
                       }`}
                       aria-hidden
                     />
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                        You owe this person
+                      <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                        Outstanding to owner (repay them)
                       </p>
                       <p
-                        className={`text-2xl font-bold tabular-nums ${
-                          hasOutstanding ? 'text-amber-900' : 'text-green-700'
+                        className={`mt-0.5 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-2xl font-bold tabular-nums ${
+                          hasOutstanding ? 'text-amber-900' : 'text-slate-700'
                         }`}
                       >
                         {showTTD ? (
                           <>
-                            ${owedTTD.toFixed(2)}{' '}
-                            <span className="text-sm font-semibold text-gray-600">TTD</span>
+                            <span>
+                              ${owedTTD.toFixed(2)}{' '}
+                              <span className="text-sm font-semibold text-gray-600">TTD</span>
+                            </span>
+                            <span
+                              className={`text-xl font-bold tabular-nums sm:text-2xl ${
+                                hasOutstanding ? 'text-amber-800' : 'text-slate-600'
+                              }`}
+                            >
+                              ${owedUSD.toFixed(2)}{' '}
+                              <span className="text-sm font-semibold text-gray-600">USD</span>
+                            </span>
                           </>
                         ) : hasOutstanding ? (
                           <>
@@ -555,30 +638,33 @@ export default function PeoplePage() {
                           </>
                         ) : (
                           <>
-                            $0.00{' '}
-                            <span className="text-sm font-semibold text-gray-600">TTD</span>
+                            <span>
+                              $0.00{' '}
+                              <span className="text-sm font-semibold text-gray-600">TTD</span>
+                            </span>
+                            <span className="text-xl font-bold tabular-nums sm:text-2xl text-slate-600">
+                              $0.00{' '}
+                              <span className="text-sm font-semibold text-gray-600">USD</span>
+                            </span>
                           </>
                         )}
                       </p>
                       {hasOutstanding && (
                         <p className="text-xs text-gray-600 mt-0.5 tabular-nums">
                           {showTTD ? (
-                            <>
-                              Unpaid (TTD): ${owedTTD.toFixed(2)} TTD
-                              <span className="text-gray-500">
-                                {' '}
-                                ≈ ${owedUSD.toFixed(2)} USD at each month’s rate
-                              </span>
-                            </>
+                            <span>
+                              USD uses each usage entry’s rate for that month (same basis as
+                              Dashboard).
+                            </span>
                           ) : (
-                            <>Unpaid (USD eq.): ${owedUSD.toFixed(2)} USD — add rates to see TTD</>
+                            <>Add card rates to see TTD; balance shown in USD equivalent.</>
                           )}
                         </p>
                       )}
                       <p className="text-xs text-gray-500 mt-1">
                         {hasOutstanding
                           ? 'Usage is logged in TTD; “paid to owner” reduces what you still owe them.'
-                          : 'No outstanding balance from logged usage, or usage is fully marked as paid back to them.'}
+                          : 'Nothing due from logged usage, or usage is fully marked as paid back to them.'}
                       </p>
                     </div>
                   </div>

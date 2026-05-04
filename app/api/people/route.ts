@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import { z } from 'zod'
 import { serverErrorResponse } from '@/lib/api-error'
 import { exchangeRateForUsageMonth } from '@/lib/exchange-rate-for-usage'
+import { loadMonthAvailabilityWithUsage } from '@/lib/month-availability-with-usage'
 import {
   mapPersonPhoneForResponse,
   parsePersonRequestBody,
@@ -12,14 +13,25 @@ import {
 
 export const runtime = 'nodejs'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await auth()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const [people, usageRows, baselineRow] = await Promise.all([
+    const { searchParams } = new URL(request.url)
+    let budgetYear = parseInt(searchParams.get('year') ?? '', 10)
+    let budgetMonth = parseInt(searchParams.get('month') ?? '', 10)
+    const now = new Date()
+    if (!Number.isFinite(budgetYear) || budgetYear < 2000 || budgetYear > 2100) {
+      budgetYear = now.getFullYear()
+    }
+    if (!Number.isFinite(budgetMonth) || budgetMonth < 1 || budgetMonth > 12) {
+      budgetMonth = now.getMonth() + 1
+    }
+
+    const [people, usageRows, baselineRow, monthBundle] = await Promise.all([
       prisma.person.findMany({
         where: {
           userId: session.user.id,
@@ -65,6 +77,7 @@ export async function GET() {
         where: { id: session.user.id },
         select: { defaultExchangeRate: true },
       }),
+      loadMonthAvailabilityWithUsage(session.user.id, budgetYear, budgetMonth),
     ])
 
     const baseline = baselineRow?.defaultExchangeRate ?? 0
@@ -128,11 +141,29 @@ export async function GET() {
 
     const round2 = (n: number) => Math.round(n * 100) / 100
 
+    const headroomTTDByPerson = new Map<string, number>()
+    const headroomUSDByPerson = new Map<string, number>()
+    for (const row of monthBundle.availabilityWithUsage) {
+      const pid = row.card.person.id
+      headroomTTDByPerson.set(
+        pid,
+        (headroomTTDByPerson.get(pid) ?? 0) + row.balanceTTD
+      )
+      headroomUSDByPerson.set(
+        pid,
+        (headroomUSDByPerson.get(pid) ?? 0) + row.balanceUSD
+      )
+    }
+
     return NextResponse.json(
       people.map((p) => ({
         ...mapPersonPhoneForResponse(p),
         owedUSD: round2(owedUSDByPerson.get(p.id) ?? 0),
         owedTTD: round2(owedTTDByPerson.get(p.id) ?? 0),
+        spendHeadroomTTD: round2(headroomTTDByPerson.get(p.id) ?? 0),
+        spendHeadroomUSD: round2(headroomUSDByPerson.get(p.id) ?? 0),
+        budgetYear,
+        budgetMonth,
       }))
     )
   } catch (error) {

@@ -408,6 +408,19 @@ export default function Dashboard() {
           </span>
         </td>
         <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
+          <span
+            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
+              item.balanceUSD > 0.005
+                ? 'bg-emerald-100 text-emerald-800'
+                : item.balanceUSD < -0.005
+                  ? 'bg-red-100 text-red-800'
+                  : 'bg-gray-100 text-gray-600'
+            }`}
+          >
+            ${item.balanceUSD.toFixed(2)}
+          </span>
+        </td>
+        <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
           <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-amber-100 text-amber-800">
             ${item.usageUSD.toFixed(2)}
           </span>
@@ -464,7 +477,7 @@ export default function Dashboard() {
       </tr>
       {expandedCardId === item.cardId ? (
         <tr className="bg-transparent">
-          <td colSpan={10} className="p-0 border-0">
+          <td colSpan={11} className="p-0 border-0">
             <CardUsagePanel
               cardId={item.cardId}
               cardLabel={dashboardCardOptionLabel(item.card)}
@@ -895,7 +908,7 @@ export default function Dashboard() {
                     )}
                   </div>
                   <div className="-mx-1 overflow-x-auto sm:mx-0 [scrollbar-gutter:stable] touch-pan-x">
-                    <table className="w-full min-w-[56rem] text-sm">
+                    <table className="w-full min-w-[62rem] text-sm">
                       <thead>
                         <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-blue-200">
                           <th className="text-left py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
@@ -906,6 +919,9 @@ export default function Dashboard() {
                           </th>
                           <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
                             Available (USD)
+                          </th>
+                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                            Balance (USD)
                           </th>
                           <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
                             Used (USD)
@@ -938,7 +954,7 @@ export default function Dashboard() {
                                 className="bg-slate-100/95 border-y border-slate-200"
                               >
                                 <td
-                                  colSpan={10}
+                                  colSpan={11}
                                   className="py-2.5 px-3 sm:px-6 font-semibold text-gray-800"
                                 >
                                   <span className="inline-flex items-center gap-2">

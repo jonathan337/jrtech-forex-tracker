@@ -43,14 +43,21 @@ function normalizePoolerDatabaseUrl(url: string | undefined): string | undefined
   return out
 }
 
-const databaseUrl = normalizePoolerDatabaseUrl(process.env.DATABASE_URL)
+const rawDatabaseUrl = process.env.DATABASE_URL
+if (!rawDatabaseUrl) {
+  throw new Error(
+    'DATABASE_URL is not set. For local dev: copy `.env.example` to `.env.local`, set DATABASE_URL (PostgreSQL) and AUTH_SECRET, then restart `npm run dev`. If you only set DATABASE_URL, DIRECT_URL is filled automatically. See SETUP.md for Supabase vs Docker.'
+  )
+}
+
+const databaseUrl = normalizePoolerDatabaseUrl(rawDatabaseUrl)
 
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
     datasources: {
       db: {
-        url: databaseUrl ?? process.env.DATABASE_URL,
+        url: databaseUrl,
       },
     },
   })
