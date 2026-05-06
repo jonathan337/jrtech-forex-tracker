@@ -434,50 +434,54 @@ export default function PersonDashboardPage() {
 
   type AvailRow = Summary['availability'][number]
 
+  const availTd = 'py-2 px-1 sm:px-1.5 lg:px-2 align-top'
+  const pill =
+    'inline-flex max-w-full justify-end px-1.5 py-0.5 rounded-full font-semibold tabular-nums text-[10px] leading-tight sm:text-xs sm:px-2 sm:py-1'
+
   const renderRow = (item: AvailRow, zebraClass: string) => (
     <Fragment key={item.id}>
       <tr className={`hover:bg-blue-50 transition-colors ${zebraClass}`}>
-        <td className="py-3 px-3 sm:py-4 sm:px-6 font-medium text-gray-900 max-w-[140px] sm:max-w-none">
+        <td className={`${availTd} min-w-0 font-medium text-gray-900`}>
           <button
             type="button"
             onClick={() =>
               setExpandedCardId((id) => (id === item.cardId ? null : item.cardId))
             }
-            className="text-left inline-flex items-center gap-1.5 flex-wrap rounded hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="text-left inline-flex items-start gap-1 w-full min-w-0 rounded hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           >
-            <span className="inline-flex flex-col items-start gap-0.5">
-              <span className="inline-flex items-center gap-2 flex-wrap">
-                {item.card.cardNickname}
+            <span className="inline-flex flex-col items-start gap-0.5 min-w-0 flex-1">
+              <span className="inline-flex flex-wrap items-center gap-1 min-w-0">
+                <span className="break-words hyphens-auto">{item.card.cardNickname}</span>
                 {item.isRecurringTemplate && (
-                  <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
-                    Every month
+                  <span className="shrink-0 text-[10px] font-normal px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 sm:text-xs sm:px-2">
+                    Monthly
                   </span>
                 )}
               </span>
               {item.card.lastFourDigits?.trim() ? (
-                <span className="text-xs font-mono font-normal text-gray-500">
+                <span className="text-[10px] font-mono font-normal text-gray-500 sm:text-xs">
                   •••• {item.card.lastFourDigits.trim()}
                 </span>
               ) : null}
-              <span className="text-xs font-normal text-gray-500">
+              <span className="text-[10px] font-normal text-gray-500 break-words sm:text-xs leading-snug">
                 {issuingBankLabel(item.card.issuingBank)}
               </span>
             </span>
             {expandedCardId === item.cardId ? (
-              <ChevronUp className="w-4 h-4 shrink-0 text-gray-500" />
+              <ChevronUp className="w-3.5 h-3.5 shrink-0 text-gray-500 sm:w-4 sm:h-4" />
             ) : (
-              <ChevronDown className="w-4 h-4 shrink-0 text-gray-500" />
+              <ChevronDown className="w-3.5 h-3.5 shrink-0 text-gray-500 sm:w-4 sm:h-4" />
             )}
           </button>
         </td>
-        <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-700">
+        <td className={`${availTd} text-right`}>
+          <span className={`${pill} bg-green-100 text-green-700`}>
             ${item.amountUSD.toFixed(2)}
           </span>
         </td>
-        <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
+        <td className={`${availTd} text-right`}>
           <span
-            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
+            className={`${pill} ${
               item.balanceUSD > 0.005
                 ? 'bg-emerald-100 text-emerald-800'
                 : item.balanceUSD < -0.005
@@ -488,14 +492,14 @@ export default function PersonDashboardPage() {
             ${item.balanceUSD.toFixed(2)}
           </span>
         </td>
-        <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-amber-100 text-amber-800">
+        <td className={`${availTd} text-right`}>
+          <span className={`${pill} bg-amber-100 text-amber-800`}>
             ${item.usageUSD.toFixed(2)}
           </span>
         </td>
-        <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
+        <td className={`${availTd} text-right`}>
           <span
-            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
+            className={`${pill} ${
               item.owedTTD > 0
                 ? 'bg-red-100 text-red-800'
                 : 'bg-teal-100 text-teal-800'
@@ -504,19 +508,19 @@ export default function PersonDashboardPage() {
             ${item.owedTTD.toFixed(2)}
           </span>
         </td>
-        <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
-          <span className="font-mono text-gray-700">
+        <td className={`${availTd} text-right`}>
+          <span className="font-mono text-[10px] text-gray-700 tabular-nums sm:text-xs">
             {item.exchangeRate.toFixed(2)}
           </span>
         </td>
-        <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-700">
+        <td className={`${availTd} text-right`}>
+          <span className={`${pill} bg-blue-100 text-blue-700`}>
             ${item.ttdValue.toFixed(2)}
           </span>
         </td>
-        <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
+        <td className={`${availTd} text-right`}>
           <span
-            className={`font-medium ${
+            className={`text-[10px] font-medium tabular-nums sm:text-xs ${
               item.impliedFeeTTD > 0
                 ? 'text-red-600'
                 : item.impliedFeeTTD < 0
@@ -524,22 +528,30 @@ export default function PersonDashboardPage() {
                   : 'text-gray-400'
             }`}
           >
-            {item.impliedFeeTTD.toFixed(2)} TTD
+            {item.impliedFeeTTD.toFixed(2)}
+            <span className="hidden sm:inline"> TTD</span>
           </span>
         </td>
-        <td className="py-3 px-3 sm:py-4 sm:px-6 text-gray-600 whitespace-nowrap">
-          {format(new Date(item.paymentDate), 'MMM dd, yyyy')}
+        <td className={`${availTd} text-gray-600 tabular-nums`}>
+          <span className="sm:hidden">{format(new Date(item.paymentDate), 'M/d/yy')}</span>
+          <span className="hidden sm:inline whitespace-nowrap">
+            {format(new Date(item.paymentDate), 'MMM d, yyyy')}
+          </span>
         </td>
-        <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
+        <td className={`${availTd} relative z-20 text-right`}>
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="h-8 text-xs"
-            onClick={() => openQuickLogForCard(item.cardId)}
+            className="touch-manipulation h-7 px-1.5 text-[10px] sm:h-8 sm:px-2 sm:text-xs relative z-10"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              openQuickLogForCard(item.cardId)
+            }}
           >
-            <Plus className="w-3.5 h-3.5 mr-1" />
-            Log
+            <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5 min-[360px]:mr-1" />
+            <span className="hidden min-[360px]:inline">Log</span>
           </Button>
         </td>
       </tr>
@@ -789,7 +801,7 @@ export default function PersonDashboardPage() {
             </Card>
           </div>
 
-          <Card className="shadow-md border-t-4 border-t-blue-500 min-w-0 overflow-hidden">
+          <Card className="shadow-md border-t-4 border-t-blue-500 min-w-0">
             <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -1004,39 +1016,82 @@ export default function PersonDashboardPage() {
                       </form>
                     )}
                   </div>
-                  <div className="-mx-1 overflow-x-auto sm:mx-0 [scrollbar-gutter:stable] touch-pan-x">
-                    <table className="w-full min-w-[56rem] text-sm">
+                  <div className="w-full min-w-0 overflow-x-auto touch-pan-x pb-3 sm:pb-4">
+                    <table className="w-full min-w-0 table-fixed border-collapse text-[11px] sm:text-xs md:text-sm">
+                      <colgroup>
+                        <col className="w-[19%]" />
+                        <col className="w-[8.5%]" />
+                        <col className="w-[8.5%]" />
+                        <col className="w-[8.5%]" />
+                        <col className="w-[9%]" />
+                        <col className="w-[6.5%]" />
+                        <col className="w-[9%]" />
+                        <col className="w-[7.5%]" />
+                        <col className="w-[11%]" />
+                        <col className="w-[12.5%]" />
+                      </colgroup>
                       <thead>
                         <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-blue-200">
-                          <th className="text-left py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                          <th className="text-left py-2 px-1 sm:px-1.5 lg:px-2 font-semibold text-gray-700 uppercase leading-tight tracking-wide text-[10px] sm:text-xs">
                             Card
                           </th>
-                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
-                            Available (USD)
+                          <th className="text-right py-2 px-1 sm:px-1.5 lg:px-2 font-semibold text-gray-700 uppercase leading-tight tracking-wide text-[10px] sm:text-xs">
+                            <span className="hidden sm:inline">Avail. (USD)</span>
+                            <span className="sm:hidden">
+                              Avail.
+                              <br />
+                              <span className="font-normal normal-case text-gray-500">USD</span>
+                            </span>
                           </th>
-                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
-                            Balance (USD)
+                          <th className="text-right py-2 px-1 sm:px-1.5 lg:px-2 font-semibold text-gray-700 uppercase leading-tight tracking-wide text-[10px] sm:text-xs">
+                            <span className="hidden sm:inline">Balance (USD)</span>
+                            <span className="sm:hidden">
+                              Bal.
+                              <br />
+                              <span className="font-normal normal-case text-gray-500">USD</span>
+                            </span>
                           </th>
-                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
-                            Used (USD)
+                          <th className="text-right py-2 px-1 sm:px-1.5 lg:px-2 font-semibold text-gray-700 uppercase leading-tight tracking-wide text-[10px] sm:text-xs">
+                            <span className="hidden sm:inline">Used (USD)</span>
+                            <span className="sm:hidden">
+                              Used
+                              <br />
+                              <span className="font-normal normal-case text-gray-500">USD</span>
+                            </span>
                           </th>
-                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
-                            Owed (TTD)
+                          <th className="text-right py-2 px-1 sm:px-1.5 lg:px-2 font-semibold text-gray-700 uppercase leading-tight tracking-wide text-[10px] sm:text-xs">
+                            <span className="hidden sm:inline">Owed (TTD)</span>
+                            <span className="sm:hidden">
+                              Owed
+                              <br />
+                              <span className="font-normal normal-case text-gray-500">TTD</span>
+                            </span>
                           </th>
-                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                          <th className="text-right py-2 px-1 sm:px-1.5 lg:px-2 font-semibold text-gray-700 uppercase leading-tight tracking-wide text-[10px] sm:text-xs">
                             Rate
                           </th>
-                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
-                            TTD Value
+                          <th className="text-right py-2 px-1 sm:px-1.5 lg:px-2 font-semibold text-gray-700 uppercase leading-tight tracking-wide text-[10px] sm:text-xs">
+                            <span className="hidden sm:inline">TTD value</span>
+                            <span className="sm:hidden">
+                              TTD
+                              <br />
+                              <span className="font-normal normal-case text-gray-500">val.</span>
+                            </span>
                           </th>
-                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
-                            Fee (TTD)
+                          <th className="text-right py-2 px-1 sm:px-1.5 lg:px-2 font-semibold text-gray-700 uppercase leading-tight tracking-wide text-[10px] sm:text-xs">
+                            <span className="hidden sm:inline">Fee (TTD)</span>
+                            <span className="sm:hidden">
+                              Fee
+                              <br />
+                              <span className="font-normal normal-case text-gray-500">TTD</span>
+                            </span>
                           </th>
-                          <th className="text-left py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider whitespace-nowrap">
-                            Pay date
+                          <th className="text-left py-2 px-1 sm:px-1.5 lg:px-2 font-semibold text-gray-700 uppercase leading-tight tracking-wide text-[10px] sm:text-xs">
+                            Pay
                           </th>
-                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
-                            Actions
+                          <th className="text-right py-2 px-1 sm:px-1.5 lg:px-2 font-semibold text-gray-700 uppercase leading-tight tracking-wide text-[10px] sm:text-xs">
+                            <span className="hidden min-[420px]:inline">Actions</span>
+                            <span className="min-[420px]:hidden">Act.</span>
                           </th>
                         </tr>
                       </thead>

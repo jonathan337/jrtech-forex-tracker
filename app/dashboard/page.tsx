@@ -566,13 +566,17 @@ export default function Dashboard() {
         <td className="py-3 px-3 sm:py-4 sm:px-6 text-gray-600 whitespace-nowrap">
           {format(new Date(item.paymentDate), 'MMM dd, yyyy')}
         </td>
-        <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
+        <td className="py-3 px-3 sm:py-4 sm:px-6 relative z-20 text-right whitespace-nowrap">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="h-8 text-xs"
-            onClick={() => openQuickLogForCard(item.cardId)}
+            className="touch-manipulation h-8 text-xs relative z-10"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              openQuickLogForCard(item.cardId)
+            }}
           >
             <Plus className="w-3.5 h-3.5 mr-1" />
             Log
@@ -795,7 +799,7 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          <Card className="shadow-md border-t-4 border-t-blue-500 min-w-0 overflow-hidden">
+          <Card className="shadow-md border-t-4 border-t-blue-500 min-w-0">
             <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -1060,7 +1064,7 @@ export default function Dashboard() {
                       </form>
                     )}
                   </div>
-                  <div className="-mx-1 overflow-x-auto sm:mx-0 [scrollbar-gutter:stable] touch-pan-x">
+                  <div className="-mx-1 overflow-x-auto sm:mx-0 touch-pan-x pb-3 sm:pb-4">
                     <table className="w-full min-w-[62rem] text-sm">
                       <thead>
                         <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-blue-200">
