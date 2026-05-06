@@ -6,6 +6,7 @@ import {
   cardHasAvailabilityForMonth,
   USAGE_REQUIRES_AVAILABILITY_MESSAGE,
 } from '@/lib/card-available-for-month'
+import { resolveUsageUsdAndTtdForMonth } from '@/lib/usage-entry-amounts'
 
 export const runtime = 'nodejs'
 
@@ -19,6 +20,10 @@ const usageSchema = z
     paidToOwnerTTD: z.number().min(0).optional(),
     usageDate: z.string().datetime().optional(),
     notes: z.string().optional(),
+  })
+  .refine((d) => d.amountUSD != null || d.amountTTD != null, {
+    message: 'Either amountUSD or amountTTD is required',
+    path: ['amountUSD'],
   })
 
 export async function GET(request: Request) {
@@ -106,25 +111,40 @@ export async function POST(request: Request) {
     }
 
     const paidToOwner = validatedData.paidToOwnerTTD ?? 0
-    const amountUSDInput =
-      typeof validatedData.amountUSD === 'number'
-        ? validatedData.amountUSD
-        : validatedData.amountTTD ?? 0
-    const amountTTD = validatedData.amountTTD ?? amountUSDInput
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { defaultExchangeRate: true },
     })
-    const fallbackRate =
+    const baseline =
       typeof user?.defaultExchangeRate === 'number' &&
-      Number.isFinite(user.defaultExchangeRate) &&
-      user.defaultExchangeRate > 0
+      Number.isFinite(user.defaultExchangeRate)
         ? user.defaultExchangeRate
-        : null
-    const amountUSD =
-      validatedData.amountUSD ??
-      (fallbackRate ? amountTTD / fallbackRate : null)
+        : 0
+
+    const resolved = await resolveUsageUsdAndTtdForMonth({
+      cardId: validatedData.cardId,
+      year: validatedData.year,
+      month: validatedData.month,
+      userBaseline: baseline,
+      ...(validatedData.amountUSD !== undefined && {
+        amountUSD: validatedData.amountUSD,
+      }),
+      ...(validatedData.amountTTD !== undefined && {
+        amountTTD: validatedData.amountTTD,
+      }),
+    })
+    if (!resolved.ok) {
+      return NextResponse.json({ error: resolved.error }, { status: 400 })
+    }
+    const { amountUSD, amountTTD } = resolved
+
+    if (paidToOwner - amountTTD > 1e-6) {
+      return NextResponse.json(
+        { error: 'Paid to owner (TTD) cannot be more than usage in TTD for this month.' },
+        { status: 400 }
+      )
+    }
 
     const entry = await prisma.cardUsage.create({
       data: {

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import {
   CreditCard,
   Users,
@@ -19,7 +19,7 @@ import {
 import { signOut, useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 
-export default function Navigation() {
+function Navigation() {
   const pathname = usePathname()
   const { data: session } = useSession()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -43,7 +43,7 @@ export default function Navigation() {
   }
 
   return (
-    <nav className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+    <nav className="sticky top-0 z-[100] bg-white border-b border-gray-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16 gap-2 min-w-0">
           <div className="flex items-center min-w-0 flex-1">
@@ -167,3 +167,5 @@ export default function Navigation() {
     </nav>
   )
 }
+
+export default memo(Navigation)

@@ -6,6 +6,7 @@ import {
   cardHasAvailabilityForMonth,
   USAGE_REQUIRES_AVAILABILITY_MESSAGE,
 } from '@/lib/card-available-for-month'
+import { resolveUsageUsdAndTtdForMonth } from '@/lib/usage-entry-amounts'
 
 export const runtime = 'nodejs'
 
@@ -93,40 +94,69 @@ export async function PATCH(
       }
     }
 
-    const nextAmountUSDBase =
-      validatedData.amountUSD ??
-      existing.amountUSD ??
-      validatedData.amountTTD ??
-      existing.amountTTD
-    const nextAmount = validatedData.amountTTD ?? nextAmountUSDBase
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { defaultExchangeRate: true },
     })
-    const fallbackRate =
+    const baseline =
       typeof user?.defaultExchangeRate === 'number' &&
-      Number.isFinite(user.defaultExchangeRate) &&
-      user.defaultExchangeRate > 0
+      Number.isFinite(user.defaultExchangeRate)
         ? user.defaultExchangeRate
-        : null
-    const nextAmountUSD =
-      validatedData.amountUSD ??
-      existing.amountUSD ??
-      (fallbackRate ? nextAmount / fallbackRate : null)
+        : 0
+
     const paidToOwnerPatch =
       validatedData.paidToOwnerTTD !== undefined
         ? validatedData.paidToOwnerTTD
         : undefined
 
+    let nextAmountUSD =
+      typeof existing.amountUSD === 'number' &&
+      Number.isFinite(existing.amountUSD)
+        ? existing.amountUSD
+        : null
+    let nextAmountTTD = existing.amountTTD
+
+    if (
+      validatedData.amountUSD !== undefined ||
+      validatedData.amountTTD !== undefined
+    ) {
+      const resolved = await resolveUsageUsdAndTtdForMonth({
+        cardId: nextCardId,
+        year: nextYear,
+        month: nextMonth,
+        userBaseline: baseline,
+        ...(validatedData.amountUSD !== undefined && {
+          amountUSD: validatedData.amountUSD,
+        }),
+        ...(validatedData.amountTTD !== undefined && {
+          amountTTD: validatedData.amountTTD,
+        }),
+      })
+      if (!resolved.ok) {
+        return NextResponse.json({ error: resolved.error }, { status: 400 })
+      }
+      nextAmountUSD = resolved.amountUSD
+      nextAmountTTD = resolved.amountTTD
+    }
+
+    const paidEffective = paidToOwnerPatch ?? existing.paidToOwnerTTD
+    if (paidEffective - nextAmountTTD > 1e-6) {
+      return NextResponse.json(
+        {
+          error:
+            'Paid to owner (TTD) cannot be more than usage in TTD for this month.',
+        },
+        { status: 400 }
+      )
+    }
+
     const updateData = {
       ...(validatedData.cardId !== undefined && { cardId: validatedData.cardId }),
       ...(validatedData.year !== undefined && { year: validatedData.year }),
       ...(validatedData.month !== undefined && { month: validatedData.month }),
-      ...(validatedData.amountTTD !== undefined && {
-        amountTTD: validatedData.amountTTD,
-      }),
-      ...(validatedData.amountTTD !== undefined || validatedData.amountUSD !== undefined
-        ? { amountUSD: nextAmountUSD }
+      ...(validatedData.amountUSD !== undefined ||
+      validatedData.amountTTD !== undefined
+        ? { amountUSD: nextAmountUSD, amountTTD: nextAmountTTD }
         : {}),
       ...(paidToOwnerPatch !== undefined && {
         paidToOwnerTTD: paidToOwnerPatch,

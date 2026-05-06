@@ -19,7 +19,7 @@ export function usageCardSelectLabel(c: UsageCardOption): string {
   }
   const last4 = c.lastFourDigits?.trim()
   if (last4) {
-    tail.push(last4)
+    tail.push(`•••• ${last4}`)
   }
   return `${owner} - ${tail.join(' ')}`
 }

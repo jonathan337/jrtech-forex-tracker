@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, Fragment } from 'react'
+import { useState, useEffect, useMemo, useCallback, Fragment } from 'react'
 import {
   useParams,
   useRouter,
@@ -31,7 +31,7 @@ import {
   ArrowLeft,
 } from 'lucide-react'
 import { CardUsagePanel } from '@/components/CardUsagePanel'
-import { usageAmountPaidSync } from '@/lib/usage-paid-sync'
+import { usageAmountPaidSyncFromUsdInputs } from '@/lib/usage-paid-sync'
 import { issuingBankLabel } from '@/lib/card-bank'
 
 interface Summary {
@@ -87,10 +87,12 @@ interface ExchangeRate {
 function personCardOptionLabel(
   card: Summary['availability'][number]['card']
 ): string {
+  const last4 = card.lastFourDigits?.trim()
+  const suffix = last4 ? ` •••• ${last4}` : ''
   if (card.issuingBank) {
-    return `${card.cardNickname} (${issuingBankLabel(card.issuingBank)})`
+    return `${card.cardNickname} (${issuingBankLabel(card.issuingBank)})${suffix}`
   }
-  return card.cardNickname
+  return `${card.cardNickname}${suffix}`
 }
 
 export default function PersonDashboardPage() {
@@ -134,7 +136,7 @@ export default function PersonDashboardPage() {
   const [showQuickUsage, setShowQuickUsage] = useState(false)
   const [quickForm, setQuickForm] = useState({
     cardId: '',
-    amountTTD: '',
+    amountUSD: '',
     paidToOwnerTTD: '',
     usageDate: format(new Date(), 'yyyy-MM-dd'),
     notes: '',
@@ -153,6 +155,12 @@ export default function PersonDashboardPage() {
     return summary.availability.filter((r) => r.balanceTTD > 0)
   }, [summary?.availability, onlyWithBalance])
 
+  const exchangeRateForQuickCardId = (cardId: string): number | null => {
+    const row = summary?.availability.find((r) => r.cardId === cardId)
+    const er = row?.exchangeRate
+    return typeof er === 'number' && Number.isFinite(er) && er > 0 ? er : null
+  }
+
   const quickCardOptions = useMemo(() => {
     if (!summary?.availability.length) return []
     const m = new Map<string, string>()
@@ -163,6 +171,98 @@ export default function PersonDashboardPage() {
     }
     return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]))
   }, [summary?.availability])
+
+  const fetchSummaryData = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        const url = new URL(
+          `/api/summary?year=${year}&month=${month}&personId=${encodeURIComponent(personId)}`,
+          window.location.origin
+        ).toString()
+        const response = await fetch(url, {
+          credentials: 'include',
+          cache: 'no-store',
+          signal,
+        })
+        if (response.status === 404) {
+          setSummary(null)
+          setLoadError('Person not found.')
+          return
+        }
+        if (response.ok) {
+          const data = await response.json()
+          setSummary(data)
+        } else {
+          setLoadError('Could not load availability for this person.')
+        }
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        console.error('Error fetching summary:', error)
+        setLoadError('Could not load availability for this person.')
+      }
+    },
+    [year, month, personId]
+  )
+
+  const fetchDefaultRateData = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const url = new URL('/api/settings', window.location.origin).toString()
+      const response = await fetch(url, {
+        credentials: 'include',
+        cache: 'no-store',
+        signal,
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setExchangeRate({
+          selling: data.defaultExchangeRate,
+          buying: data.defaultExchangeRate,
+          source: 'Your Default Rate',
+          timestamp: new Date().toISOString(),
+        })
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      console.error('Error fetching default rate:', error)
+    }
+  }, [])
+
+  const fetchPersonOwedData = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        const url = new URL(
+          `/api/people?year=${year}&month=${month}`,
+          window.location.origin
+        ).toString()
+        const response = await fetch(url, {
+          credentials: 'include',
+          cache: 'no-store',
+          signal,
+        })
+        if (!response.ok) {
+          setOwedToPersonTTD(0)
+          return
+        }
+        const data: unknown = await response.json().catch(() => null)
+        if (!Array.isArray(data)) {
+          setOwedToPersonTTD(0)
+          return
+        }
+        const row = data.find(
+          (p) => typeof p === 'object' && p !== null && (p as { id?: string }).id === personId
+        ) as { owedTTD?: unknown } | undefined
+        const owed = row?.owedTTD
+        setOwedToPersonTTD(
+          typeof owed === 'number' && Number.isFinite(owed) ? owed : 0
+        )
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        console.error('Error fetching person owed:', error)
+        setOwedToPersonTTD(0)
+      }
+    },
+    [year, month, personId]
+  )
 
   useEffect(() => {
     setQuickForm((f) => {
@@ -194,73 +294,43 @@ export default function PersonDashboardPage() {
 
   useEffect(() => {
     if (status !== 'authenticated' || !personId) return
-    fetchSummary()
-    fetchDefaultRate()
-    fetchPersonOwed()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year, month, status, personId])
+    let cancelled = false
+    const ac = new AbortController()
+    setLoading(true)
+    setLoadError('')
+    void Promise.all([
+      fetchSummaryData(ac.signal),
+      fetchDefaultRateData(ac.signal),
+      fetchPersonOwedData(ac.signal),
+    ]).finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+    return () => {
+      cancelled = true
+      ac.abort()
+    }
+  }, [
+    year,
+    month,
+    status,
+    personId,
+    fetchSummaryData,
+    fetchDefaultRateData,
+    fetchPersonOwedData,
+  ])
 
   const fetchSummary = async () => {
     setLoading(true)
     setLoadError('')
     try {
-      const url = new URL(
-        `/api/summary?year=${year}&month=${month}&personId=${encodeURIComponent(personId)}`,
-        window.location.origin
-      ).toString()
-      const response = await fetch(url, {
-        credentials: 'include',
-        cache: 'no-store',
-      })
-      if (response.status === 404) {
-        setSummary(null)
-        setLoadError('Person not found.')
-        return
-      }
-      if (response.ok) {
-        const data = await response.json()
-        setSummary(data)
-      } else {
-        setLoadError('Could not load availability for this person.')
-      }
-    } catch (error) {
-      console.error('Error fetching summary:', error)
-      setLoadError('Could not load availability for this person.')
+      await fetchSummaryData()
     } finally {
       setLoading(false)
     }
   }
 
   const fetchPersonOwed = async () => {
-    try {
-      const url = new URL(
-        `/api/people?year=${year}&month=${month}`,
-        window.location.origin
-      ).toString()
-      const response = await fetch(url, {
-        credentials: 'include',
-        cache: 'no-store',
-      })
-      if (!response.ok) {
-        setOwedToPersonTTD(0)
-        return
-      }
-      const data: unknown = await response.json().catch(() => null)
-      if (!Array.isArray(data)) {
-        setOwedToPersonTTD(0)
-        return
-      }
-      const row = data.find(
-        (p) => typeof p === 'object' && p !== null && (p as { id?: string }).id === personId
-      ) as { owedTTD?: unknown } | undefined
-      const owed = row?.owedTTD
-      setOwedToPersonTTD(
-        typeof owed === 'number' && Number.isFinite(owed) ? owed : 0
-      )
-    } catch (error) {
-      console.error('Error fetching person owed:', error)
-      setOwedToPersonTTD(0)
-    }
+    await fetchPersonOwedData()
   }
 
   const afterUsageChange = async () => {
@@ -271,9 +341,17 @@ export default function PersonDashboardPage() {
 
   const handleQuickUsageSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!quickForm.cardId || !quickForm.amountTTD) return
-    const amt = parseFloat(quickForm.amountTTD)
-    if (Number.isNaN(amt) || amt <= 0) return
+    if (!quickForm.cardId || !quickForm.amountUSD) return
+    const usageUSD = parseFloat(quickForm.amountUSD)
+    if (Number.isNaN(usageUSD) || usageUSD <= 0) return
+    const rate = exchangeRateForQuickCardId(quickForm.cardId)
+    if (rate == null) {
+      setQuickError(
+        'This card has no rate for this month. Refresh or add availability.'
+      )
+      return
+    }
+    const amt = usageUSD * rate
 
     const paidRaw = quickForm.paidToOwnerTTD.trim()
     const paidToOwner = paidRaw === '' ? 0 : parseFloat(paidRaw)
@@ -282,7 +360,9 @@ export default function PersonDashboardPage() {
       return
     }
     if (paidToOwner - amt > 1e-6) {
-      setQuickError('Paid to owner cannot be more than the usage amount.')
+      setQuickError(
+        'Paid to owner (TTD) cannot be more than usage in TTD for this month.'
+      )
       return
     }
 
@@ -298,6 +378,7 @@ export default function PersonDashboardPage() {
           cardId: quickForm.cardId,
           year,
           month,
+          amountUSD: usageUSD,
           amountTTD: amt,
           paidToOwnerTTD: paidToOwner,
           usageDate,
@@ -308,7 +389,7 @@ export default function PersonDashboardPage() {
       if (res.ok) {
         setQuickForm({
           cardId: '',
-          amountTTD: '',
+          amountUSD: '',
           paidToOwnerTTD: '',
           usageDate: format(new Date(), 'yyyy-MM-dd'),
           notes: '',
@@ -331,34 +412,13 @@ export default function PersonDashboardPage() {
     setQuickForm((f) => ({
       ...f,
       cardId,
-      amountTTD: '',
+      amountUSD: '',
       paidToOwnerTTD: '',
       usageDate: format(new Date(), 'yyyy-MM-dd'),
     }))
     setQuickError('')
     setShowQuickUsage(true)
     setExpandedCardId(null)
-  }
-
-  const fetchDefaultRate = async () => {
-    try {
-      const url = new URL('/api/settings', window.location.origin).toString()
-      const response = await fetch(url, {
-        credentials: 'include',
-        cache: 'no-store',
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setExchangeRate({
-          selling: data.defaultExchangeRate,
-          buying: data.defaultExchangeRate,
-          source: 'Your Default Rate',
-          timestamp: new Date().toISOString(),
-        })
-      }
-    } catch (error) {
-      console.error('Error fetching default rate:', error)
-    }
   }
 
   const previousMonth = () => {
@@ -854,24 +914,29 @@ export default function PersonDashboardPage() {
                             </select>
                           </div>
                           <div>
-                            <Label htmlFor="person-quick-amt">Amount (TTD) *</Label>
+                            <Label htmlFor="person-quick-amt">Amount (USD) *</Label>
                             <Input
                               id="person-quick-amt"
                               type="number"
                               step="0.01"
                               min="0.01"
-                              value={quickForm.amountTTD}
-                              onChange={(e) =>
+                              value={quickForm.amountUSD}
+                              onChange={(e) => {
+                                const rate = exchangeRateForQuickCardId(quickForm.cardId)
                                 setQuickForm((f) => ({
                                   ...f,
-                                  amountTTD: e.target.value,
-                                  paidToOwnerTTD: usageAmountPaidSync(
-                                    f.amountTTD,
-                                    f.paidToOwnerTTD,
-                                    e.target.value
-                                  ),
+                                  amountUSD: e.target.value,
+                                  paidToOwnerTTD:
+                                    rate != null && rate > 0
+                                      ? usageAmountPaidSyncFromUsdInputs(
+                                          f.amountUSD,
+                                          f.paidToOwnerTTD,
+                                          e.target.value,
+                                          rate
+                                        )
+                                      : f.paidToOwnerTTD,
                                 }))
-                              }
+                              }}
                               required
                               disabled={quickSaving}
                             />

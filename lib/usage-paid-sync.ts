@@ -17,3 +17,27 @@ export function usageAmountPaidSync(
     Math.abs(pAmt - paidNum) < 1e-6
   return wasFullRepayment ? nextAmount : prevPaid
 }
+
+/**
+ * Like {@link usageAmountPaidSync}: if paid-to-owner (TTD) matched prior usage TTD,
+ * bump paid to match the new usage TTD when the spending amount changed in USD.
+ */
+export function usageAmountPaidSyncFromUsdInputs(
+  prevAmountUsdStr: string,
+  paidToOwnerTTDStr: string,
+  nextAmountUsdStr: string,
+  exchangeRateTtdPerUsd: number
+): string {
+  if (!(exchangeRateTtdPerUsd > 0)) return paidToOwnerTTDStr
+  const prevUsd = parseFloat(prevAmountUsdStr)
+  const nextUsd = parseFloat(nextAmountUsdStr)
+  const prevTtd = prevUsd * exchangeRateTtdPerUsd
+  const nextTtd = nextUsd * exchangeRateTtdPerUsd
+  const paidTrim = paidToOwnerTTDStr.trim()
+  const paidNum = paidTrim === '' ? 0 : parseFloat(paidTrim)
+  const wasFullRepayment =
+    !Number.isNaN(prevUsd) &&
+    !Number.isNaN(paidNum) &&
+    Math.abs(prevTtd - paidNum) < 1e-6
+  return wasFullRepayment ? String(nextTtd) : paidToOwnerTTDStr
+}

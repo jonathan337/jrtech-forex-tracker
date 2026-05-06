@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, Fragment } from 'react'
+import { useState, useEffect, useMemo, useCallback, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,7 +28,7 @@ import {
 } from 'lucide-react'
 import { useGroupByOwner } from '@/hooks/use-group-by-owner'
 import { CardUsagePanel } from '@/components/CardUsagePanel'
-import { usageAmountPaidSync } from '@/lib/usage-paid-sync'
+import { usageAmountPaidSyncFromUsdInputs } from '@/lib/usage-paid-sync'
 import { issuingBankLabel } from '@/lib/card-bank'
 
 interface Summary {
@@ -85,10 +85,12 @@ interface ExchangeRate {
 function dashboardCardOptionLabel(
   card: Summary['availability'][number]['card']
 ): string {
+  const last4 = card.lastFourDigits?.trim()
+  const suffix = last4 ? ` •••• ${last4}` : ''
   if (card.issuingBank) {
-    return `${card.cardNickname} (${issuingBankLabel(card.issuingBank)}) — ${card.person.name}`
+    return `${card.cardNickname} (${issuingBankLabel(card.issuingBank)}) — ${card.person.name}${suffix}`
   }
-  return `${card.cardNickname} (${card.person.name})`
+  return `${card.cardNickname} (${card.person.name})${suffix}`
 }
 
 /** Tokens (split on whitespace) must all match person name, card nickname, stored last-4, or digits embedded in the nickname. */
@@ -154,7 +156,7 @@ export default function Dashboard() {
   const [showQuickUsage, setShowQuickUsage] = useState(false)
   const [quickForm, setQuickForm] = useState({
     cardId: '',
-    amountTTD: '',
+    amountUSD: '',
     paidToOwnerTTD: '',
     usageDate: format(new Date(), 'yyyy-MM-dd'),
     notes: '',
@@ -201,6 +203,13 @@ export default function Dashboard() {
       .sort((a, b) => a.personName.localeCompare(b.personName))
   }, [filteredRows])
 
+  const exchangeRateForQuickCardId = (cardId: string): number | null => {
+    const src = tableSearch.trim() ? filteredRows : balanceFilteredRows
+    const row = src.find((r) => r.cardId === cardId)
+    const r = row?.exchangeRate
+    return typeof r === 'number' && Number.isFinite(r) && r > 0 ? r : null
+  }
+
   const quickCardOptions = useMemo(() => {
     const source = tableSearch.trim() ? filteredRows : balanceFilteredRows
     if (!source.length) return []
@@ -212,6 +221,82 @@ export default function Dashboard() {
     }
     return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]))
   }, [balanceFilteredRows, filteredRows, tableSearch])
+
+  const fetchSummaryData = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        const url = new URL(
+          `/api/summary?year=${year}&month=${month}`,
+          window.location.origin
+        ).toString()
+        const response = await fetch(url, {
+          credentials: 'include',
+          cache: 'no-store',
+          signal,
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setSummary(data)
+        }
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        console.error('Error fetching summary:', error)
+      }
+    },
+    [year, month]
+  )
+
+  const fetchDefaultRateData = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const url = new URL('/api/settings', window.location.origin).toString()
+      const response = await fetch(url, {
+        credentials: 'include',
+        cache: 'no-store',
+        signal,
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setExchangeRate({
+          selling: data.defaultExchangeRate,
+          buying: data.defaultExchangeRate,
+          source: 'Your Default Rate',
+          timestamp: new Date().toISOString(),
+        })
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      console.error('Error fetching default rate:', error)
+    }
+  }, [])
+
+  const fetchPeopleOwedData = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const url = new URL('/api/people', window.location.origin).toString()
+      const response = await fetch(url, {
+        credentials: 'include',
+        cache: 'no-store',
+        signal,
+      })
+      if (!response.ok) {
+        setTotalOwedToPeopleTTD(0)
+        return
+      }
+      const data: unknown = await response.json().catch(() => null)
+      if (!Array.isArray(data)) {
+        setTotalOwedToPeopleTTD(0)
+        return
+      }
+      const total = data.reduce((sum, p) => {
+        const owed = (p as { owedTTD?: unknown }).owedTTD
+        return sum + (typeof owed === 'number' && Number.isFinite(owed) ? owed : 0)
+      }, 0)
+      setTotalOwedToPeopleTTD(total)
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      console.error('Error fetching people owed:', error)
+      setTotalOwedToPeopleTTD(0)
+    }
+  }, [])
 
   useEffect(() => {
     setQuickForm((f) => {
@@ -236,14 +321,22 @@ export default function Dashboard() {
   }, [status, router])
 
   useEffect(() => {
-    // Only fetch data if authenticated
-    if (status === 'authenticated') {
-      fetchSummary()
-      fetchDefaultRate()
-      fetchPeopleOwed()
+    if (status !== 'authenticated') return
+    let cancelled = false
+    const ac = new AbortController()
+    setLoading(true)
+    void Promise.all([
+      fetchSummaryData(ac.signal),
+      fetchDefaultRateData(ac.signal),
+      fetchPeopleOwedData(ac.signal),
+    ]).finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+    return () => {
+      cancelled = true
+      ac.abort()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year, month, status])
+  }, [year, month, status, fetchSummaryData, fetchDefaultRateData, fetchPeopleOwedData])
 
   // Show loading while checking authentication
   if (status === 'loading') {
@@ -272,20 +365,7 @@ export default function Dashboard() {
   const fetchSummary = async () => {
     setLoading(true)
     try {
-      const url = new URL(
-        `/api/summary?year=${year}&month=${month}`,
-        window.location.origin
-      ).toString()
-      const response = await fetch(url, {
-        credentials: 'include',
-        cache: 'no-store',
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setSummary(data)
-      }
-    } catch (error) {
-      console.error('Error fetching summary:', error)
+      await fetchSummaryData()
     } finally {
       setLoading(false)
     }
@@ -298,9 +378,17 @@ export default function Dashboard() {
 
   const handleQuickUsageSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!quickForm.cardId || !quickForm.amountTTD) return
-    const amt = parseFloat(quickForm.amountTTD)
-    if (Number.isNaN(amt) || amt <= 0) return
+    if (!quickForm.cardId || !quickForm.amountUSD) return
+    const usageUSD = parseFloat(quickForm.amountUSD)
+    if (Number.isNaN(usageUSD) || usageUSD <= 0) return
+    const rate = exchangeRateForQuickCardId(quickForm.cardId)
+    if (rate == null) {
+      setQuickError(
+        'This card has no rate for this month in the dashboard. Refresh or add availability.'
+      )
+      return
+    }
+    const amt = usageUSD * rate
 
     const paidRaw = quickForm.paidToOwnerTTD.trim()
     const paidToOwner = paidRaw === '' ? 0 : parseFloat(paidRaw)
@@ -309,7 +397,9 @@ export default function Dashboard() {
       return
     }
     if (paidToOwner - amt > 1e-6) {
-      setQuickError('Paid to owner cannot be more than the usage amount.')
+      setQuickError(
+        'Paid to owner (TTD) cannot be more than usage in TTD for this month.'
+      )
       return
     }
 
@@ -325,6 +415,7 @@ export default function Dashboard() {
           cardId: quickForm.cardId,
           year,
           month,
+          amountUSD: usageUSD,
           amountTTD: amt,
           paidToOwnerTTD: paidToOwner,
           usageDate,
@@ -335,7 +426,7 @@ export default function Dashboard() {
       if (res.ok) {
         setQuickForm({
           cardId: '',
-          amountTTD: '',
+          amountUSD: '',
           paidToOwnerTTD: '',
           usageDate: format(new Date(), 'yyyy-MM-dd'),
           notes: '',
@@ -358,61 +449,13 @@ export default function Dashboard() {
     setQuickForm((f) => ({
       ...f,
       cardId,
-      amountTTD: '',
+      amountUSD: '',
       paidToOwnerTTD: '',
       usageDate: format(new Date(), 'yyyy-MM-dd'),
     }))
     setQuickError('')
     setShowQuickUsage(true)
     setExpandedCardId(null)
-  }
-
-  const fetchDefaultRate = async () => {
-    try {
-      const url = new URL('/api/settings', window.location.origin).toString()
-      const response = await fetch(url, {
-        credentials: 'include',
-        cache: 'no-store',
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setExchangeRate({
-          selling: data.defaultExchangeRate,
-          buying: data.defaultExchangeRate,
-          source: 'Your Default Rate',
-          timestamp: new Date().toISOString(),
-        })
-      }
-    } catch (error) {
-      console.error('Error fetching default rate:', error)
-    }
-  }
-
-  const fetchPeopleOwed = async () => {
-    try {
-      const url = new URL('/api/people', window.location.origin).toString()
-      const response = await fetch(url, {
-        credentials: 'include',
-        cache: 'no-store',
-      })
-      if (!response.ok) {
-        setTotalOwedToPeopleTTD(0)
-        return
-      }
-      const data: unknown = await response.json().catch(() => null)
-      if (!Array.isArray(data)) {
-        setTotalOwedToPeopleTTD(0)
-        return
-      }
-      const total = data.reduce((sum, p) => {
-        const owed = (p as { owedTTD?: unknown }).owedTTD
-        return sum + (typeof owed === 'number' && Number.isFinite(owed) ? owed : 0)
-      }, 0)
-      setTotalOwedToPeopleTTD(total)
-    } catch (error) {
-      console.error('Error fetching people owed:', error)
-      setTotalOwedToPeopleTTD(0)
-    }
   }
 
   const previousMonth = () => {
@@ -927,24 +970,29 @@ export default function Dashboard() {
                             </select>
                           </div>
                           <div>
-                            <Label htmlFor="quick-usage-amt">Amount (TTD) *</Label>
+                            <Label htmlFor="quick-usage-amt">Amount (USD) *</Label>
                             <Input
                               id="quick-usage-amt"
                               type="number"
                               step="0.01"
                               min="0.01"
-                              value={quickForm.amountTTD}
-                              onChange={(e) =>
+                              value={quickForm.amountUSD}
+                              onChange={(e) => {
+                                const rate = exchangeRateForQuickCardId(quickForm.cardId)
                                 setQuickForm((f) => ({
                                   ...f,
-                                  amountTTD: e.target.value,
-                                  paidToOwnerTTD: usageAmountPaidSync(
-                                    f.amountTTD,
-                                    f.paidToOwnerTTD,
-                                    e.target.value
-                                  ),
+                                  amountUSD: e.target.value,
+                                  paidToOwnerTTD:
+                                    rate != null && rate > 0
+                                      ? usageAmountPaidSyncFromUsdInputs(
+                                          f.amountUSD,
+                                          f.paidToOwnerTTD,
+                                          e.target.value,
+                                          rate
+                                        )
+                                      : f.paidToOwnerTTD,
                                 }))
-                              }
+                              }}
                               required
                               disabled={quickSaving}
                             />
