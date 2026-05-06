@@ -68,6 +68,7 @@ interface Summary {
     card: {
       cardNickname: string
       issuingBank?: string | null
+      lastFourDigits?: string | null
       person: {
         id: string
         name: string
@@ -393,6 +394,11 @@ export default function PersonDashboardPage() {
                   </span>
                 )}
               </span>
+              {item.card.lastFourDigits?.trim() ? (
+                <span className="text-xs font-mono font-normal text-gray-500">
+                  •••• {item.card.lastFourDigits.trim()}
+                </span>
+              ) : null}
               <span className="text-xs font-normal text-gray-500">
                 {issuingBankLabel(item.card.issuingBank)}
               </span>
