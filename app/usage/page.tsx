@@ -22,6 +22,7 @@ import {
   usageCardSelectLabel,
   type UsageCardOption,
 } from '@/lib/usage-card-label'
+import { issuingBankLabel } from '@/lib/card-bank'
 
 type CardOption = UsageCardOption
 
@@ -579,14 +580,21 @@ export default function UsagePage() {
                           editingEntryId === row.id ? 'bg-blue-50/60' : ''
                         }`}
                       >
-                        <td className="py-3 px-4 font-medium">
+                        <td className="py-3 px-4 font-medium align-top">
                           <button
                             type="button"
-                            className="text-left font-medium text-blue-700 hover:text-blue-900 hover:underline"
+                            className="text-left font-medium text-blue-700 hover:text-blue-900 hover:underline w-full min-w-0"
                             onClick={() => openEntryEdit(row)}
                           >
-                            {row.card.cardNickname}
-                            {row.card.lastFourDigits ? ` • ${row.card.lastFourDigits}` : ''}
+                            <span className="block">
+                              {row.card.cardNickname}
+                              {row.card.lastFourDigits ? ` • ${row.card.lastFourDigits}` : ''}
+                            </span>
+                            {row.card.issuingBank ? (
+                              <span className="mt-0.5 block text-xs font-normal text-gray-500 no-underline">
+                                {issuingBankLabel(row.card.issuingBank)}
+                              </span>
+                            ) : null}
                           </button>
                         </td>
                         <td className="py-3 px-4 text-gray-600">{row.card.person.name}</td>
