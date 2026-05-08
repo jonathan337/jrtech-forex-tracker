@@ -481,10 +481,10 @@ export default function Dashboard() {
                 id === item.cardId ? null : item.cardId
               )
             }
-            className="text-left inline-flex items-center gap-1.5 flex-wrap rounded hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="text-left inline-flex items-start gap-1.5 flex-wrap rounded hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           >
-            <span className="inline-flex flex-col items-start gap-0.5">
-              <span className="inline-flex items-center gap-2 flex-wrap">
+            <span className="inline-flex flex-col items-start gap-0.5 min-w-0 flex-1">
+              <span className="inline-flex items-center gap-2 flex-wrap min-w-0">
                 {item.card.cardNickname}
                 {item.isRecurringTemplate && (
                   <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
@@ -492,7 +492,12 @@ export default function Dashboard() {
                   </span>
                 )}
               </span>
-              <span className="text-xs font-normal text-gray-500">
+              {item.card.lastFourDigits?.trim() ? (
+                <span className="text-[10px] font-mono font-normal text-gray-500 sm:text-xs">
+                  •••• {item.card.lastFourDigits.trim()}
+                </span>
+              ) : null}
+              <span className="text-xs font-normal text-gray-500 break-words">
                 {issuingBankLabel(item.card.issuingBank)}
               </span>
             </span>
