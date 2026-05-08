@@ -954,8 +954,8 @@ export default function Dashboard() {
                             {quickError}
                           </p>
                         )}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
-                          <div className="md:col-span-2">
+                        <div className="flex flex-col gap-3">
+                          <div className="w-full min-w-0">
                             <Label htmlFor="quick-usage-card">Card *</Label>
                             <select
                               id="quick-usage-card"
@@ -968,7 +968,7 @@ export default function Dashboard() {
                               }
                               required
                               disabled={quickSaving}
-                              className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                              className="flex h-10 w-full min-w-0 max-w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                             >
                               <option value="">Select card</option>
                               {quickCardOptions.map(([id, label]) => (
@@ -978,69 +978,71 @@ export default function Dashboard() {
                               ))}
                             </select>
                           </div>
-                          <div>
-                            <Label htmlFor="quick-usage-amt">Amount (USD) *</Label>
-                            <Input
-                              id="quick-usage-amt"
-                              type="number"
-                              step="0.01"
-                              min="0.01"
-                              value={quickForm.amountUSD}
-                              onChange={(e) => {
-                                const rate = exchangeRateForQuickCardId(quickForm.cardId)
-                                setQuickForm((f) => ({
-                                  ...f,
-                                  amountUSD: e.target.value,
-                                  paidToOwnerTTD:
-                                    rate != null && rate > 0
-                                      ? usageAmountPaidSyncFromUsdInputs(
-                                          f.amountUSD,
-                                          f.paidToOwnerTTD,
-                                          e.target.value,
-                                          rate
-                                        )
-                                      : f.paidToOwnerTTD,
-                                }))
-                              }}
-                              required
-                              disabled={quickSaving}
-                            />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <div className="min-w-0">
+                              <Label htmlFor="quick-usage-amt">Amount (USD) *</Label>
+                              <Input
+                                id="quick-usage-amt"
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                value={quickForm.amountUSD}
+                                onChange={(e) => {
+                                  const rate = exchangeRateForQuickCardId(quickForm.cardId)
+                                  setQuickForm((f) => ({
+                                    ...f,
+                                    amountUSD: e.target.value,
+                                    paidToOwnerTTD:
+                                      rate != null && rate > 0
+                                        ? usageAmountPaidSyncFromUsdInputs(
+                                            f.amountUSD,
+                                            f.paidToOwnerTTD,
+                                            e.target.value,
+                                            rate
+                                          )
+                                        : f.paidToOwnerTTD,
+                                  }))
+                                }}
+                                required
+                                disabled={quickSaving}
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <Label htmlFor="quick-usage-paid">Paid to owner (TTD)</Label>
+                              <Input
+                                id="quick-usage-paid"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="0 if not paid yet"
+                                title="Leave 0 until you have paid the card owner back."
+                                value={quickForm.paidToOwnerTTD}
+                                onChange={(e) =>
+                                  setQuickForm((f) => ({
+                                    ...f,
+                                    paidToOwnerTTD: e.target.value,
+                                  }))
+                                }
+                                disabled={quickSaving}
+                              />
+                            </div>
+                            <div className="min-w-0 sm:col-span-2 lg:col-span-1">
+                              <Label htmlFor="quick-usage-date">Date</Label>
+                              <Input
+                                id="quick-usage-date"
+                                type="date"
+                                value={quickForm.usageDate}
+                                onChange={(e) =>
+                                  setQuickForm((f) => ({
+                                    ...f,
+                                    usageDate: e.target.value,
+                                  }))
+                                }
+                                disabled={quickSaving}
+                              />
+                            </div>
                           </div>
-                          <div>
-                            <Label htmlFor="quick-usage-paid">Paid to owner (TTD)</Label>
-                            <Input
-                              id="quick-usage-paid"
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="0 if not paid yet"
-                              title="Leave 0 until you have paid the card owner back."
-                              value={quickForm.paidToOwnerTTD}
-                              onChange={(e) =>
-                                setQuickForm((f) => ({
-                                  ...f,
-                                  paidToOwnerTTD: e.target.value,
-                                }))
-                              }
-                              disabled={quickSaving}
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="quick-usage-date">Date</Label>
-                            <Input
-                              id="quick-usage-date"
-                              type="date"
-                              value={quickForm.usageDate}
-                              onChange={(e) =>
-                                setQuickForm((f) => ({
-                                  ...f,
-                                  usageDate: e.target.value,
-                                }))
-                              }
-                              disabled={quickSaving}
-                            />
-                          </div>
-                          <div className="md:col-span-2">
+                          <div className="w-full min-w-0">
                             <Label htmlFor="quick-usage-notes">Notes</Label>
                             <Input
                               id="quick-usage-notes"

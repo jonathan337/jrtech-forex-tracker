@@ -161,6 +161,15 @@ export default function PersonDashboardPage() {
     return typeof er === 'number' && Number.isFinite(er) && er > 0 ? er : null
   }
 
+  const defaultUsageAmountForQuickCardId = (cardId: string): string => {
+    const row = summary?.availability.find((r) => r.cardId === cardId)
+    const balance = row?.balanceUSD
+    if (typeof balance !== 'number' || !Number.isFinite(balance) || balance <= 0) {
+      return ''
+    }
+    return balance.toFixed(2)
+  }
+
   const quickCardOptions = useMemo(() => {
     if (!summary?.availability.length) return []
     const m = new Map<string, string>()
@@ -409,10 +418,11 @@ export default function PersonDashboardPage() {
   }
 
   const openQuickLogForCard = (cardId: string) => {
+    const defaultAmountUSD = defaultUsageAmountForQuickCardId(cardId)
     setQuickForm((f) => ({
       ...f,
       cardId,
-      amountUSD: '',
+      amountUSD: defaultAmountUSD,
       paidToOwnerTTD: '',
       usageDate: format(new Date(), 'yyyy-MM-dd'),
     }))
@@ -901,21 +911,23 @@ export default function PersonDashboardPage() {
                             {quickError}
                           </p>
                         )}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
-                          <div className="md:col-span-2">
+                        <div className="flex flex-col gap-3">
+                          <div className="w-full min-w-0">
                             <Label htmlFor="person-quick-card">Card *</Label>
                             <select
                               id="person-quick-card"
                               value={quickForm.cardId}
-                              onChange={(e) =>
+                              onChange={(e) => {
+                                const nextCardId = e.target.value
                                 setQuickForm((f) => ({
                                   ...f,
-                                  cardId: e.target.value,
+                                  cardId: nextCardId,
+                                  amountUSD: defaultUsageAmountForQuickCardId(nextCardId),
                                 }))
-                              }
+                              }}
                               required
                               disabled={quickSaving}
-                              className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                              className="flex h-10 w-full min-w-0 max-w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                             >
                               <option value="">Select card</option>
                               {quickCardOptions.map(([id, label]) => (
@@ -925,69 +937,71 @@ export default function PersonDashboardPage() {
                               ))}
                             </select>
                           </div>
-                          <div>
-                            <Label htmlFor="person-quick-amt">Amount (USD) *</Label>
-                            <Input
-                              id="person-quick-amt"
-                              type="number"
-                              step="0.01"
-                              min="0.01"
-                              value={quickForm.amountUSD}
-                              onChange={(e) => {
-                                const rate = exchangeRateForQuickCardId(quickForm.cardId)
-                                setQuickForm((f) => ({
-                                  ...f,
-                                  amountUSD: e.target.value,
-                                  paidToOwnerTTD:
-                                    rate != null && rate > 0
-                                      ? usageAmountPaidSyncFromUsdInputs(
-                                          f.amountUSD,
-                                          f.paidToOwnerTTD,
-                                          e.target.value,
-                                          rate
-                                        )
-                                      : f.paidToOwnerTTD,
-                                }))
-                              }}
-                              required
-                              disabled={quickSaving}
-                            />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <div className="min-w-0">
+                              <Label htmlFor="person-quick-amt">Amount (USD) *</Label>
+                              <Input
+                                id="person-quick-amt"
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                value={quickForm.amountUSD}
+                                onChange={(e) => {
+                                  const rate = exchangeRateForQuickCardId(quickForm.cardId)
+                                  setQuickForm((f) => ({
+                                    ...f,
+                                    amountUSD: e.target.value,
+                                    paidToOwnerTTD:
+                                      rate != null && rate > 0
+                                        ? usageAmountPaidSyncFromUsdInputs(
+                                            f.amountUSD,
+                                            f.paidToOwnerTTD,
+                                            e.target.value,
+                                            rate
+                                          )
+                                        : f.paidToOwnerTTD,
+                                  }))
+                                }}
+                                required
+                                disabled={quickSaving}
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <Label htmlFor="person-quick-paid">Paid to owner (TTD)</Label>
+                              <Input
+                                id="person-quick-paid"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="0 if not paid yet"
+                                title="Leave 0 until you have paid the card owner back."
+                                value={quickForm.paidToOwnerTTD}
+                                onChange={(e) =>
+                                  setQuickForm((f) => ({
+                                    ...f,
+                                    paidToOwnerTTD: e.target.value,
+                                  }))
+                                }
+                                disabled={quickSaving}
+                              />
+                            </div>
+                            <div className="min-w-0 sm:col-span-2 lg:col-span-1">
+                              <Label htmlFor="person-quick-date">Date</Label>
+                              <Input
+                                id="person-quick-date"
+                                type="date"
+                                value={quickForm.usageDate}
+                                onChange={(e) =>
+                                  setQuickForm((f) => ({
+                                    ...f,
+                                    usageDate: e.target.value,
+                                  }))
+                                }
+                                disabled={quickSaving}
+                              />
+                            </div>
                           </div>
-                          <div>
-                            <Label htmlFor="person-quick-paid">Paid to owner (TTD)</Label>
-                            <Input
-                              id="person-quick-paid"
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="0 if not paid yet"
-                              title="Leave 0 until you have paid the card owner back."
-                              value={quickForm.paidToOwnerTTD}
-                              onChange={(e) =>
-                                setQuickForm((f) => ({
-                                  ...f,
-                                  paidToOwnerTTD: e.target.value,
-                                }))
-                              }
-                              disabled={quickSaving}
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="person-quick-date">Date</Label>
-                            <Input
-                              id="person-quick-date"
-                              type="date"
-                              value={quickForm.usageDate}
-                              onChange={(e) =>
-                                setQuickForm((f) => ({
-                                  ...f,
-                                  usageDate: e.target.value,
-                                }))
-                              }
-                              disabled={quickSaving}
-                            />
-                          </div>
-                          <div className="md:col-span-2">
+                          <div className="w-full min-w-0">
                             <Label htmlFor="person-quick-notes">Notes</Label>
                             <Input
                               id="person-quick-notes"
