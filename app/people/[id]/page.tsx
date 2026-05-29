@@ -583,6 +583,141 @@ export default function PersonDashboardPage() {
     </Fragment>
   )
 
+  const mobileInfoRow = (label: string, value: React.ReactNode, valueClass = '') => (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="text-gray-500 shrink-0">{label}</dt>
+      <dd className={`text-gray-800 text-right tabular-nums ${valueClass}`}>
+        {value}
+      </dd>
+    </div>
+  )
+
+  const renderMobileCard = (item: AvailRow) => {
+    const expanded = expandedCardId === item.cardId
+    const last4 = item.card.lastFourDigits?.trim()
+    return (
+      <li key={item.id}>
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div className="p-4">
+            <div className="flex items-start justify-between gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  setExpandedCardId((id) =>
+                    id === item.cardId ? null : item.cardId
+                  )
+                }
+                className="text-left min-w-0 flex-1 inline-flex items-start gap-1.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                <span className="min-w-0 flex flex-col gap-0.5">
+                  <span className="inline-flex items-center gap-2 flex-wrap font-semibold text-gray-900">
+                    {item.card.cardNickname}
+                    {item.isRecurringTemplate && (
+                      <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                        Monthly
+                      </span>
+                    )}
+                  </span>
+                  {last4 ? (
+                    <span className="text-[10px] font-mono text-gray-500">
+                      •••• {last4}
+                    </span>
+                  ) : null}
+                  <span className="text-xs text-gray-500 break-words">
+                    {issuingBankLabel(item.card.issuingBank)}
+                  </span>
+                </span>
+                {expanded ? (
+                  <ChevronUp className="w-4 h-4 shrink-0 text-gray-500 mt-0.5" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 shrink-0 text-gray-500 mt-0.5" />
+                )}
+              </button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="touch-manipulation shrink-0 h-8 text-xs"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  openQuickLogForCard(item.cardId)
+                }}
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                Log
+              </Button>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-gray-50 px-3 py-2">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                  Balance (USD)
+                </div>
+                <div
+                  className={`mt-0.5 text-base font-semibold tabular-nums ${
+                    item.balanceUSD > 0.005
+                      ? 'text-emerald-700'
+                      : item.balanceUSD < -0.005
+                        ? 'text-red-700'
+                        : 'text-gray-700'
+                  }`}
+                >
+                  ${item.balanceUSD.toFixed(2)}
+                </div>
+              </div>
+              <div className="rounded-lg bg-gray-50 px-3 py-2">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                  Owed (TTD)
+                </div>
+                <div
+                  className={`mt-0.5 text-base font-semibold tabular-nums ${
+                    item.owedTTD > 0 ? 'text-red-700' : 'text-teal-700'
+                  }`}
+                >
+                  ${item.owedTTD.toFixed(2)}
+                </div>
+              </div>
+            </div>
+
+            <dl className="mt-3 space-y-1.5 text-sm">
+              {mobileInfoRow('Available (USD)', `$${item.amountUSD.toFixed(2)}`)}
+              {mobileInfoRow('Used (USD)', `$${item.usageUSD.toFixed(2)}`)}
+              {mobileInfoRow('Rate', item.exchangeRate.toFixed(2), 'font-mono')}
+              {mobileInfoRow('TTD value', `$${item.ttdValue.toFixed(2)}`)}
+              {mobileInfoRow(
+                'Fee (TTD)',
+                `${item.impliedFeeTTD.toFixed(2)} TTD`,
+                item.impliedFeeTTD > 0
+                  ? 'text-red-600'
+                  : item.impliedFeeTTD < 0
+                    ? 'text-green-700'
+                    : 'text-gray-400'
+              )}
+              {mobileInfoRow(
+                'Pay date',
+                format(new Date(item.paymentDate), 'MMM d, yyyy')
+              )}
+            </dl>
+          </div>
+          {expanded ? (
+            <div className="border-t border-gray-100">
+              <CardUsagePanel
+                cardId={item.cardId}
+                cardLabel={personCardOptionLabel(item.card)}
+                year={year}
+                month={month}
+                onUsageChanged={afterUsageChange}
+                usageRevision={usageRevision}
+                monthExchangeRate={item.exchangeRate}
+              />
+            </div>
+          ) : null}
+        </div>
+      </li>
+    )
+  }
+
   if (status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -1030,7 +1165,7 @@ export default function PersonDashboardPage() {
                       </form>
                     )}
                   </div>
-                  <div className="w-full min-w-0 overflow-x-auto touch-pan-x pb-3 sm:pb-4">
+                  <div className="hidden md:block w-full min-w-0 overflow-x-auto touch-pan-x pb-3 sm:pb-4">
                     <table className="w-full min-w-0 table-fixed border-collapse text-[11px] sm:text-xs md:text-sm">
                       <colgroup>
                         <col className="w-[19%]" />
@@ -1119,6 +1254,10 @@ export default function PersonDashboardPage() {
                       </tbody>
                     </table>
                   </div>
+
+                  <ul className="md:hidden space-y-3 p-4">
+                    {filteredRows.map((item) => renderMobileCard(item))}
+                  </ul>
                 </>
               )}
             </CardContent>

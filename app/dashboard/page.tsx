@@ -25,6 +25,7 @@ import {
   Plus,
   History,
   Search,
+  Filter,
 } from 'lucide-react'
 import { useGroupByOwner } from '@/hooks/use-group-by-owner'
 import { CardUsagePanel } from '@/components/CardUsagePanel'
@@ -152,6 +153,7 @@ export default function Dashboard() {
   const [groupByOwner, setGroupByOwner] = useGroupByOwner()
   const [onlyWithBalance, setOnlyWithBalance] = useState(false)
   const [tableSearch, setTableSearch] = useState('')
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
   const [showQuickUsage, setShowQuickUsage] = useState(false)
   const [quickForm, setQuickForm] = useState({
@@ -606,6 +608,141 @@ export default function Dashboard() {
     </Fragment>
   )
 
+  const mobileInfoRow = (label: string, value: React.ReactNode, valueClass = '') => (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="text-gray-500 shrink-0">{label}</dt>
+      <dd className={`text-gray-800 text-right tabular-nums ${valueClass}`}>
+        {value}
+      </dd>
+    </div>
+  )
+
+  const renderAvailabilityMobileCard = (item: AvailRow) => {
+    const expanded = expandedCardId === item.cardId
+    const last4 = item.card.lastFourDigits?.trim()
+    return (
+      <li key={item.id}>
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div className="p-4">
+            <div className="flex items-start justify-between gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  setExpandedCardId((id) =>
+                    id === item.cardId ? null : item.cardId
+                  )
+                }
+                className="text-left min-w-0 flex-1 inline-flex items-start gap-1.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                <span className="min-w-0 flex flex-col gap-0.5">
+                  <span className="inline-flex items-center gap-2 flex-wrap font-semibold text-gray-900">
+                    {item.card.cardNickname}
+                    {item.isRecurringTemplate && (
+                      <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                        Every month
+                      </span>
+                    )}
+                  </span>
+                  {last4 ? (
+                    <span className="text-[10px] font-mono text-gray-500">
+                      •••• {last4}
+                    </span>
+                  ) : null}
+                  <span className="text-xs text-gray-500 break-words">
+                    {item.card.person.name} · {issuingBankLabel(item.card.issuingBank)}
+                  </span>
+                </span>
+                {expanded ? (
+                  <ChevronUp className="w-4 h-4 shrink-0 text-gray-500 mt-0.5" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 shrink-0 text-gray-500 mt-0.5" />
+                )}
+              </button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="touch-manipulation shrink-0 h-8 text-xs"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  openQuickLogForCard(item.cardId)
+                }}
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                Log
+              </Button>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-gray-50 px-3 py-2">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                  Balance (USD)
+                </div>
+                <div
+                  className={`mt-0.5 text-base font-semibold tabular-nums ${
+                    item.balanceUSD > 0.005
+                      ? 'text-emerald-700'
+                      : item.balanceUSD < -0.005
+                        ? 'text-red-700'
+                        : 'text-gray-700'
+                  }`}
+                >
+                  ${item.balanceUSD.toFixed(2)}
+                </div>
+              </div>
+              <div className="rounded-lg bg-gray-50 px-3 py-2">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                  Owed (TTD)
+                </div>
+                <div
+                  className={`mt-0.5 text-base font-semibold tabular-nums ${
+                    item.owedTTD > 0 ? 'text-red-700' : 'text-teal-700'
+                  }`}
+                >
+                  ${item.owedTTD.toFixed(2)}
+                </div>
+              </div>
+            </div>
+
+            <dl className="mt-3 space-y-1.5 text-sm">
+              {mobileInfoRow('Available (USD)', `$${item.amountUSD.toFixed(2)}`)}
+              {mobileInfoRow('Used (USD)', `$${item.usageUSD.toFixed(2)}`)}
+              {mobileInfoRow('Rate', item.exchangeRate.toFixed(2), 'font-mono')}
+              {mobileInfoRow('TTD value', `$${item.ttdValue.toFixed(2)}`)}
+              {mobileInfoRow(
+                'Fee (TTD)',
+                `${item.impliedFeeTTD.toFixed(2)} TTD`,
+                item.impliedFeeTTD > 0
+                  ? 'text-red-600'
+                  : item.impliedFeeTTD < 0
+                    ? 'text-green-700'
+                    : 'text-gray-400'
+              )}
+              {mobileInfoRow(
+                'Pay date',
+                format(new Date(item.paymentDate), 'MMM dd, yyyy')
+              )}
+            </dl>
+          </div>
+          {expanded ? (
+            <div className="border-t border-gray-100">
+              <CardUsagePanel
+                cardId={item.cardId}
+                cardLabel={dashboardCardOptionLabel(item.card)}
+                year={year}
+                month={month}
+                onUsageChanged={afterUsageChange}
+                usageRevision={usageRevision}
+                monthExchangeRate={item.exchangeRate}
+              />
+            </div>
+          ) : null}
+        </div>
+      </li>
+    )
+  }
+
   return (
     <div className="space-y-6 min-w-0">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between min-w-0">
@@ -830,7 +967,20 @@ export default function Dashboard() {
                       ) : null}
                     </CardDescription>
                   </div>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowMobileFilters((v) => !v)}
+                    className="sm:hidden inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700"
+                    aria-expanded={showMobileFilters}
+                  >
+                    <Filter className="w-4 h-4" />
+                    {showMobileFilters ? 'Hide filters' : 'Filters & search'}
+                  </button>
+                  <div
+                    className={`${
+                      showMobileFilters ? 'flex' : 'hidden'
+                    } flex-col gap-3 sm:flex sm:flex-row sm:flex-wrap sm:items-center sm:justify-end`}
+                  >
                     <div className="relative w-full sm:max-w-xs lg:w-56">
                       <Label htmlFor="dashboard-table-search" className="sr-only">
                         Search by person or card digits
@@ -1071,7 +1221,7 @@ export default function Dashboard() {
                       </form>
                     )}
                   </div>
-                  <div className="-mx-1 overflow-x-auto sm:mx-0 touch-pan-x pb-3 sm:pb-4">
+                  <div className="hidden md:block -mx-1 overflow-x-auto sm:mx-0 touch-pan-x pb-3 sm:pb-4">
                     <table className="w-full min-w-[62rem] text-sm">
                       <thead>
                         <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-blue-200">
@@ -1177,6 +1327,40 @@ export default function Dashboard() {
                       </tbody>
                     </table>
                   </div>
+
+                  <ul className="md:hidden space-y-3 p-4">
+                    {groupByOwner
+                      ? availabilityByOwner.flatMap((owner) => {
+                          const ot = sumOwnerTotals(owner.items)
+                          return [
+                            <li key={`owner-${owner.ownerId}`} className="pt-1">
+                              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-1">
+                                <span className="inline-flex items-center gap-2 font-semibold text-gray-800">
+                                  <User
+                                    className="w-4 h-4 shrink-0 text-slate-600"
+                                    aria-hidden
+                                  />
+                                  {owner.personName}
+                                  <span className="font-normal text-gray-500">
+                                    ({owner.items.length} card
+                                    {owner.items.length !== 1 ? 's' : ''})
+                                  </span>
+                                </span>
+                                <span className="text-xs text-slate-600 tabular-nums">
+                                  Bal ${ot.balanceUSD.toFixed(2)} · Owed $
+                                  {ot.owedTTD.toFixed(2)} TTD
+                                </span>
+                              </div>
+                            </li>,
+                            ...owner.items.map((item) =>
+                              renderAvailabilityMobileCard(item)
+                            ),
+                          ]
+                        })
+                      : filteredRows.map((item) =>
+                          renderAvailabilityMobileCard(item)
+                        )}
+                  </ul>
                 </>
               )}
             </CardContent>

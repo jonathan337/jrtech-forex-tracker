@@ -11,6 +11,7 @@ import { Plus, Edit, Trash2, X, Calendar, Loader2, User } from 'lucide-react'
 import { format } from 'date-fns'
 import { ratePremiumTtd } from '@/lib/rate-premium'
 import { useGroupByOwner } from '@/hooks/use-group-by-owner'
+import { MobileAddButton } from '@/components/ui/mobile-add-button'
 
 interface CardType {
   id: string
@@ -368,6 +369,162 @@ export default function AvailabilityPage() {
     )
   }
 
+  const entryFeeTtd = (item: Availability) =>
+    baselineTtd != null && baselineTtd > 0
+      ? ratePremiumTtd(item.amountUSD, item.exchangeRate, baselineTtd)
+      : null
+
+  const renderEntriesTable = (entries: Availability[]) => (
+    <>
+      <div className="hidden md:block overflow-x-auto touch-pan-x -mx-1 sm:mx-0 [scrollbar-gutter:stable]">
+        <table className="w-full min-w-[44rem] text-sm">
+          <thead>
+            <tr className="border-b bg-gray-50">
+              <th className="text-left py-3 px-4 font-medium text-gray-700">Month</th>
+              <th className="text-right py-3 px-4 font-medium text-gray-700">Amount (USD)</th>
+              <th className="text-right py-3 px-4 font-medium text-gray-700">Rate</th>
+              <th className="text-right py-3 px-4 font-medium text-gray-700">TTD Value</th>
+              <th className="text-right py-3 px-4 font-medium text-gray-700">Fee (TTD)</th>
+              <th className="text-left py-3 px-4 font-medium text-gray-700">Payment Date</th>
+              <th className="text-center py-3 px-4 font-medium text-gray-700">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((item) => {
+              const fee = entryFeeTtd(item)
+              return (
+                <tr key={item.id} className="border-b hover:bg-blue-50 transition-colors">
+                  <td className="py-3 px-4 font-medium">
+                    {MONTHS[item.month - 1]} {item.year}
+                  </td>
+                  <td className="py-3 px-4 text-right text-green-600 font-semibold">
+                    ${item.amountUSD.toFixed(2)}
+                  </td>
+                  <td className="py-3 px-4 text-right">{item.exchangeRate.toFixed(2)}</td>
+                  <td className="py-3 px-4 text-right text-blue-600 font-semibold">
+                    ${(item.amountUSD * item.exchangeRate).toFixed(2)}
+                  </td>
+                  <td className="py-3 px-4 text-right">
+                    {fee != null ? (
+                      <span className="text-red-600 font-medium">{fee.toFixed(2)} TTD</span>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-4">
+                    {format(new Date(item.paymentDate), 'MMM dd, yyyy')}
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="flex justify-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(item)}
+                        className="hover:bg-blue-100"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(item.id)}
+                        className="hover:bg-red-100"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-600" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <ul className="md:hidden space-y-3">
+        {entries.map((item) => {
+          const fee = entryFeeTtd(item)
+          return (
+            <li
+              key={item.id}
+              className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="font-semibold text-gray-900">
+                  {MONTHS[item.month - 1]} {item.year}
+                </div>
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEdit(item)}
+                    className="h-8 w-8 p-0 hover:bg-blue-100"
+                    aria-label="Edit entry"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDelete(item.id)}
+                    className="h-8 w-8 p-0 hover:bg-red-100"
+                    aria-label="Delete entry"
+                  >
+                    <Trash2 className="w-4 h-4 text-red-600" />
+                  </Button>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-gray-50 px-3 py-2">
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                    Amount (USD)
+                  </div>
+                  <div className="mt-0.5 text-base font-semibold tabular-nums text-green-600">
+                    ${item.amountUSD.toFixed(2)}
+                  </div>
+                </div>
+                <div className="rounded-lg bg-gray-50 px-3 py-2">
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                    TTD Value
+                  </div>
+                  <div className="mt-0.5 text-base font-semibold tabular-nums text-blue-600">
+                    ${(item.amountUSD * item.exchangeRate).toFixed(2)}
+                  </div>
+                </div>
+              </div>
+              <dl className="mt-3 space-y-1.5 text-sm">
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-gray-500 shrink-0">Rate</dt>
+                  <dd className="text-gray-800 text-right tabular-nums font-mono">
+                    {item.exchangeRate.toFixed(2)}
+                  </dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-gray-500 shrink-0">Fee (TTD)</dt>
+                  <dd className="text-gray-800 text-right tabular-nums">
+                    {fee != null ? (
+                      <span className="text-red-600 font-medium">
+                        {fee.toFixed(2)} TTD
+                      </span>
+                    ) : (
+                      '—'
+                    )}
+                  </dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-gray-500 shrink-0">Payment date</dt>
+                  <dd className="text-gray-800 text-right tabular-nums">
+                    {format(new Date(item.paymentDate), 'MMM dd, yyyy')}
+                  </dd>
+                </div>
+              </dl>
+            </li>
+          )
+        })}
+      </ul>
+    </>
+  )
+
   return (
     <div className="space-y-6 min-w-0">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between min-w-0">
@@ -718,93 +875,7 @@ export default function AvailabilityPage() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="pt-4">
-                      <div className="overflow-x-auto touch-pan-x -mx-1 sm:mx-0 [scrollbar-gutter:stable]">
-                        <table className="w-full min-w-[44rem] text-sm">
-                          <thead>
-                            <tr className="border-b bg-gray-50">
-                              <th className="text-left py-3 px-4 font-medium text-gray-700">
-                                Month
-                              </th>
-                              <th className="text-right py-3 px-4 font-medium text-gray-700">
-                                Amount (USD)
-                              </th>
-                              <th className="text-right py-3 px-4 font-medium text-gray-700">
-                                Rate
-                              </th>
-                              <th className="text-right py-3 px-4 font-medium text-gray-700">
-                                TTD Value
-                              </th>
-                              <th className="text-right py-3 px-4 font-medium text-gray-700">
-                                Fee (TTD)
-                              </th>
-                              <th className="text-left py-3 px-4 font-medium text-gray-700">
-                                Payment Date
-                              </th>
-                              <th className="text-center py-3 px-4 font-medium text-gray-700">
-                                Actions
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {entries.map((item) => (
-                              <tr
-                                key={item.id}
-                                className="border-b hover:bg-blue-50 transition-colors"
-                              >
-                                <td className="py-3 px-4 font-medium">
-                                  {MONTHS[item.month - 1]} {item.year}
-                                </td>
-                                <td className="py-3 px-4 text-right text-green-600 font-semibold">
-                                  ${item.amountUSD.toFixed(2)}
-                                </td>
-                                <td className="py-3 px-4 text-right">
-                                  {item.exchangeRate.toFixed(2)}
-                                </td>
-                                <td className="py-3 px-4 text-right text-blue-600 font-semibold">
-                                  ${(item.amountUSD * item.exchangeRate).toFixed(2)}
-                                </td>
-                                <td className="py-3 px-4 text-right">
-                                  {baselineTtd != null && baselineTtd > 0 ? (
-                                    <span className="text-red-600 font-medium">
-                                      {ratePremiumTtd(
-                                        item.amountUSD,
-                                        item.exchangeRate,
-                                        baselineTtd
-                                      ).toFixed(2)}{' '}
-                                      TTD
-                                    </span>
-                                  ) : (
-                                    <span className="text-gray-400">—</span>
-                                  )}
-                                </td>
-                                <td className="py-3 px-4">
-                                  {format(new Date(item.paymentDate), 'MMM dd, yyyy')}
-                                </td>
-                                <td className="py-3 px-4">
-                                  <div className="flex justify-center gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleEdit(item)}
-                                      className="hover:bg-blue-100"
-                                    >
-                                      <Edit className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleDelete(item.id)}
-                                      className="hover:bg-red-100"
-                                    >
-                                      <Trash2 className="w-4 h-4 text-red-600" />
-                                    </Button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                      {renderEntriesTable(entries)}
                     </CardContent>
                   </Card>
                 ))}
@@ -831,83 +902,14 @@ export default function AvailabilityPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="pt-4">
-                <div className="overflow-x-auto touch-pan-x -mx-1 sm:mx-0 [scrollbar-gutter:stable]">
-                  <table className="w-full min-w-[44rem] text-sm">
-                    <thead>
-                      <tr className="border-b bg-gray-50">
-                        <th className="text-left py-3 px-4 font-medium text-gray-700">Month</th>
-                        <th className="text-right py-3 px-4 font-medium text-gray-700">Amount (USD)</th>
-                        <th className="text-right py-3 px-4 font-medium text-gray-700">Rate</th>
-                        <th className="text-right py-3 px-4 font-medium text-gray-700">TTD Value</th>
-                        <th className="text-right py-3 px-4 font-medium text-gray-700">
-                          Fee (TTD)
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-700">Payment Date</th>
-                        <th className="text-center py-3 px-4 font-medium text-gray-700">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {entries.map((item) => (
-                        <tr key={item.id} className="border-b hover:bg-blue-50 transition-colors">
-                          <td className="py-3 px-4 font-medium">
-                            {MONTHS[item.month - 1]} {item.year}
-                          </td>
-                          <td className="py-3 px-4 text-right text-green-600 font-semibold">
-                            ${item.amountUSD.toFixed(2)}
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            {item.exchangeRate.toFixed(2)}
-                          </td>
-                          <td className="py-3 px-4 text-right text-blue-600 font-semibold">
-                            ${(item.amountUSD * item.exchangeRate).toFixed(2)}
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            {baselineTtd != null && baselineTtd > 0 ? (
-                              <span className="text-red-600 font-medium">
-                                {ratePremiumTtd(
-                                  item.amountUSD,
-                                  item.exchangeRate,
-                                  baselineTtd
-                                ).toFixed(2)}{' '}
-                                TTD
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">—</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4">
-                            {format(new Date(item.paymentDate), 'MMM dd, yyyy')}
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex justify-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEdit(item)}
-                                className="hover:bg-blue-100"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDelete(item.id)}
-                                className="hover:bg-red-100"
-                              >
-                                <Trash2 className="w-4 h-4 text-red-600" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                {renderEntriesTable(entries)}
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      <MobileAddButton label="Add availability" onClick={openAddForm} />
     </div>
   )
 }

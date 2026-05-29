@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { ResponsiveTable } from '@/components/ui/responsive-table'
 import { format } from 'date-fns'
 import {
   ArrowLeft,
@@ -286,52 +287,55 @@ export default function CardDetailPage() {
                   .
                 </p>
               ) : (
-                <div className="overflow-x-auto touch-pan-x [scrollbar-gutter:stable]">
-                  <table className="w-full min-w-[36rem] text-sm">
-                    <thead>
-                      <tr className="border-b bg-gray-50 text-left">
-                        <th className="py-3 px-4 font-medium text-gray-700">Month</th>
-                        <th className="py-3 px-4 font-medium text-gray-700 text-right">
-                          USD
-                        </th>
-                        <th className="py-3 px-4 font-medium text-gray-700 text-right">
-                          Rate
-                        </th>
-                        <th className="py-3 px-4 font-medium text-gray-700 text-right">
-                          TTD value
-                        </th>
-                        <th className="py-3 px-4 font-medium text-gray-700">
-                          Payment
-                        </th>
-                        <th className="py-3 px-4 font-medium text-gray-700">Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {card.monthlyAvailability.map((row) => (
-                        <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50/80">
-                          <td className="py-3 px-4">
-                            {MONTHS[row.month - 1]} {row.year}
-                          </td>
-                          <td className="py-3 px-4 text-right font-medium text-green-700">
-                            ${row.amountUSD.toFixed(2)}
-                          </td>
-                          <td className="py-3 px-4 text-right font-mono">
-                            {row.exchangeRate.toFixed(4)}
-                          </td>
-                          <td className="py-3 px-4 text-right text-blue-700">
-                            ${(row.amountUSD * row.exchangeRate).toFixed(2)}
-                          </td>
-                          <td className="py-3 px-4 text-gray-600 whitespace-nowrap">
-                            {format(new Date(row.paymentDate), 'MMM d, yyyy')}
-                          </td>
-                          <td className="py-3 px-4 text-gray-600 max-w-[200px] truncate" title={row.notes ?? ''}>
-                            {row.notes || '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <ResponsiveTable<MonthlyEntry>
+                  rows={card.monthlyAvailability}
+                  rowKey={(row) => row.id}
+                  columns={[
+                    {
+                      id: 'month',
+                      header: 'Month',
+                      mobile: 'title',
+                      cell: (row) => `${MONTHS[row.month - 1]} ${row.year}`,
+                    },
+                    {
+                      id: 'usd',
+                      header: 'USD',
+                      align: 'right',
+                      mobile: 'primary',
+                      className: 'font-medium text-green-700',
+                      cell: (row) => `$${row.amountUSD.toFixed(2)}`,
+                    },
+                    {
+                      id: 'ttd',
+                      header: 'TTD value',
+                      align: 'right',
+                      mobile: 'primary',
+                      className: 'text-blue-700',
+                      cell: (row) =>
+                        `$${(row.amountUSD * row.exchangeRate).toFixed(2)}`,
+                    },
+                    {
+                      id: 'rate',
+                      header: 'Rate',
+                      align: 'right',
+                      className: 'font-mono',
+                      cell: (row) => row.exchangeRate.toFixed(4),
+                    },
+                    {
+                      id: 'payment',
+                      header: 'Payment',
+                      className: 'text-gray-600 whitespace-nowrap',
+                      cell: (row) =>
+                        format(new Date(row.paymentDate), 'MMM d, yyyy'),
+                    },
+                    {
+                      id: 'notes',
+                      header: 'Notes',
+                      className: 'text-gray-600 max-w-[200px] truncate',
+                      cell: (row) => row.notes || '—',
+                    },
+                  ]}
+                />
               )}
             </CardContent>
           </Card>
@@ -356,44 +360,47 @@ export default function CardDetailPage() {
                   No usage logged yet for this card.
                 </p>
               ) : (
-                <div className="overflow-x-auto touch-pan-x [scrollbar-gutter:stable]">
-                  <table className="w-full min-w-[32rem] text-sm">
-                    <thead>
-                      <tr className="border-b bg-gray-50 text-left">
-                        <th className="py-3 px-4 font-medium text-gray-700">Date</th>
-                        <th className="py-3 px-4 font-medium text-gray-700">Period</th>
-                        <th className="py-3 px-4 font-medium text-gray-700 text-right">
-                          Amount (TTD)
-                        </th>
-                        <th className="py-3 px-4 font-medium text-gray-700 text-right whitespace-nowrap">
-                          Paid owner
-                        </th>
-                        <th className="py-3 px-4 font-medium text-gray-700">Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {usage.map((u) => (
-                        <tr key={u.id} className="border-b border-gray-100 hover:bg-gray-50/80">
-                          <td className="py-3 px-4 whitespace-nowrap text-gray-800">
-                            {format(new Date(u.usageDate), 'MMM d, yyyy')}
-                          </td>
-                          <td className="py-3 px-4 text-gray-600">
-                            {MONTHS[u.month - 1]} {u.year}
-                          </td>
-                          <td className="py-3 px-4 text-right font-medium text-amber-800">
-                            ${u.amountTTD.toFixed(2)}
-                          </td>
-                          <td className="py-3 px-4 text-right text-gray-700 whitespace-nowrap">
-                            ${u.paidToOwnerTTD.toFixed(2)}
-                          </td>
-                          <td className="py-3 px-4 text-gray-600 max-w-[240px] truncate" title={u.notes ?? ''}>
-                            {u.notes || '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <ResponsiveTable<UsageRow>
+                  rows={usage}
+                  rowKey={(u) => u.id}
+                  columns={[
+                    {
+                      id: 'date',
+                      header: 'Date',
+                      mobile: 'title',
+                      className: 'whitespace-nowrap text-gray-800',
+                      cell: (u) => format(new Date(u.usageDate), 'MMM d, yyyy'),
+                    },
+                    {
+                      id: 'amount',
+                      header: 'Amount (TTD)',
+                      align: 'right',
+                      mobile: 'primary',
+                      className: 'font-medium text-amber-800',
+                      cell: (u) => `$${u.amountTTD.toFixed(2)}`,
+                    },
+                    {
+                      id: 'paid',
+                      header: 'Paid owner',
+                      align: 'right',
+                      mobile: 'primary',
+                      className: 'text-gray-700 whitespace-nowrap',
+                      cell: (u) => `$${u.paidToOwnerTTD.toFixed(2)}`,
+                    },
+                    {
+                      id: 'period',
+                      header: 'Period',
+                      className: 'text-gray-600',
+                      cell: (u) => `${MONTHS[u.month - 1]} ${u.year}`,
+                    },
+                    {
+                      id: 'notes',
+                      header: 'Notes',
+                      className: 'text-gray-600 max-w-[240px] truncate',
+                      cell: (u) => u.notes || '—',
+                    },
+                  ]}
+                />
               )}
             </CardContent>
           </Card>

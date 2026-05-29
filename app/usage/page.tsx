@@ -363,6 +363,272 @@ export default function UsagePage() {
 
   const monthName = format(currentDate, 'MMMM yyyy')
 
+  const renderUsageEditForm = (row: UsageEntry) => (
+    <>
+      {editEntryError && (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded px-3 py-2 mb-3">
+          {editEntryError}
+        </p>
+      )}
+      <p className="text-sm font-medium text-gray-800 mb-3">
+        Edit usage — {row.card.cardNickname} ({row.card.person.name})
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+        <div>
+          <Label htmlFor={`edit-amt-usd-${row.id}-m`}>Usage amount (USD) *</Label>
+          <Input
+            id={`edit-amt-usd-${row.id}-m`}
+            type="number"
+            step="0.01"
+            min="0"
+            value={editDraft.amountUSD}
+            onChange={(e) =>
+              setEditDraft((d) => ({ ...d, amountUSD: e.target.value }))
+            }
+          />
+        </div>
+        <div>
+          <Label htmlFor={`edit-paid-${row.id}-m`}>Paid to owner (TTD)</Label>
+          <Input
+            id={`edit-paid-${row.id}-m`}
+            type="number"
+            step="0.01"
+            min="0"
+            value={editDraft.paidToOwnerTTD}
+            onChange={(e) =>
+              setEditDraft((d) => ({
+                ...d,
+                paidToOwnerTTD: e.target.value,
+              }))
+            }
+          />
+        </div>
+        <div>
+          <Label htmlFor={`edit-date-${row.id}-m`}>Date</Label>
+          <Input
+            id={`edit-date-${row.id}-m`}
+            type="date"
+            value={editDraft.usageDate}
+            onChange={(e) =>
+              setEditDraft((d) => ({
+                ...d,
+                usageDate: e.target.value,
+              }))
+            }
+          />
+        </div>
+        <div className="sm:col-span-2 lg:col-span-1">
+          <Label htmlFor={`edit-notes-${row.id}-m`}>Notes</Label>
+          <Input
+            id={`edit-notes-${row.id}-m`}
+            value={editDraft.notes}
+            onChange={(e) =>
+              setEditDraft((d) => ({ ...d, notes: e.target.value }))
+            }
+          />
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          onClick={saveEntryEdit}
+          disabled={savingEntryId === row.id}
+        >
+          {savingEntryId === row.id ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Saving…
+            </>
+          ) : (
+            'Save changes'
+          )}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={cancelEntryEdit}
+          disabled={savingEntryId === row.id}
+        >
+          Cancel
+        </Button>
+        {(() => {
+          const usd = parseFloat(editDraft.amountUSD)
+          const cardRate = rateForCardId(row.cardId)
+          const ttd =
+            !Number.isNaN(usd) && cardRate && cardRate > 0
+              ? usd * cardRate
+              : null
+          const paid = parseFloat(editDraft.paidToOwnerTTD || '0')
+          return ttd != null && ttd - paid > 1e-6
+        })() && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={savingEntryId === row.id}
+            onClick={() => {
+              const usd = parseFloat(editDraft.amountUSD)
+              const cardRate = rateForCardId(row.cardId)
+              const a =
+                !Number.isNaN(usd) && cardRate && cardRate > 0
+                  ? usd * cardRate
+                  : null
+              if (a != null)
+                setEditDraft((d) => ({
+                  ...d,
+                  paidToOwnerTTD: String(a),
+                }))
+            }}
+          >
+            Match paid to full usage
+          </Button>
+        )}
+      </div>
+    </>
+  )
+
+  const usageOwedTTD = (row: UsageEntry): number | null => {
+    const cardRate = rateForCardId(row.cardId)
+    const usageUSD = typeof row.amountUSD === 'number' ? row.amountUSD : null
+    if (usageUSD == null || !cardRate || cardRate <= 0) return null
+    return usageUSD * cardRate - row.paidToOwnerTTD
+  }
+
+  const renderUsageMobileCard = (row: UsageEntry) => {
+    const editing = editingEntryId === row.id
+    const owed = usageOwedTTD(row)
+    const hasOwed = owed != null && owed > 0.005
+    const canSettle = owed != null && owed > 1e-6
+    const usd =
+      typeof row.amountUSD === 'number'
+        ? `USD $${row.amountUSD.toFixed(2)}`
+        : 'USD —'
+    return (
+      <li key={row.id}>
+        <div
+          className={`rounded-xl border bg-white shadow-sm overflow-hidden ${
+            editing ? 'border-blue-300 ring-1 ring-blue-200' : 'border-gray-200'
+          }`}
+        >
+          <div className="p-4">
+            <div className="flex items-start justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => openEntryEdit(row)}
+                className="text-left min-w-0 flex-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                <span className="block font-semibold text-gray-900">
+                  {row.card.cardNickname}
+                  {row.card.lastFourDigits ? ` • ${row.card.lastFourDigits}` : ''}
+                </span>
+                <span className="mt-0.5 block text-xs text-gray-500">
+                  {row.card.person.name}
+                  {row.card.issuingBank
+                    ? ` · ${issuingBankLabel(row.card.issuingBank)}`
+                    : ''}
+                </span>
+              </button>
+              <div className="flex items-center gap-0.5 shrink-0">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50"
+                  onClick={() => openEntryEdit(row)}
+                  title="Edit usage & payment to owner"
+                >
+                  <Pencil className="w-4 h-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => handleDelete(row.id)}
+                  title="Delete"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-gray-50 px-3 py-2">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                  Usage amount
+                </div>
+                <div className="mt-0.5 text-base font-semibold tabular-nums text-blue-700">
+                  {usd}
+                </div>
+              </div>
+              <div className="rounded-lg bg-gray-50 px-3 py-2">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                  Owed (TTD)
+                </div>
+                <div
+                  className={`mt-0.5 text-base font-semibold tabular-nums ${
+                    hasOwed ? 'text-red-700' : 'text-gray-500'
+                  }`}
+                >
+                  {owed == null ? '—' : `TTD $${Math.max(0, owed).toFixed(2)}`}
+                </div>
+              </div>
+            </div>
+
+            <dl className="mt-3 space-y-1.5 text-sm">
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-gray-500 shrink-0">Paid owner (TTD)</dt>
+                <dd className="text-gray-800 text-right tabular-nums">
+                  TTD ${row.paidToOwnerTTD.toFixed(2)}
+                </dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-gray-500 shrink-0">Date</dt>
+                <dd className="text-gray-800 text-right tabular-nums">
+                  {format(new Date(row.usageDate), 'MMM d, yyyy')}
+                </dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-gray-500 shrink-0">Notes</dt>
+                <dd className="text-gray-800 text-right min-w-0 break-words">
+                  {row.notes || '—'}
+                </dd>
+              </div>
+            </dl>
+
+            {canSettle && !editing ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3 w-full inline-flex items-center justify-center gap-1 text-green-700 hover:bg-green-50"
+                disabled={savingEntryId === row.id}
+                onClick={() => markEntrySettled(row)}
+                title="Set paid to owner equal to usage (fully settled)"
+              >
+                {savingEntryId === row.id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    Mark settled
+                  </>
+                )}
+              </Button>
+            ) : null}
+          </div>
+          {editing ? (
+            <div className="border-t border-blue-100 bg-blue-50/40 p-4">
+              {renderUsageEditForm(row)}
+            </div>
+          ) : null}
+        </div>
+      </li>
+    )
+  }
+
   return (
     <div className="space-y-6 min-w-0">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between min-w-0">
@@ -545,12 +811,13 @@ export default function UsagePage() {
               No usage logged for this month yet.
             </div>
           ) : (
-            <div className="overflow-x-auto touch-pan-x [scrollbar-gutter:stable]">
+            <div>
               {listActionError && (
                 <div className="px-4 py-2 text-sm text-red-800 bg-red-50 border-b border-red-100">
                   {listActionError}
                 </div>
               )}
+              <div className="hidden md:block overflow-x-auto touch-pan-x [scrollbar-gutter:stable]">
               <table className="w-full min-w-[46rem] text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b">
@@ -834,6 +1101,11 @@ export default function UsagePage() {
                   ))}
                 </tbody>
               </table>
+              </div>
+
+              <ul className="md:hidden space-y-3 p-4">
+                {entries.map((row) => renderUsageMobileCard(row))}
+              </ul>
             </div>
           )}
         </CardContent>

@@ -18,6 +18,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { useGroupByOwner } from '@/hooks/use-group-by-owner'
+import { MobileAddButton } from '@/components/ui/mobile-add-button'
 import {
   ISSUING_BANK_CODES,
   ISSUING_BANK_LABELS,
@@ -846,6 +847,8 @@ export default function CardsPage() {
           )}
         </>
       )}
+
+      <MobileAddButton label="Add card" onClick={openAddForm} />
     </div>
   )
 }

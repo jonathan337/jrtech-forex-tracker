@@ -17,6 +17,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { ResponsiveTable } from '@/components/ui/responsive-table'
+import { MobileAddButton } from '@/components/ui/mobile-add-button'
 
 type PaymentRow = {
   id: string
@@ -337,60 +339,71 @@ export default function PaymentsPage() {
         <CardContent className="p-0">
           {loading ? (
             <div className="py-12 text-center text-gray-500">Loading…</div>
-          ) : payments.length === 0 ? (
-            <div className="py-12 px-6 text-center text-gray-500">
-              No payments logged for this month.
-            </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200 text-left">
-                    <th className="py-3 px-4 font-semibold text-gray-700">Date</th>
-                    <th className="py-3 px-4 font-semibold text-gray-700">Paid to</th>
-                    <th className="py-3 px-4 font-semibold text-gray-700 text-right">Amount (TTD)</th>
-                    <th className="py-3 px-4 font-semibold text-gray-700">Notes</th>
-                    <th className="py-3 px-4 font-semibold text-gray-700 text-right w-24"> </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {payments.map((p) => (
-                    <tr key={p.id} className="hover:bg-gray-50/80">
-                      <td className="py-3 px-4 whitespace-nowrap tabular-nums text-gray-800">
-                        {format(new Date(p.paidAt), 'MMM d, yyyy')}
-                      </td>
-                      <td className="py-3 px-4 text-gray-800">{p.personName ?? '—'}</td>
-                      <td className="py-3 px-4 text-right font-medium tabular-nums text-emerald-800">
-                        ${p.amountTTD.toFixed(2)}
-                      </td>
-                      <td className="py-3 px-4 text-gray-600 max-w-[200px] sm:max-w-md truncate">
-                        {p.notes ?? '—'}
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          disabled={deletingId === p.id}
-                          onClick={() => void handleDelete(p.id)}
-                          aria-label="Delete payment"
-                        >
-                          {deletingId === p.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ResponsiveTable<PaymentRow>
+              rows={payments}
+              rowKey={(p) => p.id}
+              empty="No payments logged for this month."
+              columns={[
+                {
+                  id: 'date',
+                  header: 'Date',
+                  mobile: 'title',
+                  className: 'whitespace-nowrap tabular-nums',
+                  cell: (p) => format(new Date(p.paidAt), 'MMM d, yyyy'),
+                },
+                {
+                  id: 'amount',
+                  header: 'Amount (TTD)',
+                  align: 'right',
+                  mobile: 'primary',
+                  className: 'font-medium tabular-nums text-emerald-800',
+                  cell: (p) => `$${p.amountTTD.toFixed(2)}`,
+                },
+                {
+                  id: 'person',
+                  header: 'Paid to',
+                  cell: (p) => p.personName ?? '—',
+                },
+                {
+                  id: 'notes',
+                  header: 'Notes',
+                  className:
+                    'text-gray-600 max-w-[200px] sm:max-w-md truncate',
+                  cell: (p) => p.notes ?? '—',
+                },
+              ]}
+              actions={{
+                render: (p) => (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    disabled={deletingId === p.id}
+                    onClick={() => void handleDelete(p.id)}
+                    aria-label="Delete payment"
+                  >
+                    {deletingId === p.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </Button>
+                ),
+              }}
+            />
           )}
         </CardContent>
       </Card>
+
+      <MobileAddButton
+        label="Log a payment"
+        onClick={() => {
+          setShowForm(true)
+          setFormError('')
+        }}
+      />
     </div>
   )
 }
