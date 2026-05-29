@@ -37,8 +37,20 @@ function normalizePoolerDatabaseUrl(url: string | undefined): string | undefined
     out += out.includes('?') ? '&' : '?'
     out += 'pgbouncer=true'
   }
+  // A single page load fans out into several parallel queries (Promise.all) across
+  // multiple API routes. connection_limit=1 serializes them and trips the pool
+  // timeout (P2024). PgBouncer (transaction mode) safely multiplexes these, so allow
+  // a small pool per instance. Override via DB_CONNECTION_LIMIT if needed.
+  const limit = process.env.DB_CONNECTION_LIMIT ?? '10'
   if (!out.includes('connection_limit=')) {
-    out += '&connection_limit=1'
+    out += `&connection_limit=${limit}`
+  } else {
+    // Upgrade the historical connection_limit=1 default that throttled the pool.
+    out = out.replace(/connection_limit=1(?!\d)/, `connection_limit=${limit}`)
+  }
+  // Give queued queries more time before failing under bursty concurrent loads.
+  if (!out.includes('pool_timeout=')) {
+    out += '&pool_timeout=20'
   }
   return out
 }

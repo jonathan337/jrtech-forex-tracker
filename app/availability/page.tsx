@@ -15,6 +15,7 @@ import { useGroupByOwner } from '@/hooks/use-group-by-owner'
 interface CardType {
   id: string
   cardNickname: string
+  lastFourDigits: string | null
   person: {
     id: string
     name: string
@@ -471,7 +472,8 @@ export default function AvailabilityPage() {
                     <option value="">Select a card</option>
                     {cards.map((card) => (
                       <option key={card.id} value={card.id}>
-                        {card.cardNickname} ({card.person.name})
+                        {card.person.name} ({card.cardNickname}
+                        {card.lastFourDigits ? ` •••• ${card.lastFourDigits}` : ''})
                       </option>
                     ))}
                   </select>

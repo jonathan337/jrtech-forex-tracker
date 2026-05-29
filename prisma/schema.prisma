@@ -12,30 +12,32 @@ datasource db {
 }
 
 model User {
-  id                       String    @id @default(cuid())
-  email                    String    @unique
+  id                       String         @id @default(cuid())
+  email                    String         @unique
   password                 String
   businessName             String
-  defaultExchangeRate      Float     @default(6.7993)
-  createdAt                DateTime  @default(now())
-  updatedAt                DateTime  @updatedAt
+  defaultExchangeRate      Float          @default(6.7993)
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
   emailVerificationExpires DateTime?
   emailVerificationToken   String?
-  emailVerified            Boolean   @default(false)
+  emailVerified            Boolean        @default(false)
   people                   Person[]
+  sentPayments             SentPayment[]
 }
 
 model Person {
-  id        String   @id @default(cuid())
+  id        String         @id @default(cuid())
   userId    String
   name      String
   email     String?
   phone     String?
   notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   cards     Card[]
+  payments  SentPayment[]
 
   @@index([userId])
 }
@@ -98,4 +100,21 @@ model MonthlyAvailability {
   @@unique([cardId, year, month])
   @@index([year, month])
   @@index([cardId])
+}
+
+/** Standalone log of money you sent (e.g. bank transfer). Optional link to a person for context. Does not auto-update usage “paid to owner” — use the Usage page or person payment for that. */
+model SentPayment {
+  id        String   @id @default(cuid())
+  userId    String
+  personId  String?
+  amountTTD Float
+  paidAt    DateTime
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  person    Person?  @relation(fields: [personId], references: [id], onDelete: SetNull)
+
+  @@index([userId, paidAt])
+  @@index([personId])
 }

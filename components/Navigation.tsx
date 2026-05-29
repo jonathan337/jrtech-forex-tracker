@@ -13,6 +13,7 @@ import {
   BarChart3,
   Settings,
   Wallet,
+  Receipt,
   Menu,
   X,
 } from 'lucide-react'
@@ -31,6 +32,7 @@ function Navigation() {
     { href: '/cards', label: 'Cards', icon: CreditCard },
     { href: '/availability', label: 'Availability', icon: Calendar },
     { href: '/usage', label: 'Usage', icon: Wallet },
+    { href: '/payments', label: 'Payments', icon: Receipt },
     { href: '/settings', label: 'Settings', icon: Settings },
   ]
 
