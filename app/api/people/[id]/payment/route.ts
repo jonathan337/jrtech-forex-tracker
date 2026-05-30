@@ -220,6 +220,24 @@ export async function POST(
     )
     const surplusTTD = round2(amountTTD - appliedTTD)
 
+    if (appliedTTD > EPS) {
+      try {
+        await prisma.sentPayment.create({
+          data: {
+            userId: session.user.id,
+            personId,
+            amountTTD: appliedTTD,
+            paidAt: new Date(),
+            notes: `Owner payment — applied across ${allocations.length} usage row${
+              allocations.length === 1 ? '' : 's'
+            }`,
+          },
+        })
+      } catch (logErr) {
+        console.error('[person payment] Failed to log SentPayment:', logErr)
+      }
+    }
+
     return NextResponse.json({
       appliedTTD,
       surplusTTD: surplusTTD > EPS ? surplusTTD : 0,

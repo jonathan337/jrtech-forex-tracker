@@ -7,6 +7,7 @@ import {
   USAGE_REQUIRES_AVAILABILITY_MESSAGE,
 } from '@/lib/card-available-for-month'
 import { resolveUsageUsdAndTtdForMonth } from '@/lib/usage-entry-amounts'
+import { recordOwnerPaymentDelta } from '@/lib/sent-payment-sync'
 
 export const runtime = 'nodejs'
 
@@ -180,6 +181,18 @@ export async function PATCH(
         },
       },
     })
+
+    if (paidToOwnerPatch !== undefined) {
+      const delta = paidToOwnerPatch - existing.paidToOwnerTTD
+      await recordOwnerPaymentDelta({
+        userId: session.user.id,
+        personId: updated.card.personId,
+        deltaTTD: delta,
+        cardNickname: updated.card.cardNickname,
+        month: updated.month,
+        year: updated.year,
+      })
+    }
 
     return NextResponse.json(updated)
   } catch (error) {

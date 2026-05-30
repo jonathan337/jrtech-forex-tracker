@@ -7,6 +7,7 @@ import {
   USAGE_REQUIRES_AVAILABILITY_MESSAGE,
 } from '@/lib/card-available-for-month'
 import { resolveUsageUsdAndTtdForMonth } from '@/lib/usage-entry-amounts'
+import { recordOwnerPaymentDelta } from '@/lib/sent-payment-sync'
 
 export const runtime = 'nodejs'
 
@@ -166,6 +167,15 @@ export async function POST(request: Request) {
           },
         },
       },
+    })
+
+    await recordOwnerPaymentDelta({
+      userId: session.user.id,
+      personId: entry.card.personId,
+      deltaTTD: paidToOwner,
+      cardNickname: entry.card.cardNickname,
+      month: entry.month,
+      year: entry.year,
     })
 
     return NextResponse.json(entry, { status: 201 })
