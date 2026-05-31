@@ -114,7 +114,14 @@ export function ChatWidget() {
   }, [messages, loading, open])
 
   useEffect(() => {
-    if (open) inputRef.current?.focus()
+    if (!open) return
+    // Only autofocus on desktop — on touch devices this pops up the keyboard immediately.
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia('(min-width: 768px)').matches
+    ) {
+      inputRef.current?.focus()
+    }
   }, [open])
 
   async function send(text: string) {
@@ -242,8 +249,8 @@ export function ChatWidget() {
       {open && (
         <div
           className="fixed z-50 flex flex-col bg-white shadow-2xl border border-gray-200 overflow-hidden
-            inset-x-3 bottom-3 top-16 rounded-2xl
-            md:inset-auto md:bottom-6 md:right-6 md:top-auto md:w-[400px] md:h-[600px]"
+            inset-x-4 bottom-4 top-24 rounded-2xl
+            md:inset-auto md:bottom-6 md:right-6 md:top-auto md:w-[380px] md:h-[540px]"
           role="dialog"
           aria-label="Assistant"
         >
