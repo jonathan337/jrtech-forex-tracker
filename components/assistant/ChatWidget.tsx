@@ -381,7 +381,8 @@ export function ChatWidget() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Type a message…"
-              className="min-w-0 flex-1 rounded-full border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              /* 16px on mobile prevents iOS Safari from auto-zooming the page on focus. */
+              className="min-w-0 flex-1 rounded-full border border-gray-300 px-4 py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
             <button
               type="submit"
