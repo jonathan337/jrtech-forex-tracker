@@ -51,10 +51,14 @@ export async function loadMonthAvailabilityWithUsage(
     },
   })
 
-  const explicitWithFlag = explicit.map((item) => ({
-    ...item,
-    isRecurringTemplate: false as const,
-  }))
+  // Rows flagged "unavailable" are not real availability — exclude them from the
+  // numbers, but still let them suppress recurring availability (see `covered` below).
+  const explicitWithFlag = explicit
+    .filter((item) => !item.unavailable)
+    .map((item) => ({
+      ...item,
+      isRecurringTemplate: false as const,
+    }))
 
   const recurringCards = await prisma.card.findMany({
     where: {

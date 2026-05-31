@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback, Fragment } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'react'
 import {
   useParams,
   useRouter,
   useSearchParams,
   usePathname,
 } from 'next/navigation'
+import { useDataChanged } from '@/lib/use-data-changed'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -130,6 +131,8 @@ export default function PersonDashboardPage() {
   const [summary, setSummary] = useState<Summary | null>(null)
   const [exchangeRate, setExchangeRate] = useState<ExchangeRate | null>(null)
   const [loading, setLoading] = useState(true)
+  // Only the very first load shows the full-page spinner; later refreshes update in place.
+  const didInitialLoadRef = useRef(false)
   const [loadError, setLoadError] = useState('')
   const [onlyWithBalance, setOnlyWithBalance] = useState(false)
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
@@ -305,14 +308,17 @@ export default function PersonDashboardPage() {
     if (status !== 'authenticated' || !personId) return
     let cancelled = false
     const ac = new AbortController()
-    setLoading(true)
+    if (!didInitialLoadRef.current) setLoading(true)
     setLoadError('')
     void Promise.all([
       fetchSummaryData(ac.signal),
       fetchDefaultRateData(ac.signal),
       fetchPersonOwedData(ac.signal),
     ]).finally(() => {
-      if (!cancelled) setLoading(false)
+      if (!cancelled) {
+        setLoading(false)
+        didInitialLoadRef.current = true
+      }
     })
     return () => {
       cancelled = true
@@ -329,13 +335,8 @@ export default function PersonDashboardPage() {
   ])
 
   const fetchSummary = async () => {
-    setLoading(true)
     setLoadError('')
-    try {
-      await fetchSummaryData()
-    } finally {
-      setLoading(false)
-    }
+    await fetchSummaryData()
   }
 
   const fetchPersonOwed = async () => {
@@ -347,6 +348,10 @@ export default function PersonDashboardPage() {
     await fetchPersonOwed()
     setUsageRevision((n) => n + 1)
   }
+
+  useDataChanged(() => {
+    void afterUsageChange()
+  })
 
   const handleQuickUsageSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

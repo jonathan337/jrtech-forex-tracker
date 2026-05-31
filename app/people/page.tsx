@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { useDataChanged } from '@/lib/use-data-changed'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -21,6 +22,7 @@ import {
   Banknote,
   CircleDollarSign,
   Wallet,
+  Search,
 } from 'lucide-react'
 import { PersonLogUsagePanel } from '@/components/PersonLogUsagePanel'
 import { PersonAddPaymentPanel } from '@/components/PersonAddPaymentPanel'
@@ -61,6 +63,8 @@ export default function PeoplePage() {
   const { status, data: session } = useSession()
   const [people, setPeople] = useState<Person[]>([])
   const [loading, setLoading] = useState(true)
+  // Only the very first load shows the full-page spinner; later refreshes update in place.
+  const didInitialLoadRef = useRef(false)
   const [showForm, setShowForm] = useState(false)
   const [editingPerson, setEditingPerson] = useState<Person | null>(null)
   const [formData, setFormData] = useState({
@@ -80,6 +84,51 @@ export default function PeoplePage() {
   const [addPaymentForPersonId, setAddPaymentForPersonId] = useState<
     string | null
   >(null)
+  const [search, setSearch] = useState('')
+  const [onlyAvailableUSD, setOnlyAvailableUSD] = useState(false)
+  const [onlyOwed, setOnlyOwed] = useState(false)
+
+  const filteredPeople = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return people.filter((p) => {
+      if (q) {
+        const hay = `${p.name} ${p.email ?? ''} ${p.phone ?? ''}`.toLowerCase()
+        if (!hay.includes(q)) return false
+      }
+      if (onlyAvailableUSD) {
+        const avail =
+          typeof p.spendHeadroomUSD === 'number' &&
+          Number.isFinite(p.spendHeadroomUSD)
+            ? p.spendHeadroomUSD
+            : 0
+        if (avail <= 0.005) return false
+      }
+      if (onlyOwed) {
+        const owedT =
+          typeof p.owedTTD === 'number' && Number.isFinite(p.owedTTD)
+            ? p.owedTTD
+            : 0
+        const owedU =
+          typeof p.owedUSD === 'number' && Number.isFinite(p.owedUSD)
+            ? p.owedUSD
+            : 0
+        if (owedT <= 0.005 && owedU <= 0.005) return false
+      }
+      return true
+    })
+  }, [people, search, onlyAvailableUSD, onlyOwed])
+
+  const filtersActive = search.trim() !== '' || onlyAvailableUSD || onlyOwed
+
+  const clearFilters = () => {
+    setSearch('')
+    setOnlyAvailableUSD(false)
+    setOnlyOwed(false)
+  }
+
+  useDataChanged(() => {
+    if (status === 'authenticated' && session?.user?.id) void fetchPeople()
+  })
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -107,7 +156,7 @@ export default function PeoplePage() {
   }, [status, session?.user?.id])
 
   const fetchPeople = async () => {
-    setLoading(true)
+    if (!didInitialLoadRef.current) setLoading(true)
     setLoadError('')
     try {
       const d = new Date()
@@ -151,6 +200,7 @@ export default function PeoplePage() {
       setPeople([])
     } finally {
       setLoading(false)
+      didInitialLoadRef.current = true
     }
   }
 
@@ -267,6 +317,59 @@ export default function PeoplePage() {
           Add Person
         </Button>
       </div>
+
+      {!loading && people.length > 0 && (
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center min-w-0">
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name, email, or phone…"
+              className="pl-9"
+              aria-label="Search people"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setOnlyAvailableUSD((v) => !v)}
+              aria-pressed={onlyAvailableUSD}
+              className={`touch-manipulation inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-sm font-medium transition-colors ${
+                onlyAvailableUSD
+                  ? 'border-emerald-300 bg-emerald-100 text-emerald-900'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <CircleDollarSign className="w-4 h-4 shrink-0" />
+              Available USD
+            </button>
+            <button
+              type="button"
+              onClick={() => setOnlyOwed((v) => !v)}
+              aria-pressed={onlyOwed}
+              className={`touch-manipulation inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-sm font-medium transition-colors ${
+                onlyOwed
+                  ? 'border-amber-300 bg-amber-100 text-amber-900'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <Banknote className="w-4 h-4 shrink-0" />
+              I owe them
+            </button>
+            {filtersActive && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="touch-manipulation inline-flex items-center gap-1 rounded-full px-2.5 py-2 text-sm font-medium text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-4 h-4 shrink-0" />
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <Card className="border-2 border-blue-200 shadow-xl min-w-0 overflow-hidden">
@@ -425,9 +528,25 @@ export default function PeoplePage() {
             </Button>
           </CardContent>
         </Card>
+      ) : filteredPeople.length === 0 ? (
+        <Card className="shadow-md">
+          <CardContent className="py-12 text-center">
+            <Search className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-700 mb-2">
+              No people match your filters
+            </h3>
+            <p className="text-gray-500 mb-4">
+              Try a different search{onlyAvailableUSD || onlyOwed ? ' or turn off a filter' : ''}.
+            </p>
+            <Button variant="outline" onClick={clearFilters}>
+              <X className="w-4 h-4 mr-2" />
+              Clear filters
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-stretch">
-          {people.map((person) => {
+          {filteredPeople.map((person) => {
             const owedUSD =
               typeof person.owedUSD === 'number' && Number.isFinite(person.owedUSD)
                 ? person.owedUSD

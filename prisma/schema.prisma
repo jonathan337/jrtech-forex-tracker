@@ -92,6 +92,8 @@ model MonthlyAvailability {
   amountUSD    Float
   exchangeRate Float
   paymentDate  DateTime
+  /** When true, the card is explicitly NOT available this month (overrides recurring availability). */
+  unavailable  Boolean  @default(false)
   notes        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

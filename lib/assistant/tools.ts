@@ -62,6 +62,7 @@ export function systemPrompt(): string {
     '- For read questions, call the read tools and answer concisely with concrete numbers (include the currency).',
     '- When the user asks you to log usage or apply/log a payment, call the matching write tool. Write tools DO NOT execute immediately — they prepare an action the user must confirm with a button, so do not claim the action is done.',
     '- When you call a write tool, identify the card or person by the user\'s words; the tool resolves it. If a tool returns an error about an ambiguous or missing match, ask the user a brief clarifying question (or call a list tool to show options).',
+    '- If the user asks for several actions at once (e.g. log usage on two different cards, or log usage and a payment together), call the matching write tool ONCE PER ACTION in the same turn — do not collapse them into one or drop any.',
     '- Prefer specifying amounts in the currency the user used. Usage can take USD or TTD; payments are in TTD.',
     '- Never invent card names, people, or balances — always use tool results.',
     '',

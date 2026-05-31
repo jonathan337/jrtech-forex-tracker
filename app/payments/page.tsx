@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { useDataChanged } from '@/lib/use-data-changed'
 import { format } from 'date-fns'
 import Link from 'next/link'
 import {
@@ -36,6 +37,8 @@ export default function PaymentsPage() {
   const { status } = useSession()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [loading, setLoading] = useState(true)
+  // Only the very first load shows the full-page spinner; later refreshes update in place.
+  const didInitialLoadRef = useRef(false)
   const [payments, setPayments] = useState<PaymentRow[]>([])
   const [people, setPeople] = useState<PersonOption[]>([])
   const [formError, setFormError] = useState('')
@@ -60,7 +63,7 @@ export default function PaymentsPage() {
   }, [status, router])
 
   const fetchPayments = useCallback(async () => {
-    setLoading(true)
+    if (!didInitialLoadRef.current) setLoading(true)
     try {
       const res = await fetch(`/api/payments?year=${year}&month=${month}`, {
         credentials: 'include',
@@ -76,6 +79,7 @@ export default function PaymentsPage() {
       setPayments([])
     } finally {
       setLoading(false)
+      didInitialLoadRef.current = true
     }
   }, [year, month])
 
@@ -106,6 +110,13 @@ export default function PaymentsPage() {
     void fetchPayments()
     void fetchPeople()
   }, [status, fetchPayments, fetchPeople])
+
+  useDataChanged(() => {
+    if (status === 'authenticated') {
+      void fetchPayments()
+      void fetchPeople()
+    }
+  })
 
   useEffect(() => {
     setFormError('')

@@ -5,15 +5,31 @@ import { z } from 'zod'
 
 export const runtime = 'nodejs'
 
-const availabilitySchema = z.object({
-  cardId: z.string().min(1, 'Card is required'),
-  year: z.number().int().min(2000).max(2100),
-  month: z.number().int().min(1).max(12),
-  amountUSD: z.number().positive('Amount must be positive'),
-  exchangeRate: z.number().positive('Exchange rate must be positive'),
-  paymentDate: z.string().datetime(),
-  notes: z.string().optional(),
-})
+const availabilitySchema = z
+  .object({
+    cardId: z.string().min(1, 'Card is required'),
+    year: z.number().int().min(2000).max(2100),
+    month: z.number().int().min(1).max(12),
+    amountUSD: z.number().positive('Amount must be positive').optional(),
+    exchangeRate: z.number().positive('Exchange rate must be positive').optional(),
+    paymentDate: z.string().datetime().optional(),
+    notes: z.string().optional(),
+    unavailable: z.boolean().optional(),
+  })
+  .refine(
+    (d) =>
+      d.unavailable === true ||
+      (d.amountUSD != null && d.exchangeRate != null && d.paymentDate != null),
+    {
+      message: 'Amount, exchange rate, and payment date are required',
+      path: ['amountUSD'],
+    }
+  )
+
+/** First of the given month at noon UTC — used as the payment date for "not available" rows. */
+function firstOfMonthUTC(year: number, month: number): Date {
+  return new Date(Date.UTC(year, month - 1, 1, 12, 0, 0))
+}
 
 export async function GET(request: Request) {
   try {
@@ -82,14 +98,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Card not found' }, { status: 404 })
     }
 
+    const unavailable = validatedData.unavailable === true
+
     const availability = await prisma.monthlyAvailability.create({
       data: {
         cardId: validatedData.cardId,
         year: validatedData.year,
         month: validatedData.month,
-        amountUSD: validatedData.amountUSD,
-        exchangeRate: validatedData.exchangeRate,
-        paymentDate: new Date(validatedData.paymentDate),
+        unavailable,
+        amountUSD: unavailable ? 0 : validatedData.amountUSD!,
+        exchangeRate: unavailable ? validatedData.exchangeRate ?? 1 : validatedData.exchangeRate!,
+        paymentDate: validatedData.paymentDate
+          ? new Date(validatedData.paymentDate)
+          : firstOfMonthUTC(validatedData.year, validatedData.month),
         notes: validatedData.notes || null,
       },
       include: {

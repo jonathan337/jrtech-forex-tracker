@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { MessageCircle, X, Send, Check, Loader2, Sparkles } from 'lucide-react'
 import type { PendingAction } from '@/lib/assistant/tools'
+import { emitDataChanged } from '@/lib/use-data-changed'
 
 type ChatMessage = {
   id: string
   role: 'user' | 'assistant'
   content: string
-  pending?: PendingAction
+  pendingActions?: PendingAction[]
   done?: boolean
 }
 
@@ -64,9 +65,11 @@ function RichText({ text }: { text: string }) {
         .filter(Boolean)
       if (cells.length > 0) {
         out.push(
-          <div key={key} className="flex gap-1.5">
-            <span className="text-gray-400 select-none">•</span>
-            <span>{inline(cells.join(' — '), key)}</span>
+          <div key={key} className="flex gap-1.5 min-w-0">
+            <span className="text-gray-400 select-none shrink-0">•</span>
+            <span className="min-w-0 break-words">
+              {inline(cells.join(' — '), key)}
+            </span>
           </div>
         )
         return
@@ -77,18 +80,22 @@ function RichText({ text }: { text: string }) {
     const bullet = /^([-*•])\s+(.*)$/.exec(line)
     if (bullet) {
       out.push(
-        <div key={key} className="flex gap-1.5">
-          <span className="text-gray-400 select-none">•</span>
-          <span>{inline(bullet[2], key)}</span>
+        <div key={key} className="flex gap-1.5 min-w-0">
+          <span className="text-gray-400 select-none shrink-0">•</span>
+          <span className="min-w-0 break-words">{inline(bullet[2], key)}</span>
         </div>
       )
       return
     }
 
-    out.push(<p key={key}>{inline(line, key)}</p>)
+    out.push(
+      <p key={key} className="break-words">
+        {inline(line, key)}
+      </p>
+    )
   })
 
-  return <div className="space-y-1">{out}</div>
+  return <div className="min-w-0 space-y-1">{out}</div>
 }
 
 export function ChatWidget() {
@@ -148,7 +155,7 @@ export function ChatWidget() {
           id: uid(),
           role: 'assistant',
           content: data.reply || 'Done.',
-          pending: data.pendingAction as PendingAction | undefined,
+          pendingActions: data.pendingActions as PendingAction[] | undefined,
         },
       ])
     } catch {
@@ -165,33 +172,45 @@ export function ChatWidget() {
     }
   }
 
-  async function confirm(msgId: string, action: PendingAction) {
+  async function confirm(msgId: string, actions: PendingAction[]) {
     if (confirming) return
     setConfirming(true)
     try {
-      const res = await fetch('/api/assistant/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ action }),
-      })
-      const data = await res.json()
+      const results: string[] = []
+      let anyOk = false
+      for (const action of actions) {
+        try {
+          const res = await fetch('/api/assistant/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ action }),
+          })
+          const data = await res.json()
+          if (res.ok) {
+            anyOk = true
+            results.push(data.message || 'Done.')
+          } else {
+            results.push(data.error || 'Could not complete that action.')
+          }
+        } catch {
+          results.push('Network error on one action.')
+        }
+      }
+      if (anyOk) {
+        // Tell any open page to refresh its data so the changes show immediately.
+        emitDataChanged({})
+      }
+      const content = results
+        .map((r) => (actions.length > 1 ? `- ${r}` : r))
+        .join('\n')
       setMessages((prev) =>
         prev
-          .map((m) => (m.id === msgId ? { ...m, pending: undefined, done: res.ok } : m))
-          .concat({
-            id: uid(),
-            role: 'assistant',
-            content: res.ok
-              ? data.message || 'Done.'
-              : data.error || 'Could not complete that action.',
-          })
+          .map((m) =>
+            m.id === msgId ? { ...m, pendingActions: undefined, done: anyOk } : m
+          )
+          .concat({ id: uid(), role: 'assistant', content })
       )
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        { id: uid(), role: 'assistant', content: 'Network error — please try again.' },
-      ])
     } finally {
       setConfirming(false)
     }
@@ -200,7 +219,7 @@ export function ChatWidget() {
   function cancel(msgId: string) {
     setMessages((prev) =>
       prev
-        .map((m) => (m.id === msgId ? { ...m, pending: undefined } : m))
+        .map((m) => (m.id === msgId ? { ...m, pendingActions: undefined } : m))
         .concat({ id: uid(), role: 'assistant', content: 'Okay, cancelled.' })
     )
   }
@@ -243,7 +262,10 @@ export function ChatWidget() {
           </div>
 
           {/* Messages */}
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 space-y-3">
+          <div
+            ref={scrollRef}
+            className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-3"
+          >
             {messages.length === 0 && (
               <div className="text-sm text-gray-500 space-y-3">
                 <p>
@@ -287,15 +309,32 @@ export function ChatWidget() {
                   </div>
                 </div>
 
-                {m.pending && (
+                {m.pendingActions && m.pendingActions.length > 0 && (
                   <div className="mt-2 ml-1 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">
-                    <p className="font-medium text-amber-900">Confirm action</p>
-                    <p className="mt-0.5 text-amber-800">{m.pending.summary}</p>
+                    <p className="font-medium text-amber-900">
+                      {m.pendingActions.length === 1
+                        ? 'Confirm action'
+                        : `Confirm ${m.pendingActions.length} actions`}
+                    </p>
+                    {m.pendingActions.length === 1 ? (
+                      <p className="mt-0.5 text-amber-800">
+                        {m.pendingActions[0].summary}
+                      </p>
+                    ) : (
+                      <ul className="mt-1 space-y-1 text-amber-800">
+                        {m.pendingActions.map((a, i) => (
+                          <li key={i} className="flex gap-1.5">
+                            <span className="shrink-0">•</span>
+                            <span className="min-w-0 break-words">{a.summary}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                     <div className="mt-2.5 flex gap-2">
                       <button
                         type="button"
                         disabled={confirming}
-                        onClick={() => confirm(m.id, m.pending as PendingAction)}
+                        onClick={() => confirm(m.id, m.pendingActions as PendingAction[])}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60"
                       >
                         {confirming ? (
@@ -342,7 +381,7 @@ export function ChatWidget() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Type a message…"
-              className="flex-1 rounded-full border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="min-w-0 flex-1 rounded-full border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
             <button
               type="submit"

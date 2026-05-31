@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { useDataChanged } from '@/lib/use-data-changed'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,6 +18,7 @@ interface CardType {
   id: string
   cardNickname: string
   lastFourDigits: string | null
+  issuingBank: string | null
   person: {
     id: string
     name: string
@@ -30,6 +32,7 @@ interface Availability {
   amountUSD: number
   exchangeRate: number
   paymentDate: string
+  unavailable?: boolean
   notes: string | null
   card: CardType
 }
@@ -66,6 +69,7 @@ export default function AvailabilityPage() {
     exchangeRate: '',
     paymentDate: '',
     notes: '',
+    unavailable: false,
   })
 
   useEffect(() => {
@@ -122,8 +126,12 @@ export default function AvailabilityPage() {
     })
   }, [baselineTtd, showForm, editingAvailability])
 
+  useDataChanged(() => {
+    void fetchAvailability()
+  })
+
   const fetchAvailability = async () => {
-    setLoading(true)
+    // Background refresh — keep current list on screen instead of flashing a spinner.
     try {
       const response = await fetch('/api/availability', {
         credentials: 'include',
@@ -135,8 +143,6 @@ export default function AvailabilityPage() {
       }
     } catch (error) {
       console.error('Error fetching availability:', error)
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -174,15 +180,23 @@ export default function AvailabilityPage() {
 
         // If editing, update the current one and create new ones for other months
         for (const { year, month } of months) {
-          const payload = {
-            cardId: formData.cardId,
-            year,
-            month,
-            amountUSD: parseFloat(formData.amountUSD),
-            exchangeRate: parseFloat(formData.exchangeRate),
-            paymentDate: new Date(formData.paymentDate).toISOString(),
-            notes: formData.notes || undefined,
-          }
+          const payload = formData.unavailable
+            ? {
+                cardId: formData.cardId,
+                year,
+                month,
+                unavailable: true,
+                notes: formData.notes || undefined,
+              }
+            : {
+                cardId: formData.cardId,
+                year,
+                month,
+                amountUSD: parseFloat(formData.amountUSD),
+                exchangeRate: parseFloat(formData.exchangeRate),
+                paymentDate: new Date(formData.paymentDate).toISOString(),
+                notes: formData.notes || undefined,
+              }
 
           // If this is the month being edited, update it
           if (editingAvailability && year === editingAvailability.year && month === editingAvailability.month) {
@@ -210,15 +224,23 @@ export default function AvailabilityPage() {
           : '/api/availability'
         const method = editingAvailability ? 'PUT' : 'POST'
 
-        const payload = {
-          cardId: formData.cardId,
-          year: formData.year,
-          month: formData.month,
-          amountUSD: parseFloat(formData.amountUSD),
-          exchangeRate: parseFloat(formData.exchangeRate),
-          paymentDate: new Date(formData.paymentDate).toISOString(),
-          notes: formData.notes || undefined,
-        }
+        const payload = formData.unavailable
+          ? {
+              cardId: formData.cardId,
+              year: formData.year,
+              month: formData.month,
+              unavailable: true,
+              notes: formData.notes || undefined,
+            }
+          : {
+              cardId: formData.cardId,
+              year: formData.year,
+              month: formData.month,
+              amountUSD: parseFloat(formData.amountUSD),
+              exchangeRate: parseFloat(formData.exchangeRate),
+              paymentDate: new Date(formData.paymentDate).toISOString(),
+              notes: formData.notes || undefined,
+            }
 
         const response = await fetch(url, {
           method,
@@ -255,6 +277,7 @@ export default function AvailabilityPage() {
       exchangeRate: item.exchangeRate.toString(),
       paymentDate: format(new Date(item.paymentDate), 'yyyy-MM-dd'),
       notes: item.notes || '',
+      unavailable: item.unavailable ?? false,
     })
     setShowForm(true)
   }
@@ -289,6 +312,7 @@ export default function AvailabilityPage() {
       exchangeRate: '',
       paymentDate: '',
       notes: '',
+      unavailable: false,
     })
     setEditingAvailability(null)
     setShowForm(false)
@@ -314,6 +338,7 @@ export default function AvailabilityPage() {
       exchangeRate: newAvailabilityBaselineRate(),
       paymentDate: '',
       notes: '',
+      unavailable: false,
     })
     setShowForm(true)
   }
@@ -397,6 +422,14 @@ export default function AvailabilityPage() {
                   <td className="py-3 px-4 font-medium">
                     {MONTHS[item.month - 1]} {item.year}
                   </td>
+                  {item.unavailable ? (
+                    <td colSpan={5} className="py-3 px-4">
+                      <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                        Not available
+                      </span>
+                    </td>
+                  ) : (
+                    <>
                   <td className="py-3 px-4 text-right text-green-600 font-semibold">
                     ${item.amountUSD.toFixed(2)}
                   </td>
@@ -414,6 +447,8 @@ export default function AvailabilityPage() {
                   <td className="py-3 px-4">
                     {format(new Date(item.paymentDate), 'MMM dd, yyyy')}
                   </td>
+                    </>
+                  )}
                   <td className="py-3 px-4">
                     <div className="flex justify-center gap-1">
                       <Button
@@ -474,6 +509,14 @@ export default function AvailabilityPage() {
                   </Button>
                 </div>
               </div>
+              {item.unavailable ? (
+                <div className="mt-3">
+                  <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                    Not available
+                  </span>
+                </div>
+              ) : (
+                <>
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <div className="rounded-lg bg-gray-50 px-3 py-2">
                   <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
@@ -518,6 +561,8 @@ export default function AvailabilityPage() {
                   </dd>
                 </div>
               </dl>
+                </>
+              )}
             </li>
           )
         })}
@@ -627,12 +672,22 @@ export default function AvailabilityPage() {
                     className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                   >
                     <option value="">Select a card</option>
-                    {cards.map((card) => (
-                      <option key={card.id} value={card.id}>
-                        {card.person.name} ({card.cardNickname}
-                        {card.lastFourDigits ? ` •••• ${card.lastFourDigits}` : ''})
-                      </option>
-                    ))}
+                    {[...cards]
+                      .sort((a, b) =>
+                        a.person.name.localeCompare(b.person.name, undefined, {
+                          sensitivity: 'base',
+                        }) ||
+                        a.cardNickname.localeCompare(b.cardNickname, undefined, {
+                          sensitivity: 'base',
+                        })
+                      )
+                      .map((card) => (
+                        <option key={card.id} value={card.id}>
+                          {card.person.name} ({card.cardNickname}
+                          {card.lastFourDigits ? ` •••• ${card.lastFourDigits}` : ''})
+                          {card.issuingBank ? ` — ${card.issuingBank}` : ''}
+                        </option>
+                      ))}
                   </select>
                 </div>
 
@@ -731,6 +786,29 @@ export default function AvailabilityPage() {
                 )}
               </div>
 
+              <label className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg cursor-pointer select-none min-w-0">
+                <input
+                  type="checkbox"
+                  checked={formData.unavailable}
+                  onChange={(e) =>
+                    setFormData({ ...formData, unavailable: e.target.checked })
+                  }
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 shrink-0"
+                />
+                <span className="min-w-0">
+                  <span className="block font-medium text-amber-900">
+                    Mark this card as not available
+                  </span>
+                  <span className="block text-sm text-amber-800">
+                    Use this when the card has no availability for the selected{' '}
+                    {isRangeMode ? 'months' : 'month'}. It overrides any recurring
+                    availability and blocks usage for that period.
+                  </span>
+                </span>
+              </label>
+
+              {!formData.unavailable && (
+              <>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="amountUSD">Amount (USD) *</Label>
@@ -782,6 +860,8 @@ export default function AvailabilityPage() {
                   required
                 />
               </div>
+              </>
+              )}
 
               <div>
                 <Label htmlFor="notes">Notes</Label>

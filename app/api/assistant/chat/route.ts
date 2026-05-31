@@ -92,7 +92,7 @@ export async function POST(request: Request) {
       const modelContent = response.candidates?.[0]?.content
       if (modelContent) contents.push(modelContent)
 
-      let pending: PendingAction | null = null
+      const pendings: PendingAction[] = []
       const responseParts: Part[] = []
 
       for (const call of calls) {
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
                 : { error: result.error },
             },
           })
-          if (result.ok) pending = result.action
+          if (result.ok) pendings.push(result.action)
           continue
         }
 
@@ -121,11 +121,13 @@ export async function POST(request: Request) {
         })
       }
 
-      if (pending) {
-        return NextResponse.json({
-          reply: textReply || pending.summary,
-          pendingAction: pending,
-        })
+      if (pendings.length > 0) {
+        const reply =
+          textReply ||
+          (pendings.length === 1
+            ? pendings[0].summary
+            : `Please confirm these ${pendings.length} actions:`)
+        return NextResponse.json({ reply, pendingActions: pendings })
       }
 
       // Otherwise feed tool results back and loop.

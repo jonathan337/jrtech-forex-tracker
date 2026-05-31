@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback, Fragment } from 'react'
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useDataChanged } from '@/lib/use-data-changed'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -48,6 +49,8 @@ export default function UsagePage() {
   const [cardsLoading, setCardsLoading] = useState(false)
   const [cardsError, setCardsError] = useState('')
   const [loading, setLoading] = useState(true)
+  // Only the very first load shows the full-page spinner; later refreshes update in place.
+  const didInitialLoadRef = useRef(false)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -86,7 +89,7 @@ export default function UsagePage() {
   
 
   const fetchEntries = useCallback(async () => {
-    setLoading(true)
+    if (!didInitialLoadRef.current) setLoading(true)
     try {
       const res = await fetch(`/api/usage?year=${year}&month=${month}`, {
         credentials: 'include',
@@ -99,6 +102,7 @@ export default function UsagePage() {
       console.error(e)
     } finally {
       setLoading(false)
+      didInitialLoadRef.current = true
     }
   }, [year, month])
 
@@ -140,6 +144,10 @@ export default function UsagePage() {
       void fetchCards()
     }
   }, [year, month, status, fetchEntries, fetchCards])
+
+  useDataChanged(() => {
+    if (status === 'authenticated') void fetchEntries()
+  })
 
   useEffect(() => {
     setFormError('')

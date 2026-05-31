@@ -16,11 +16,11 @@ export function cardHasAvailabilityForMonthFromLoadedCard(
   year: number,
   month: number
 ): boolean {
-  if (
-    card.monthlyAvailability.some((a) => a.year === year && a.month === month)
-  ) {
-    return true
-  }
+  const explicit = card.monthlyAvailability.find(
+    (a) => a.year === year && a.month === month
+  )
+  // An explicit row decides the month outright (an "unavailable" row overrides recurring).
+  if (explicit) return !explicit.unavailable
   return buildRecurringAvailabilityEntry(card, year, month) !== null
 }
 
@@ -36,7 +36,7 @@ export async function cardHasAvailabilityForMonth(
   const explicit = await prisma.monthlyAvailability.findFirst({
     where: { cardId, year, month },
   })
-  if (explicit) return true
+  if (explicit) return !explicit.unavailable
 
   const card = await prisma.card.findUnique({
     where: { id: cardId },

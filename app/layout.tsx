@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/AppShell";
 import { AppSessionProvider } from "@/components/AppSessionProvider";
+import { GlobalProgress } from "@/components/GlobalProgress";
 import { auth } from "@/lib/auth";
 
 const geistSans = Geist({
@@ -31,6 +32,7 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 overflow-x-clip`}
       >
+        <GlobalProgress />
         <AppSessionProvider session={session}>
           <AppShell>{children}</AppShell>
         </AppSessionProvider>

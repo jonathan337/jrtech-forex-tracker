@@ -76,6 +76,7 @@ export default function CardsPage() {
   const [saving, setSaving] = useState(false)
   const savingLockRef = useRef(false)
   const [formError, setFormError] = useState('')
+  const formCardRef = useRef<HTMLDivElement>(null)
   const [groupByOwner, setGroupByOwner] = useGroupByOwner()
   /** User baseline TTD/USD from Settings; used to prefill recurring exchange on new cards. */
   const [defaultExchangeRate, setDefaultExchangeRate] = useState<number | null>(
@@ -179,6 +180,15 @@ export default function CardsPage() {
     }
   }, [status])
 
+  /** Bring the add/edit form into view when it opens (it renders at the top of the page). */
+  useEffect(() => {
+    if (!showForm) return
+    const id = window.requestAnimationFrame(() => {
+      formCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    return () => window.cancelAnimationFrame(id)
+  }, [showForm])
+
   /** If baseline loads after the add form is open, prefill an empty recurring rate. */
   useEffect(() => {
     if (defaultExchangeRate == null || !showForm || editingCard != null) return
@@ -189,7 +199,7 @@ export default function CardsPage() {
   }, [defaultExchangeRate, showForm, editingCard])
 
   const fetchCards = async () => {
-    setLoading(true)
+    // Background refresh — keep current cards on screen instead of flashing a spinner.
     setLoadError('')
     try {
       const response = await fetch('/api/cards', {
@@ -212,8 +222,6 @@ export default function CardsPage() {
     } catch (error) {
       console.error('Error fetching cards:', error)
       setLoadError('Network error while loading cards.')
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -389,7 +397,7 @@ export default function CardsPage() {
       </div>
 
       {showForm && (
-        <Card className="border-2 border-blue-200 shadow-xl min-w-0 overflow-hidden">
+        <Card ref={formCardRef} className="border-2 border-blue-200 shadow-xl min-w-0 overflow-hidden scroll-mt-20">
           <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between min-w-0">
               <div className="min-w-0">

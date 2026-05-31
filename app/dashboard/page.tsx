@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback, Fragment } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'react'
+import { useDataChanged } from '@/lib/use-data-changed'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -150,6 +151,8 @@ export default function Dashboard() {
   const [summary, setSummary] = useState<Summary | null>(null)
   const [exchangeRate, setExchangeRate] = useState<ExchangeRate | null>(null)
   const [loading, setLoading] = useState(true)
+  // Only the very first load shows the full-page spinner; later refreshes update in place.
+  const didInitialLoadRef = useRef(false)
   const [groupByOwner, setGroupByOwner] = useGroupByOwner()
   const [onlyWithBalance, setOnlyWithBalance] = useState(false)
   const [tableSearch, setTableSearch] = useState('')
@@ -326,19 +329,26 @@ export default function Dashboard() {
     if (status !== 'authenticated') return
     let cancelled = false
     const ac = new AbortController()
-    setLoading(true)
+    if (!didInitialLoadRef.current) setLoading(true)
     void Promise.all([
       fetchSummaryData(ac.signal),
       fetchDefaultRateData(ac.signal),
       fetchPeopleOwedData(ac.signal),
     ]).finally(() => {
-      if (!cancelled) setLoading(false)
+      if (!cancelled) {
+        setLoading(false)
+        didInitialLoadRef.current = true
+      }
     })
     return () => {
       cancelled = true
       ac.abort()
     }
   }, [year, month, status, fetchSummaryData, fetchDefaultRateData, fetchPeopleOwedData])
+
+  useDataChanged(() => {
+    if (status === 'authenticated') void afterUsageChange()
+  })
 
   // Show loading while checking authentication
   if (status === 'loading') {
@@ -365,12 +375,7 @@ export default function Dashboard() {
   }
 
   const fetchSummary = async () => {
-    setLoading(true)
-    try {
-      await fetchSummaryData()
-    } finally {
-      setLoading(false)
-    }
+    await fetchSummaryData()
   }
 
   const afterUsageChange = async () => {
