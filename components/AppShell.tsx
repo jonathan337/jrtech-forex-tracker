@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState, type ReactNode } from 'react'
 import {
   CreditCard,
@@ -16,6 +16,7 @@ import {
   Receipt,
   Menu,
   X,
+  Banknote,
 } from 'lucide-react'
 import { signOut, useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
@@ -29,6 +30,7 @@ const LINKS = [
   { href: '/availability', label: 'Availability', icon: Calendar },
   { href: '/usage', label: 'Usage', icon: Wallet },
   { href: '/payments', label: 'Payments', icon: Receipt },
+  { href: '/usd-purchases', label: 'USD Buys', icon: Banknote },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
@@ -47,12 +49,15 @@ function Logo() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
+  const router = useRouter()
   const { data: session } = useSession()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [desktopOpen, setDesktopOpen] = useState(true)
+  const [pendingHref, setPendingHref] = useState<string | null>(null)
 
   useEffect(() => {
     setMobileOpen(false)
+    setPendingHref(null)
   }, [pathname])
 
   useEffect(() => {
@@ -67,6 +72,17 @@ export function AppShell({ children }: { children: ReactNode }) {
       document.body.style.overflow = ''
     }
   }, [mobileOpen])
+
+  /** Close the drawer and navigate — avoids taps being swallowed by the overlay. */
+  const navigateTo = (href: string) => {
+    if (href === pathname) {
+      setMobileOpen(false)
+      return
+    }
+    setMobileOpen(false)
+    setPendingHref(href)
+    router.push(href)
+  }
 
   const handleSignOut = async () => {
     await signOut({ callbackUrl: '/login' })
@@ -123,19 +139,35 @@ export function AppShell({ children }: { children: ReactNode }) {
       {LINKS.map((link) => {
         const Icon = link.icon
         const active = isActive(link.href)
+        const pending = pendingHref === link.href
         return (
           <Link
             key={link.href}
             href={link.href}
+            prefetch
+            onClick={(e) => {
+              if (
+                typeof window !== 'undefined' &&
+                window.matchMedia('(max-width: 767px)').matches
+              ) {
+                e.preventDefault()
+                navigateTo(link.href)
+              } else if (link.href !== pathname) {
+                setPendingHref(link.href)
+              }
+            }}
+            aria-current={active ? 'page' : undefined}
             className={`touch-manipulation flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors ${
               active
                 ? 'bg-blue-50 text-blue-800'
-                : 'text-gray-700 hover:bg-gray-50'
+                : pending
+                  ? 'bg-gray-100 text-gray-900'
+                  : 'text-gray-700 hover:bg-gray-50'
             }`}
           >
             <Icon
               className={`w-5 h-5 shrink-0 ${
-                active ? 'text-blue-600' : 'text-gray-400'
+                active ? 'text-blue-600' : pending ? 'text-gray-500' : 'text-gray-400'
               }`}
             />
             {link.label}

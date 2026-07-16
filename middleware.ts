@@ -10,7 +10,7 @@ export default auth((req) => {
   const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route))
   
   // Protected routes that require authentication
-  const protectedRoutes = ['/dashboard', '/people', '/cards', '/availability', '/usage', '/payments', '/analytics', '/settings']
+  const protectedRoutes = ['/dashboard', '/people', '/cards', '/availability', '/usage', '/payments', '/usd-purchases', '/analytics', '/settings']
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
   
   // If not authenticated and trying to access protected route, redirect to login

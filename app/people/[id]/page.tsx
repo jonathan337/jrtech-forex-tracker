@@ -799,9 +799,7 @@ export default function PersonDashboardPage() {
                 variant="ghost"
                 size="sm"
                 className="shrink-0 self-start sm:self-auto"
-                onClick={() => {
-                  window.location.href = '/settings'
-                }}
+                onClick={() => router.push('/settings')}
                 title="Configure in Settings"
               >
                 <RefreshCw className="w-4 h-4" />

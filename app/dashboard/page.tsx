@@ -29,6 +29,7 @@ import {
   Filter,
 } from 'lucide-react'
 import { useGroupByOwner } from '@/hooks/use-group-by-owner'
+import type { MonthUsdCostSummary } from '@/lib/month-usd-cost-summary'
 import { CardUsagePanel } from '@/components/CardUsagePanel'
 import { usageAmountPaidSyncFromUsdInputs } from '@/lib/usage-paid-sync'
 import { issuingBankLabel } from '@/lib/card-bank'
@@ -170,6 +171,9 @@ export default function Dashboard() {
   const [quickSaving, setQuickSaving] = useState(false)
   const [usageRevision, setUsageRevision] = useState(0)
   const [totalOwedToPeopleTTD, setTotalOwedToPeopleTTD] = useState(0)
+  const [usdCostSummary, setUsdCostSummary] = useState<MonthUsdCostSummary | null>(
+    null
+  )
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth() + 1
@@ -303,6 +307,32 @@ export default function Dashboard() {
     }
   }, [])
 
+  const fetchUsdCostData = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        const url = new URL(
+          `/api/usd-purchases?year=${year}&month=${month}`,
+          window.location.origin
+        ).toString()
+        const response = await fetch(url, {
+          credentials: 'include',
+          cache: 'no-store',
+          signal,
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setUsdCostSummary(data.summary ?? null)
+        } else {
+          setUsdCostSummary(null)
+        }
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        setUsdCostSummary(null)
+      }
+    },
+    [year, month]
+  )
+
   useEffect(() => {
     setQuickForm((f) => {
       if (!f.cardId) return f
@@ -334,6 +364,7 @@ export default function Dashboard() {
       fetchSummaryData(ac.signal),
       fetchDefaultRateData(ac.signal),
       fetchPeopleOwedData(ac.signal),
+      fetchUsdCostData(ac.signal),
     ]).finally(() => {
       if (!cancelled) {
         setLoading(false)
@@ -344,7 +375,7 @@ export default function Dashboard() {
       cancelled = true
       ac.abort()
     }
-  }, [year, month, status, fetchSummaryData, fetchDefaultRateData, fetchPeopleOwedData])
+  }, [year, month, status, fetchSummaryData, fetchDefaultRateData, fetchPeopleOwedData, fetchUsdCostData])
 
   useDataChanged(() => {
     if (status === 'authenticated') void afterUsageChange()
@@ -379,7 +410,7 @@ export default function Dashboard() {
   }
 
   const afterUsageChange = async () => {
-    await fetchSummary()
+    await Promise.all([fetchSummary(), fetchUsdCostData()])
     setUsageRevision((n) => n + 1)
   }
 
@@ -797,7 +828,7 @@ export default function Dashboard() {
                 variant="ghost"
                 size="sm"
                 className="shrink-0 self-start sm:self-auto"
-                onClick={() => (window.location.href = '/settings')}
+                onClick={() => router.push('/settings')}
                 title="Configure in Settings"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -817,6 +848,62 @@ export default function Dashboard() {
                 💡 This is your baseline rate. Any rate above this represents a premium/extra cost for obtaining USD.
                 You can update this in Settings.
               </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {usdCostSummary && (
+        <Card className="border-l-4 border-l-emerald-500 shadow-md bg-gradient-to-r from-emerald-50/50 to-teal-50/50 min-w-0 overflow-hidden">
+          <CardHeader className="pb-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between min-w-0">
+              <div className="min-w-0">
+                <CardTitle className="text-lg">Your USD cost this month</CardTitle>
+                <CardDescription className="mt-1 break-words">
+                  Weighted average from direct buys and card usage so far
+                </CardDescription>
+              </div>
+              <Link
+                href="/usd-purchases"
+                className="inline-flex h-8 shrink-0 items-center justify-center rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Log USD buy
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="bg-white rounded-lg p-4 shadow-sm text-center">
+                <p className="text-xs text-gray-500 mb-1">Blended avg</p>
+                <p className="text-3xl font-bold text-emerald-700 tabular-nums">
+                  {usdCostSummary.blended.weightedAvgRate != null
+                    ? usdCostSummary.blended.weightedAvgRate.toFixed(4)
+                    : '—'}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">TTD per USD</p>
+              </div>
+              <div className="bg-white rounded-lg p-4 shadow-sm">
+                <p className="text-xs text-gray-500 mb-1">Direct buys</p>
+                <p className="text-xl font-semibold tabular-nums">
+                  {usdCostSummary.directPurchases.weightedAvgRate != null
+                    ? usdCostSummary.directPurchases.weightedAvgRate.toFixed(4)
+                    : '—'}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  ${usdCostSummary.directPurchases.totalUSD.toFixed(2)} USD
+                </p>
+              </div>
+              <div className="bg-white rounded-lg p-4 shadow-sm">
+                <p className="text-xs text-gray-500 mb-1">Card usage</p>
+                <p className="text-xl font-semibold tabular-nums">
+                  {usdCostSummary.cardUsage.weightedAvgRate != null
+                    ? usdCostSummary.cardUsage.weightedAvgRate.toFixed(4)
+                    : '—'}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  ${usdCostSummary.cardUsage.totalUSD.toFixed(2)} USD used
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>

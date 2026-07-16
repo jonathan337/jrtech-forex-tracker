@@ -141,20 +141,6 @@ export default function PeoplePage() {
     fetchPeople()
   }, [status, session?.user?.id])
 
-  useEffect(() => {
-    const onVisible = () => {
-      if (
-        document.visibilityState === 'visible' &&
-        status === 'authenticated' &&
-        session?.user?.id
-      ) {
-        fetchPeople()
-      }
-    }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [status, session?.user?.id])
-
   const fetchPeople = async () => {
     if (!didInitialLoadRef.current) setLoading(true)
     setLoadError('')
