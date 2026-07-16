@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DatePicker } from '@/components/ui/date-picker'
 import { ResponsiveTable } from '@/components/ui/responsive-table'
 import { MobileAddButton } from '@/components/ui/mobile-add-button'
 
@@ -282,7 +283,7 @@ export default function PaymentsPage() {
                     value={form.personId}
                     onChange={(e) => setForm((f) => ({ ...f, personId: e.target.value }))}
                     disabled={saving}
-                    className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                   >
                     <option value="">— Not linked —</option>
                     {people.map((p) => (
@@ -307,11 +308,10 @@ export default function PaymentsPage() {
                 </div>
                 <div className="min-w-0 sm:col-span-2">
                   <Label htmlFor="pay-date">Payment date *</Label>
-                  <Input
+                  <DatePicker
                     id="pay-date"
-                    type="date"
                     value={form.paidAt}
-                    onChange={(e) => setForm((f) => ({ ...f, paidAt: e.target.value }))}
+                    onChange={(v) => setForm((f) => ({ ...f, paidAt: v }))}
                     required
                     disabled={saving}
                   />

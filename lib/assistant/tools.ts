@@ -7,6 +7,7 @@ export const WRITE_TOOLS = new Set([
   'log_usage',
   'apply_owner_payment',
   'log_payment',
+  'add_card',
 ])
 
 export type PendingAction =
@@ -44,13 +45,28 @@ export type PendingAction =
         notes?: string | null
       }
     }
+  | {
+      type: 'add_card'
+      summary: string
+      params: {
+        personId: string
+        personName: string
+        cardNickname: string
+        issuingBank?: string | null
+        lastFourDigits?: string | null
+        notes?: string | null
+        recurringAmountUSD?: number
+        recurringExchangeRate?: number
+        recurringPaymentDay?: number
+      }
+    }
 
 export function systemPrompt(): string {
   const now = new Date()
   return [
     'You are the in-app assistant for a foreign-currency (USD/TTD) card tracking app.',
     `Today is ${now.toISOString().slice(0, 10)} (year ${now.getFullYear()}, month ${now.getMonth() + 1}).`,
-    'You help the user check balances and record usage and payments by calling tools.',
+    'You help the user check balances, record usage and payments, and add cards by calling tools.',
     '',
     'Key concepts:',
     '- "USD left" / availability = USD loaded onto cards for a month minus USD already used.',
@@ -187,6 +203,48 @@ export const TOOLS: FunctionDeclaration[] = [
         amountTTD: { type: Type.NUMBER, description: 'TTD amount to apply.' },
       },
       required: ['personName', 'amountTTD'],
+    },
+  },
+  {
+    name: 'add_card',
+    description:
+      'Prepare adding a new card for a person (requires user confirmation). If the person mentions the card is available every month with a USD amount and rate, include the recurring fields.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        personName: {
+          type: Type.STRING,
+          description: 'The card owner (must be an existing person).',
+        },
+        cardNickname: {
+          type: Type.STRING,
+          description: 'Name for the card, e.g. "Visa Gold" or "Aero".',
+        },
+        issuingBank: {
+          type: Type.STRING,
+          description:
+            'Optional bank: Scotiabank, Republic Bank, First Citizens, or RBC.',
+        },
+        lastFourDigits: {
+          type: Type.STRING,
+          description: 'Optional last 4 digits of the card number.',
+        },
+        notes: { type: Type.STRING, description: 'Optional note.' },
+        recurringAmountUSD: {
+          type: Type.NUMBER,
+          description:
+            'Optional monthly USD availability if the card is available every month.',
+        },
+        recurringExchangeRate: {
+          type: Type.NUMBER,
+          description: 'Optional TTD/USD rate for the recurring availability.',
+        },
+        recurringPaymentDay: {
+          type: Type.INTEGER,
+          description: 'Optional day of month (1-31) the owner gets paid.',
+        },
+      },
+      required: ['personName', 'cardNickname'],
     },
   },
   {

@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DatePicker } from '@/components/ui/date-picker'
 import { format } from 'date-fns'
 import Link from 'next/link'
 import {
@@ -865,7 +866,7 @@ export default function Dashboard() {
               </div>
               <Link
                 href="/usd-purchases"
-                className="inline-flex h-8 shrink-0 items-center justify-center rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Log USD buy
               </Link>
@@ -1062,7 +1063,7 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => setShowMobileFilters((v) => !v)}
-                    className="sm:hidden inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700"
+                    className="sm:hidden inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700"
                     aria-expanded={showMobileFilters}
                   >
                     <Filter className="w-4 h-4" />
@@ -1210,7 +1211,7 @@ export default function Dashboard() {
                               }
                               required
                               disabled={quickSaving}
-                              className="flex h-10 w-full min-w-0 max-w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                              className="flex h-10 w-full min-w-0 max-w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                             >
                               <option value="">Select card</option>
                               {quickCardOptions.map(([id, label]) => (
@@ -1270,14 +1271,13 @@ export default function Dashboard() {
                             </div>
                             <div className="min-w-0 sm:col-span-2 lg:col-span-1">
                               <Label htmlFor="quick-usage-date">Date</Label>
-                              <Input
+                              <DatePicker
                                 id="quick-usage-date"
-                                type="date"
                                 value={quickForm.usageDate}
-                                onChange={(e) =>
+                                onChange={(v) =>
                                   setQuickForm((f) => ({
                                     ...f,
-                                    usageDate: e.target.value,
+                                    usageDate: v,
                                   }))
                                 }
                                 disabled={quickSaving}

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { z } from 'zod'
 import {
+  executeAddCard,
   executeApplyOwnerPayment,
   executeLogPayment,
   executeLogUsage,
@@ -41,6 +42,20 @@ const actionSchema = z.discriminatedUnion('type', [
       notes: z.string().nullish(),
     }),
   }),
+  z.object({
+    type: z.literal('add_card'),
+    params: z.object({
+      personId: z.string().min(1),
+      personName: z.string().optional(),
+      cardNickname: z.string().min(1),
+      issuingBank: z.string().nullish(),
+      lastFourDigits: z.string().nullish(),
+      notes: z.string().nullish(),
+      recurringAmountUSD: z.number().positive().optional(),
+      recurringExchangeRate: z.number().positive().optional(),
+      recurringPaymentDay: z.number().int().min(1).max(31).optional(),
+    }),
+  }),
 ])
 
 const bodySchema = z.object({ action: actionSchema })
@@ -68,6 +83,9 @@ export async function POST(request: Request) {
         break
       case 'log_payment':
         result = await executeLogPayment({ userId, ...action.params })
+        break
+      case 'add_card':
+        result = await executeAddCard({ userId, ...action.params })
         break
       default:
         result = { ok: false, error: 'Unknown action.' }

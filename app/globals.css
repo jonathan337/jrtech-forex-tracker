@@ -23,3 +23,31 @@ body {
     font-size: 16px;
   }
 }
+
+/* Modern finishes */
+::selection {
+  background: rgba(59, 130, 246, 0.18);
+}
+
+select {
+  transition: border-color 150ms ease;
+}
+select:hover:not(:disabled) {
+  border-color: #9ca3af;
+}
+
+/* Slim, unobtrusive scrollbars (WebKit) */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}

@@ -672,3 +672,75 @@ export async function executeLogPayment(params: {
     }.`,
   }
 }
+
+/** Map free-text bank names to the stored issuingBank codes. */
+export function normalizeIssuingBank(input: string | null | undefined): string | null {
+  const q = (input ?? '').trim().toLowerCase()
+  if (!q) return null
+  if (q.includes('scotia')) return 'SCOTIABANK'
+  if (q.includes('republic')) return 'REPUBLIC_BANK'
+  if (q.includes('first citizen') || q === 'fcb') return 'FIRST_CITIZENS'
+  if (q.includes('rbc') || q.includes('royal')) return 'RBC'
+  return null
+}
+
+export async function executeAddCard(params: {
+  userId: string
+  personId: string
+  cardNickname: string
+  issuingBank?: string | null
+  lastFourDigits?: string | null
+  notes?: string | null
+  recurringAmountUSD?: number
+  recurringExchangeRate?: number
+  recurringPaymentDay?: number
+}): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const { userId, personId } = params
+
+  const person = await prisma.person.findFirst({
+    where: { id: personId, userId },
+    select: { id: true, name: true },
+  })
+  if (!person) return { ok: false, error: 'Person not found.' }
+
+  const nickname = params.cardNickname.trim()
+  if (!nickname) return { ok: false, error: 'Card nickname is required.' }
+
+  const last4 = params.lastFourDigits?.trim() || null
+  if (last4 && !/^\d{4}$/.test(last4)) {
+    return { ok: false, error: 'Last four digits must be exactly 4 numbers.' }
+  }
+
+  const hasRecurring =
+    typeof params.recurringAmountUSD === 'number' &&
+    params.recurringAmountUSD > 0 &&
+    typeof params.recurringExchangeRate === 'number' &&
+    params.recurringExchangeRate > 0
+
+  const card = await prisma.card.create({
+    data: {
+      personId: person.id,
+      cardNickname: nickname,
+      issuingBank: params.issuingBank || null,
+      lastFourDigits: last4,
+      notes: params.notes?.trim() || null,
+      alwaysAvailable: hasRecurring,
+      recurringAmountUSD: hasRecurring ? params.recurringAmountUSD : null,
+      recurringExchangeRate: hasRecurring ? params.recurringExchangeRate : null,
+      recurringPaymentDay: hasRecurring
+        ? Math.min(Math.max(params.recurringPaymentDay ?? 1, 1), 31)
+        : null,
+    },
+  })
+
+  return {
+    ok: true,
+    message: `Added card "${card.cardNickname}"${
+      last4 ? ` ••${last4}` : ''
+    } for ${person.name}${
+      hasRecurring
+        ? ` with $${params.recurringAmountUSD} USD available every month at ${params.recurringExchangeRate}`
+        : ''
+    }.`,
+  }
+}

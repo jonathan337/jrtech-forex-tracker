@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DatePicker } from '@/components/ui/date-picker'
 import { Plus, Edit, Trash2, X, Calendar, Loader2, User } from 'lucide-react'
 import { format } from 'date-fns'
 import { ratePremiumTtd } from '@/lib/rate-premium'
@@ -672,7 +673,7 @@ export default function AvailabilityPage() {
                       setFormData({ ...formData, cardId: e.target.value })
                     }
                     required
-                    className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                    className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                   >
                     <option value="">Select a card</option>
                     {[...cards]
@@ -705,7 +706,7 @@ export default function AvailabilityPage() {
                             setFormData({ ...formData, startMonth: parseInt(e.target.value) })
                           }
                           required
-                          className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                          className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                         >
                           {MONTHS.map((monthName, index) => (
                             <option key={index + 1} value={index + 1}>
@@ -735,7 +736,7 @@ export default function AvailabilityPage() {
                             setFormData({ ...formData, endMonth: parseInt(e.target.value) })
                           }
                           required
-                          className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                          className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                         >
                           {MONTHS.map((monthName, index) => (
                             <option key={index + 1} value={index + 1}>
@@ -766,7 +767,7 @@ export default function AvailabilityPage() {
                           setFormData({ ...formData, month: parseInt(e.target.value) })
                         }
                         required
-                        className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                        className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                       >
                         {MONTHS.map((monthName, index) => (
                           <option key={index + 1} value={index + 1}>
@@ -853,13 +854,10 @@ export default function AvailabilityPage() {
 
               <div>
                 <Label htmlFor="paymentDate">Payment Date *</Label>
-                <Input
+                <DatePicker
                   id="paymentDate"
-                  type="date"
                   value={formData.paymentDate}
-                  onChange={(e) =>
-                    setFormData({ ...formData, paymentDate: e.target.value })
-                  }
+                  onChange={(v) => setFormData({ ...formData, paymentDate: v })}
                   required
                 />
               </div>
@@ -874,7 +872,7 @@ export default function AvailabilityPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, notes: e.target.value })
                   }
-                  className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                  className="flex min-h-[80px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                   placeholder="Any special notes about fees, payment arrangements, etc."
                 />
               </div>

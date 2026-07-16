@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DatePicker } from '@/components/ui/date-picker'
 import { Loader2, Trash2, Pencil, CheckCircle2 } from 'lucide-react'
 import { usageAmountPaidSyncFromUsdInputs } from '@/lib/usage-paid-sync'
 
@@ -538,12 +539,11 @@ export function CardUsagePanel({
                           </div>
                           <div>
                             <Label htmlFor={`panel-edit-date-${u.id}`}>Date</Label>
-                            <Input
+                            <DatePicker
                               id={`panel-edit-date-${u.id}`}
-                              type="date"
                               value={editDraft.usageDate}
-                              onChange={(e) =>
-                                setEditDraft((d) => ({ ...d, usageDate: e.target.value }))
+                              onChange={(v) =>
+                                setEditDraft((d) => ({ ...d, usageDate: v }))
                               }
                             />
                           </div>
@@ -688,12 +688,11 @@ export function CardUsagePanel({
           </div>
           <div>
             <Label htmlFor={`usage-date-${cardId}`}>Date</Label>
-            <Input
+            <DatePicker
               id={`usage-date-${cardId}`}
-              type="date"
               value={form.usageDate}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, usageDate: e.target.value }))
+              onChange={(v) =>
+                setForm((f) => ({ ...f, usageDate: v }))
               }
               disabled={saving}
             />

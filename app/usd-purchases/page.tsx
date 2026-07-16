@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DatePicker } from '@/components/ui/date-picker'
 import { ResponsiveTable } from '@/components/ui/responsive-table'
 import { MobileAddButton } from '@/components/ui/mobile-add-button'
 import {
@@ -367,7 +368,7 @@ export default function UsdPurchasesPage() {
                     onChange={(e) =>
                       setForm({ ...form, method: e.target.value as UsdPurchaseMethod })
                     }
-                    className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                    className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
                   >
                     {USD_PURCHASE_METHODS.map((m) => (
                       <option key={m} value={m}>
@@ -378,11 +379,10 @@ export default function UsdPurchasesPage() {
                 </div>
                 <div>
                   <Label htmlFor="purchasedAt">Date *</Label>
-                  <Input
+                  <DatePicker
                     id="purchasedAt"
-                    type="date"
                     value={form.purchasedAt}
-                    onChange={(e) => setForm({ ...form, purchasedAt: e.target.value })}
+                    onChange={(v) => setForm({ ...form, purchasedAt: v })}
                     required
                   />
                 </div>

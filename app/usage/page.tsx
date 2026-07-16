@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DatePicker } from '@/components/ui/date-picker'
 import {
   ChevronLeft,
   ChevronRight,
@@ -413,14 +414,13 @@ export default function UsagePage() {
         </div>
         <div>
           <Label htmlFor={`edit-date-${row.id}-m`}>Date</Label>
-          <Input
+          <DatePicker
             id={`edit-date-${row.id}-m`}
-            type="date"
             value={editDraft.usageDate}
-            onChange={(e) =>
+            onChange={(v) =>
               setEditDraft((d) => ({
                 ...d,
-                usageDate: e.target.value,
+                usageDate: v,
               }))
             }
           />
@@ -720,7 +720,7 @@ export default function UsagePage() {
                 <Label htmlFor="usage-card">Card</Label>
                 <select
                   id="usage-card"
-                  className="w-full h-10 rounded-md border border-gray-300 bg-white px-3 text-sm disabled:opacity-60"
+                  className="w-full h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm disabled:opacity-60"
                   value={form.cardId}
                   onChange={(e) => setForm((f) => ({ ...f, cardId: e.target.value }))}
                   required
@@ -773,11 +773,10 @@ export default function UsagePage() {
                 </div>
                 <div className="space-y-2 sm:col-span-2 lg:col-span-1">
                   <Label htmlFor="usage-date">Date</Label>
-                  <Input
+                  <DatePicker
                     id="usage-date"
-                    type="date"
                     value={form.usageDate}
-                    onChange={(e) => setForm((f) => ({ ...f, usageDate: e.target.value }))}
+                    onChange={(v) => setForm((f) => ({ ...f, usageDate: v }))}
                   />
                 </div>
               </div>
@@ -1021,14 +1020,13 @@ export default function UsagePage() {
                               </div>
                               <div>
                                 <Label htmlFor={`edit-date-${row.id}`}>Date</Label>
-                                <Input
+                                <DatePicker
                                   id={`edit-date-${row.id}`}
-                                  type="date"
                                   value={editDraft.usageDate}
-                                  onChange={(e) =>
+                                  onChange={(v) =>
                                     setEditDraft((d) => ({
                                       ...d,
-                                      usageDate: e.target.value,
+                                      usageDate: v,
                                     }))
                                   }
                                 />

@@ -18,6 +18,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { useGroupByOwner } from '@/hooks/use-group-by-owner'
+import { useDataChanged } from '@/lib/use-data-changed'
 import { MobileAddButton } from '@/components/ui/mobile-add-button'
 import {
   ISSUING_BANK_CODES,
@@ -47,7 +48,37 @@ interface CardType {
     id: string
     year: number
     month: number
+    exchangeRate: number
+    unavailable?: boolean
   }>
+}
+
+/** Rate the owner charges this month: explicit availability first, then recurring. */
+function currentMonthRate(card: CardType): number | null {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = now.getMonth() + 1
+  const explicit = card.monthlyAvailability?.find(
+    (a) => a.year === y && a.month === m
+  )
+  if (explicit) {
+    if (explicit.unavailable) return null
+    return Number.isFinite(explicit.exchangeRate) ? explicit.exchangeRate : null
+  }
+  if (card.alwaysAvailable && card.recurringExchangeRate != null) {
+    return card.recurringExchangeRate
+  }
+  return null
+}
+
+function RateBadge({ card }: { card: CardType }) {
+  const rate = currentMonthRate(card)
+  if (rate == null) return null
+  return (
+    <span className="inline-block mt-1 mr-1 text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 tabular-nums">
+      {rate.toFixed(2)} TTD/USD
+    </span>
+  )
 }
 
 const emptyForm = () => ({
@@ -197,6 +228,10 @@ export default function CardsPage() {
       return { ...prev, recurringExchangeRate: String(defaultExchangeRate) }
     })
   }, [defaultExchangeRate, showForm, editingCard])
+
+  useDataChanged(() => {
+    if (status === 'authenticated') void fetchCards()
+  })
 
   const fetchCards = async () => {
     // Background refresh — keep current cards on screen instead of flashing a spinner.
@@ -353,6 +388,18 @@ export default function CardsPage() {
     setShowForm(true)
   }
 
+  /** Quick-add with the owner preselected (from a person's section header). */
+  const openAddFormForPerson = (personId: string) => {
+    setEditingCard(null)
+    setFormError('')
+    setFormData({
+      ...emptyForm(),
+      personId,
+      recurringExchangeRate: newCardFormBaselineRate(),
+    })
+    setShowForm(true)
+  }
+
   if (status === 'loading' || status === 'unauthenticated') {
     return (
       <div className="min-h-[40vh] flex items-center justify-center">
@@ -437,7 +484,7 @@ export default function CardsPage() {
                   }
                   required
                   disabled={saving}
-                  className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <option value="">Select a person</option>
                   {people.map((person) => (
@@ -473,7 +520,7 @@ export default function CardsPage() {
                   }
                   required
                   disabled={saving}
-                  className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <option value="">Select bank</option>
                   {ISSUING_BANK_CODES.map((code) => (
@@ -504,7 +551,7 @@ export default function CardsPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, notes: e.target.value })
                   }
-                  className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex min-h-[80px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="Payment arrangements, special conditions..."
                   disabled={saving}
                 />
@@ -622,7 +669,7 @@ export default function CardsPage() {
                             recurringNotes: e.target.value,
                           })
                         }
-                        className="flex min-h-[60px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50"
+                        className="flex min-h-[60px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50"
                         placeholder="Shown with each month on the dashboard"
                         disabled={saving}
                       />
@@ -684,6 +731,14 @@ export default function CardsPage() {
                     <span className="text-sm text-gray-500">
                       {group.cards.length} card{group.cards.length !== 1 ? 's' : ''}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => openAddFormForPerson(group.person.id)}
+                      className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add card
+                    </button>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {group.cards.map((card) => (
@@ -718,6 +773,7 @@ export default function CardsPage() {
                                     •••• {card.lastFourDigits}
                                   </p>
                                 )}
+                                <RateBadge card={card} />
                                 {card.alwaysAvailable && (
                                   <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
                                     Every month
@@ -800,6 +856,7 @@ export default function CardsPage() {
                               •••• {card.lastFourDigits}
                             </p>
                           )}
+                          <RateBadge card={card} />
                           {card.alwaysAvailable && (
                             <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
                               Every month

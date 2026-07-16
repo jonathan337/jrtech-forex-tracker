@@ -16,6 +16,7 @@ import {
   listCardBalances,
   listCards,
   listPeople,
+  normalizeIssuingBank,
   resolveCard,
   resolvePerson,
   round2,
@@ -319,6 +320,84 @@ async function buildPendingAction(
           ...(personId && { personId, personName }),
           ...(date && { paidAt: date }),
           ...(notes && { notes }),
+        },
+      },
+    }
+  }
+
+  if (name === 'add_card') {
+    const person = await resolvePerson(userId, String(args.personName ?? ''))
+    if (!person.ok) return { ok: false, error: person.error }
+
+    const cardNickname =
+      typeof args.cardNickname === 'string' ? args.cardNickname.trim() : ''
+    if (!cardNickname) {
+      return { ok: false, error: 'Provide a nickname for the card.' }
+    }
+
+    const rawBank =
+      typeof args.issuingBank === 'string' ? args.issuingBank.trim() : ''
+    const issuingBank = normalizeIssuingBank(rawBank)
+    if (rawBank && !issuingBank) {
+      return {
+        ok: false,
+        error:
+          'Unknown bank. Supported: Scotiabank, Republic Bank, First Citizens, RBC.',
+      }
+    }
+
+    const lastFourDigits =
+      typeof args.lastFourDigits === 'string' &&
+      /^\d{4}$/.test(args.lastFourDigits.trim())
+        ? args.lastFourDigits.trim()
+        : undefined
+    if (typeof args.lastFourDigits === 'string' && args.lastFourDigits.trim() && !lastFourDigits) {
+      return { ok: false, error: 'Last four digits must be exactly 4 numbers.' }
+    }
+
+    const recurringAmountUSD =
+      typeof args.recurringAmountUSD === 'number' && args.recurringAmountUSD > 0
+        ? args.recurringAmountUSD
+        : undefined
+    const recurringExchangeRate =
+      typeof args.recurringExchangeRate === 'number' &&
+      args.recurringExchangeRate > 0
+        ? args.recurringExchangeRate
+        : undefined
+    const recurringPaymentDay =
+      typeof args.recurringPaymentDay === 'number' &&
+      args.recurringPaymentDay >= 1 &&
+      args.recurringPaymentDay <= 31
+        ? Math.round(args.recurringPaymentDay)
+        : undefined
+    const notes =
+      typeof args.notes === 'string' && args.notes.trim()
+        ? args.notes.trim()
+        : undefined
+
+    const recurringText =
+      recurringAmountUSD && recurringExchangeRate
+        ? `, available every month with $${fmtNum(recurringAmountUSD)} USD at ${recurringExchangeRate}`
+        : ''
+    const summary = `Add card "${cardNickname}"${
+      lastFourDigits ? ` ••${lastFourDigits}` : ''
+    }${issuingBank ? ` (${rawBank})` : ''} for ${person.name}${recurringText}?`
+
+    return {
+      ok: true,
+      action: {
+        type: 'add_card',
+        summary,
+        params: {
+          personId: person.personId,
+          personName: person.name,
+          cardNickname,
+          ...(issuingBank && { issuingBank }),
+          ...(lastFourDigits && { lastFourDigits }),
+          ...(notes && { notes }),
+          ...(recurringAmountUSD && { recurringAmountUSD }),
+          ...(recurringExchangeRate && { recurringExchangeRate }),
+          ...(recurringPaymentDay && { recurringPaymentDay }),
         },
       },
     }

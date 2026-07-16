@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DatePicker } from '@/components/ui/date-picker'
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { usageCardSelectLabel, type UsageCardOption } from '@/lib/usage-card-label'
@@ -211,7 +212,7 @@ export function PersonLogUsagePanel({ personId, onLogged }: Props) {
           <Label htmlFor={`usage-card-${personId}`}>Card</Label>
           <select
             id={`usage-card-${personId}`}
-            className="w-full h-10 rounded-md border border-gray-300 bg-white px-3 text-sm disabled:opacity-60"
+            className="w-full h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm disabled:opacity-60"
             value={form.cardId}
             onChange={(e) =>
               setForm((f) => {
@@ -273,12 +274,11 @@ export function PersonLogUsagePanel({ personId, onLogged }: Props) {
           </div>
           <div className="space-y-2 sm:col-span-2 lg:col-span-1">
             <Label htmlFor={`usage-date-${personId}`}>Date</Label>
-            <Input
+            <DatePicker
               id={`usage-date-${personId}`}
-              type="date"
               value={form.usageDate}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, usageDate: e.target.value }))
+              onChange={(v) =>
+                setForm((f) => ({ ...f, usageDate: v }))
               }
             />
           </div>
