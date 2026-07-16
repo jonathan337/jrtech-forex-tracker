@@ -903,6 +903,8 @@ export default function Dashboard() {
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   ${usdCostSummary.projectedCards.totalUSD.toFixed(2)} USD access
+                  {' · '}incl.{' '}
+                  {(usdCostSummary.cardProcessingFeeRate * 100).toFixed(1)}% fee
                 </p>
               </div>
             </div>

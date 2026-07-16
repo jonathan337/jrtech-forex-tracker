@@ -294,7 +294,8 @@ export default function UsdPurchasesPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Projected cards avg</CardTitle>
               <CardDescription>
-                Cards scheduled/available this month ({summary.projectedCards.count})
+                Cards scheduled/available this month ({summary.projectedCards.count}) —
+                incl. {(summary.cardProcessingFeeRate * 100).toFixed(1)}% processing fee
               </CardDescription>
             </CardHeader>
             <CardContent>

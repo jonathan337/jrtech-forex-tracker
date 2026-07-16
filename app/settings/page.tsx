@@ -13,6 +13,7 @@ export default function SettingsPage() {
   const savingLockRef = useRef(false)
   const [success, setSuccess] = useState(false)
   const [defaultRate, setDefaultRate] = useState('6.7993')
+  const [cardFeePct, setCardFeePct] = useState('4.5')
 
   useEffect(() => {
     fetchSettings()
@@ -24,6 +25,9 @@ export default function SettingsPage() {
       if (response.ok) {
         const data = await response.json()
         setDefaultRate(data.defaultExchangeRate.toString())
+        if (typeof data.cardProcessingFeePct === 'number') {
+          setCardFeePct(data.cardProcessingFeePct.toString())
+        }
       }
     } catch (error) {
       console.error('Error fetching settings:', error)
@@ -45,6 +49,7 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           defaultExchangeRate: parseFloat(defaultRate),
+          cardProcessingFeePct: parseFloat(cardFeePct),
         }),
       })
 
@@ -110,6 +115,27 @@ export default function SettingsPage() {
               <p className="text-sm text-gray-500 mt-2">
                 This is your baseline exchange rate for calculating the true cost of foreign currency.
                 Any rate higher than this represents additional cost beyond the official rate.
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="cardFeePct">Card processing fee (%)</Label>
+              <Input
+                id="cardFeePct"
+                type="number"
+                step="0.1"
+                min="0"
+                max="25"
+                value={cardFeePct}
+                onChange={(e) => setCardFeePct(e.target.value)}
+                placeholder="4.5"
+                required
+                className="mt-1"
+              />
+              <p className="text-sm text-gray-500 mt-2">
+                Fee charged when you spend on cards (typically 3–4.5%). Applied to the
+                projected card cost in your monthly USD average. Direct USD buys
+                (cash, Zelle, wire) are never marked up — they use exactly what you paid.
               </p>
             </div>
 

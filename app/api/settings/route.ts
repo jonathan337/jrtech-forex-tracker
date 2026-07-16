@@ -7,6 +7,11 @@ export const runtime = 'nodejs'
 
 const settingsSchema = z.object({
   defaultExchangeRate: z.number().positive('Exchange rate must be positive'),
+  cardProcessingFeePct: z
+    .number()
+    .min(0, 'Fee cannot be negative')
+    .max(25, 'Fee looks too high — enter a percentage like 4.5')
+    .optional(),
 })
 
 export async function GET() {
@@ -20,6 +25,7 @@ export async function GET() {
       where: { id: session.user.id },
       select: {
         defaultExchangeRate: true,
+        cardProcessingFeePct: true,
         businessName: true,
       },
     })
@@ -52,9 +58,13 @@ export async function PUT(request: Request) {
       where: { id: session.user.id },
       data: {
         defaultExchangeRate: validatedData.defaultExchangeRate,
+        ...(validatedData.cardProcessingFeePct !== undefined && {
+          cardProcessingFeePct: validatedData.cardProcessingFeePct,
+        }),
       },
       select: {
         defaultExchangeRate: true,
+        cardProcessingFeePct: true,
         businessName: true,
       },
     })
