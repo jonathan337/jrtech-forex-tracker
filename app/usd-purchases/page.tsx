@@ -50,11 +50,46 @@ export default function UsdPurchasesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [form, setForm] = useState({
     amountUSD: '',
+    rate: '',
     amountTTD: '',
     method: 'CASH' as UsdPurchaseMethod,
     purchasedAt: format(new Date(), 'yyyy-MM-dd'),
     notes: '',
   })
+
+  /** Keep USD × rate = TTD in sync no matter which two fields the user types. */
+  const setUsd = (amountUSD: string) => {
+    setForm((f) => {
+      const usd = parseFloat(amountUSD)
+      const rate = parseFloat(f.rate)
+      if (Number.isFinite(usd) && usd > 0 && Number.isFinite(rate) && rate > 0) {
+        return { ...f, amountUSD, amountTTD: (usd * rate).toFixed(2) }
+      }
+      return { ...f, amountUSD }
+    })
+  }
+
+  const setRate = (rate: string) => {
+    setForm((f) => {
+      const usd = parseFloat(f.amountUSD)
+      const r = parseFloat(rate)
+      if (Number.isFinite(usd) && usd > 0 && Number.isFinite(r) && r > 0) {
+        return { ...f, rate, amountTTD: (usd * r).toFixed(2) }
+      }
+      return { ...f, rate }
+    })
+  }
+
+  const setTtd = (amountTTD: string) => {
+    setForm((f) => {
+      const usd = parseFloat(f.amountUSD)
+      const ttd = parseFloat(amountTTD)
+      if (Number.isFinite(usd) && usd > 0 && Number.isFinite(ttd) && ttd > 0) {
+        return { ...f, amountTTD, rate: (ttd / usd).toFixed(4) }
+      }
+      return { ...f, amountTTD }
+    })
+  }
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth() + 1
@@ -107,11 +142,6 @@ export default function UsdPurchasesPage() {
 
   if (status === 'unauthenticated') return null
 
-  const impliedRate =
-    form.amountUSD && form.amountTTD
-      ? parseFloat(form.amountTTD) / parseFloat(form.amountUSD)
-      : null
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const usd = parseFloat(form.amountUSD.trim())
@@ -144,6 +174,7 @@ export default function UsdPurchasesPage() {
       }
       setForm({
         amountUSD: '',
+        rate: '',
         amountTTD: '',
         method: form.method,
         purchasedAt: format(new Date(), 'yyyy-MM-dd'),
@@ -228,7 +259,7 @@ export default function UsdPurchasesPage() {
                 <TrendingUp className="w-4 h-4 text-emerald-600" />
                 Blended avg this month
               </CardTitle>
-              <CardDescription>Direct buys + card usage so far</CardDescription>
+              <CardDescription>Direct buys + projected card access</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-emerald-700 tabular-nums">
@@ -260,15 +291,17 @@ export default function UsdPurchasesPage() {
 
           <Card className="shadow-md sm:col-span-2 lg:col-span-1">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Card usage avg</CardTitle>
-              <CardDescription>Based on usage logged this month</CardDescription>
+              <CardTitle className="text-sm font-medium">Projected cards avg</CardTitle>
+              <CardDescription>
+                Cards scheduled/available this month ({summary.projectedCards.count})
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold text-gray-900 tabular-nums">
-                {fmtRate(summary.cardUsage.weightedAvgRate)}
+                {fmtRate(summary.projectedCards.weightedAvgRate)}
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                ${summary.cardUsage.totalUSD.toFixed(2)} USD used on cards
+                ${summary.projectedCards.totalUSD.toFixed(2)} USD projected access
               </p>
             </CardContent>
           </Card>
@@ -285,7 +318,7 @@ export default function UsdPurchasesPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div>
                   <Label htmlFor="amountUSD">Amount (USD) *</Label>
                   <Input
@@ -293,29 +326,38 @@ export default function UsdPurchasesPage() {
                     type="number"
                     step="0.01"
                     value={form.amountUSD}
-                    onChange={(e) => setForm({ ...form, amountUSD: e.target.value })}
+                    onChange={(e) => setUsd(e.target.value)}
                     placeholder="500.00"
                     required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="amountTTD">Paid (TTD) *</Label>
+                  <Label htmlFor="rate">Rate (TTD/USD) *</Label>
+                  <Input
+                    id="rate"
+                    type="number"
+                    step="0.0001"
+                    value={form.rate}
+                    onChange={(e) => setRate(e.target.value)}
+                    placeholder="6.80"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="amountTTD">Paid (TTD)</Label>
                   <Input
                     id="amountTTD"
                     type="number"
                     step="0.01"
                     value={form.amountTTD}
-                    onChange={(e) => setForm({ ...form, amountTTD: e.target.value })}
-                    placeholder="3400.00"
-                    required
+                    onChange={(e) => setTtd(e.target.value)}
+                    placeholder="Auto-calculated"
                   />
+                  <p className="mt-1 text-xs text-gray-500">
+                    USD × rate — fills in automatically
+                  </p>
                 </div>
               </div>
-              {impliedRate != null && Number.isFinite(impliedRate) && (
-                <p className="text-sm text-emerald-800 bg-emerald-50 rounded-lg px-3 py-2">
-                  Implied rate: <strong>{impliedRate.toFixed(4)}</strong> TTD/USD
-                </p>
-              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label htmlFor="method">Method *</Label>

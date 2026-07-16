@@ -9,7 +9,9 @@ export type MonthUsdCostSummary = {
     weightedAvgRate: number | null
     count: number
   }
-  cardUsage: {
+  /** Projected card access for the month: every card scheduled/available this month
+   *  (explicit availability + recurring, minus months marked "not available"). */
+  projectedCards: {
     totalUSD: number
     totalTTD: number
     weightedAvgRate: number | null
@@ -22,13 +24,19 @@ export type MonthUsdCostSummary = {
   }
 }
 
-/** Direct USD buys + card usage for the month, with weighted average rates. */
+/**
+ * Direct USD buys + projected card access for the month, with weighted average rates.
+ *
+ * The card component is based on what you have ACCESS to this month (availability
+ * rows incl. recurring cards), not usage-so-far. Marking a card "not available" for
+ * the month removes it from the projection, so the average updates immediately.
+ */
 export async function loadMonthUsdCostSummary(
   userId: string,
   year: number,
   month: number
 ): Promise<MonthUsdCostSummary> {
-  const [purchases, { usageRows, availabilityWithUsage }] = await Promise.all([
+  const [purchases, { availabilityWithUsage }] = await Promise.all([
     prisma.usdPurchase.findMany({
       where: { userId, year, month },
       orderBy: { purchasedAt: 'desc' },
@@ -36,49 +44,21 @@ export async function loadMonthUsdCostSummary(
     loadMonthAvailabilityWithUsage(userId, year, month),
   ])
 
-  const rateByCard = new Map<string, number>()
-  for (const row of availabilityWithUsage) {
-    rateByCard.set(row.cardId, row.exchangeRate)
-  }
-
   const directRows = purchases.map((p) => ({
     amountUSD: p.amountUSD,
     amountTTD: p.amountTTD,
   }))
 
-  const usageEntries = await prisma.cardUsage.findMany({
-    where: {
-      year,
-      month,
-      card: { person: { userId } },
-    },
-    select: {
-      amountUSD: true,
-      amountTTD: true,
-      cardId: true,
-    },
-  })
-
-  const cardRows = usageEntries.map((u) => {
-    const rate = rateByCard.get(u.cardId) ?? null
-    const usd =
-      typeof u.amountUSD === 'number' && Number.isFinite(u.amountUSD)
-        ? u.amountUSD
-        : rate && rate > 0
-          ? u.amountTTD / rate
-          : 0
-    return {
-      amountUSD: usd,
-      amountTTD: u.amountTTD,
-    }
-  })
+  // Each availability row costs amountUSD × exchangeRate TTD if fully used.
+  const cardRows = availabilityWithUsage.map((row) => ({
+    amountUSD: row.amountUSD,
+    amountTTD: row.amountUSD * row.exchangeRate,
+  }))
 
   const directTotalUSD = directRows.reduce((s, r) => s + r.amountUSD, 0)
   const directTotalTTD = directRows.reduce((s, r) => s + r.amountTTD, 0)
   const cardTotalUSD = cardRows.reduce((s, r) => s + r.amountUSD, 0)
   const cardTotalTTD = cardRows.reduce((s, r) => s + r.amountTTD, 0)
-
-  const blendedRows = [...directRows, ...cardRows]
 
   return {
     directPurchases: {
@@ -87,16 +67,16 @@ export async function loadMonthUsdCostSummary(
       weightedAvgRate: weightedAverageRate(directRows),
       count: purchases.length,
     },
-    cardUsage: {
+    projectedCards: {
       totalUSD: cardTotalUSD,
       totalTTD: cardTotalTTD,
       weightedAvgRate: weightedAverageRate(cardRows),
-      count: usageRows.length,
+      count: cardRows.length,
     },
     blended: {
       totalUSD: directTotalUSD + cardTotalUSD,
       totalTTD: directTotalTTD + cardTotalTTD,
-      weightedAvgRate: weightedAverageRate(blendedRows),
+      weightedAvgRate: weightedAverageRate([...directRows, ...cardRows]),
     },
   }
 }

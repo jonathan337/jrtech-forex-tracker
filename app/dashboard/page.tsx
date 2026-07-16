@@ -860,7 +860,7 @@ export default function Dashboard() {
               <div className="min-w-0">
                 <CardTitle className="text-lg">Your USD cost this month</CardTitle>
                 <CardDescription className="mt-1 break-words">
-                  Weighted average from direct buys and card usage so far
+                  Weighted average from direct buys and cards scheduled this month
                 </CardDescription>
               </div>
               <Link
@@ -894,14 +894,14 @@ export default function Dashboard() {
                 </p>
               </div>
               <div className="bg-white rounded-lg p-4 shadow-sm">
-                <p className="text-xs text-gray-500 mb-1">Card usage</p>
+                <p className="text-xs text-gray-500 mb-1">Projected cards</p>
                 <p className="text-xl font-semibold tabular-nums">
-                  {usdCostSummary.cardUsage.weightedAvgRate != null
-                    ? usdCostSummary.cardUsage.weightedAvgRate.toFixed(4)
+                  {usdCostSummary.projectedCards.weightedAvgRate != null
+                    ? usdCostSummary.projectedCards.weightedAvgRate.toFixed(4)
                     : '—'}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  ${usdCostSummary.cardUsage.totalUSD.toFixed(2)} USD used
+                  ${usdCostSummary.projectedCards.totalUSD.toFixed(2)} USD access
                 </p>
               </div>
             </div>

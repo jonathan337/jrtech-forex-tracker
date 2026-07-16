@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { useDataChanged } from '@/lib/use-data-changed'
+import { useDataChanged, emitDataChanged } from '@/lib/use-data-changed'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -216,6 +216,7 @@ export default function AvailabilityPage() {
         }
         
         await fetchAvailability()
+        emitDataChanged({})
         resetForm()
       } else {
         // Single entry update or creation
@@ -250,6 +251,7 @@ export default function AvailabilityPage() {
 
         if (response.ok) {
           await fetchAvailability()
+          emitDataChanged({})
           resetForm()
         }
       }
@@ -292,6 +294,7 @@ export default function AvailabilityPage() {
 
       if (response.ok) {
         await fetchAvailability()
+        emitDataChanged({})
       }
     } catch (error) {
       console.error('Error deleting availability:', error)
