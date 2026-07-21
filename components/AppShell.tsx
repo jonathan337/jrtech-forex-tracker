@@ -34,13 +34,18 @@ const LINKS = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
-function Logo() {
+/** `tone="dark"` is for the near-black sidebar; the default is for light surfaces. */
+function Logo({ tone = 'light' }: { tone?: 'light' | 'dark' }) {
   return (
     <Link href="/dashboard" className="touch-manipulation flex items-center gap-2 min-w-0">
-      <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0">
+      <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
         <span className="text-white font-bold text-sm">FX</span>
       </div>
-      <span className="text-lg font-semibold tracking-[-0.01em] text-slate-900 truncate">
+      <span
+        className={`text-lg font-semibold tracking-[-0.01em] truncate ${
+          tone === 'dark' ? 'text-white' : 'text-[#0d1220]'
+        }`}
+      >
         FX Tracker
       </span>
     </Link>
@@ -108,7 +113,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (!session) {
     return (
       <div className="min-h-screen min-w-0">
-        <nav className="sticky top-0 z-[100] bg-white border-b border-gray-200 shadow-sm">
+        <nav className="sticky top-0 z-[100] bg-white/85 backdrop-blur border-b border-[#dfe4ec]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16 gap-2 min-w-0">
               <Logo />
@@ -159,15 +164,15 @@ export function AppShell({ children }: { children: ReactNode }) {
             aria-current={active ? 'page' : undefined}
             className={`touch-manipulation flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors ${
               active
-                ? 'bg-blue-50 text-blue-800'
+                ? 'bg-blue-600 text-white'
                 : pending
-                  ? 'bg-gray-100 text-gray-900'
-                  : 'text-gray-700 hover:bg-gray-50'
+                  ? 'bg-white/10 text-white'
+                  : 'text-[#8b93a1] hover:bg-white/5 hover:text-white'
             }`}
           >
             <Icon
               className={`w-5 h-5 shrink-0 ${
-                active ? 'text-blue-600' : pending ? 'text-gray-500' : 'text-gray-400'
+                active ? 'text-white' : pending ? 'text-white' : 'text-[#6b7383]'
               }`}
             />
             {link.label}
@@ -178,13 +183,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   )
 
   const signOutButton = (
-    <div className="border-t border-gray-200 p-2">
+    <div className="border-t border-white/10 p-2">
       <button
         type="button"
         onClick={handleSignOut}
-        className="touch-manipulation flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        className="touch-manipulation flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-[#8b93a1] hover:bg-white/5 hover:text-white"
       >
-        <LogOut className="w-5 h-5 shrink-0 text-gray-400" />
+        <LogOut className="w-5 h-5 shrink-0 text-[#6b7383]" />
         Sign out
       </button>
     </div>
@@ -194,16 +199,16 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen flex">
       {/* Desktop sidebar: in-flow, collapsible, open by default */}
       <aside
-        className={`hidden md:block md:sticky md:top-0 md:h-screen shrink-0 overflow-hidden border-r border-gray-200 bg-white transition-[width] duration-200 ease-out ${
+        className={`hidden md:block md:sticky md:top-0 md:h-screen shrink-0 overflow-hidden border-r border-black/10 bg-[#12151b] transition-[width] duration-200 ease-out ${
           desktopOpen ? 'w-64' : 'w-0 border-r-0'
         }`}
       >
         <div className="w-64 h-screen flex flex-col">
-          <div className="flex items-center h-16 px-4 border-b border-gray-200 shrink-0">
-            <Logo />
+          <div className="flex items-center h-16 px-4 border-b border-white/10 shrink-0">
+            <Logo tone="dark" />
           </div>
           {session.user?.name && (
-            <p className="px-4 pt-3 text-xs text-gray-500 flex items-center gap-1 truncate">
+            <p className="px-4 pt-3 text-xs text-[#6b7383] flex items-center gap-1 truncate">
               <Building2 className="w-3 h-3 shrink-0" />
               <span className="truncate">{session.user.name}</span>
             </p>
@@ -222,18 +227,18 @@ export function AppShell({ children }: { children: ReactNode }) {
         onClick={() => setMobileOpen(false)}
       />
       <aside
-        className={`md:hidden fixed top-0 left-0 z-[120] h-full w-72 max-w-[85vw] bg-white shadow-xl transition-transform duration-200 ease-out flex flex-col ${
+        className={`md:hidden fixed top-0 left-0 z-[120] h-full w-72 max-w-[85vw] bg-[#12151b] shadow-xl transition-transform duration-200 ease-out flex flex-col ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         role="dialog"
         aria-modal="true"
         aria-label="Navigation menu"
       >
-        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
-          <Logo />
+        <div className="flex items-center justify-between h-16 px-4 border-b border-white/10">
+          <Logo tone="dark" />
           <button
             type="button"
-            className="touch-manipulation inline-flex items-center justify-center rounded-md p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="touch-manipulation inline-flex items-center justify-center rounded-md p-2 text-[#8b93a1] hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
             aria-label="Close menu"
             onClick={() => setMobileOpen(false)}
           >
@@ -246,11 +251,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Main column */}
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="sticky top-0 z-[100] bg-white border-b border-gray-200 shadow-sm">
+        <header className="sticky top-0 z-[100] bg-white/85 backdrop-blur border-b border-[#dfe4ec]">
           <div className="flex items-center h-16 gap-2 px-4 sm:px-6 lg:px-8 min-w-0">
             <button
               type="button"
-              className="touch-manipulation inline-flex items-center justify-center rounded-md p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              className="touch-manipulation inline-flex items-center justify-center rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-[#0d1220] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
               aria-label="Toggle menu"
               aria-expanded={desktopOpen}
               onClick={toggleMenu}
@@ -266,7 +271,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 variant="ghost"
                 size="sm"
                 onClick={handleSignOut}
-                className="text-gray-600 hover:text-gray-900 px-2 sm:px-3"
+                className="px-2 sm:px-3"
               >
                 <LogOut className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Sign out</span>

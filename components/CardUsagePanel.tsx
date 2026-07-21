@@ -625,7 +625,7 @@ export function CardUsagePanel({
 
       <form
         onSubmit={handleAdd}
-        className="rounded-lg border border-indigo-200 bg-white p-4 space-y-3"
+        className="rounded-lg border border-blue-200 bg-white p-4 space-y-3"
       >
         <p className="text-sm font-medium text-gray-800">
           Add usage for {monthName}

@@ -21,7 +21,6 @@ import {
   TrendingUp,
   RefreshCw,
   Loader2,
-  Wallet,
   Scale,
   User,
   Plus,
@@ -462,7 +461,7 @@ export default function Dashboard() {
               <span className="inline-flex items-center gap-2 flex-wrap min-w-0">
                 {item.card.cardNickname}
                 {item.isRecurringTemplate && (
-                  <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                  <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
                     Every month
                   </span>
                 )}
@@ -487,7 +486,7 @@ export default function Dashboard() {
           {item.card.person.name}
         </td>
         <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
-          <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium tabular-nums bg-slate-50 text-slate-700 ring-1 ring-[#eef0f3]">
+          <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium tabular-nums bg-slate-50 text-slate-700 ring-1 ring-[#e8ecf3]">
             ${item.amountUSD.toFixed(2)}
           </span>
         </td>
@@ -498,14 +497,14 @@ export default function Dashboard() {
                 ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100'
                 : item.balanceUSD < -0.005
                   ? 'bg-rose-50 text-rose-700 ring-1 ring-rose-100'
-                  : 'bg-slate-50 text-slate-500 ring-1 ring-[#eef0f3]'
+                  : 'bg-slate-50 text-slate-500 ring-1 ring-[#e8ecf3]'
             }`}
           >
             ${item.balanceUSD.toFixed(2)}
           </span>
         </td>
         <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
-          <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium tabular-nums bg-slate-50 text-slate-700 ring-1 ring-[#eef0f3]">
+          <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium tabular-nums bg-slate-50 text-slate-700 ring-1 ring-[#e8ecf3]">
             ${item.usageUSD.toFixed(2)}
           </span>
         </td>
@@ -526,7 +525,7 @@ export default function Dashboard() {
           </span>
         </td>
         <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
-          <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium tabular-nums bg-slate-50 text-slate-700 ring-1 ring-[#eef0f3]">
+          <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium tabular-nums bg-slate-50 text-slate-700 ring-1 ring-[#e8ecf3]">
             ${item.ttdValue.toFixed(2)}
           </span>
         </td>
@@ -595,7 +594,7 @@ export default function Dashboard() {
     const last4 = item.card.lastFourDigits?.trim()
     return (
       <li key={item.id}>
-        <div className="rounded-xl border border-[#e6e8ec] bg-white overflow-hidden">
+        <div className="rounded-xl border border-[#dfe4ec] bg-white overflow-hidden">
           <div className="p-4">
             <div className="flex items-start justify-between gap-3">
               <button
@@ -611,7 +610,7 @@ export default function Dashboard() {
                   <span className="inline-flex items-center gap-2 flex-wrap font-semibold text-gray-900">
                     {item.card.cardNickname}
                     {item.isRecurringTemplate && (
-                      <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                      <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
                         Every month
                       </span>
                     )}
@@ -648,7 +647,7 @@ export default function Dashboard() {
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-3">
-              <div className="rounded-lg bg-slate-50 ring-1 ring-[#eef0f3] px-3 py-2">
+              <div className="rounded-lg bg-slate-50 ring-1 ring-[#e8ecf3] px-3 py-2">
                 <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
                   Balance (USD)
                 </div>
@@ -664,7 +663,7 @@ export default function Dashboard() {
                   ${item.balanceUSD.toFixed(2)}
                 </div>
               </div>
-              <div className="rounded-lg bg-slate-50 ring-1 ring-[#eef0f3] px-3 py-2">
+              <div className="rounded-lg bg-slate-50 ring-1 ring-[#e8ecf3] px-3 py-2">
                 <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
                   Owed (TTD)
                 </div>
@@ -720,7 +719,7 @@ export default function Dashboard() {
     <div className="space-y-6 min-w-0">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between min-w-0">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-[-0.02em] text-slate-900">
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-[-0.02em] text-[#0d1220]">
             Dashboard
           </h1>
           <p className="text-slate-500 mt-1 text-sm sm:text-base">
@@ -773,15 +772,15 @@ export default function Dashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-6 text-center">
+            <div className="rounded-xl border border-[#dfe4ec] bg-slate-50/70 p-6 text-center">
               <p className="text-[13px] font-medium text-slate-500 mb-2">Official/Baseline Rate</p>
-              <p className="text-4xl font-semibold tabular-nums tracking-[-0.02em] text-indigo-700 mb-2">
+              <p className="text-4xl font-semibold tabular-nums tracking-[-0.02em] text-[#0d1220] mb-2">
                 {exchangeRate.selling.toFixed(4)}
               </p>
               <p className="text-[13px] text-slate-500">TTD per USD</p>
             </div>
-            <div className="mt-4 bg-amber-50/60 border border-amber-100 rounded-xl p-3">
-              <p className="text-xs text-amber-900/80 leading-relaxed">
+            <div className="mt-4 bg-slate-50 border border-[#e8ecf3] rounded-xl p-3">
+              <p className="text-xs text-slate-600 leading-relaxed">
                 💡 This is your baseline rate. Any rate above this represents a premium/extra cost for obtaining USD.
                 You can update this in Settings.
               </p>
@@ -802,7 +801,7 @@ export default function Dashboard() {
               </div>
               <Link
                 href="/usd-purchases"
-                className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-[#dfe4ec] bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 Log USD buy
               </Link>
@@ -810,16 +809,32 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 text-center">
+              <div className="rounded-xl border border-[#dfe4ec] bg-slate-50/70 p-4 text-center">
                 <p className="text-xs font-medium text-slate-500 mb-1">Blended avg</p>
-                <p className="text-3xl font-semibold tabular-nums tracking-[-0.02em] text-indigo-700">
+                <p className="text-3xl font-semibold tabular-nums tracking-[-0.02em] text-[#0d1220]">
                   {usdCostSummary.blended.weightedAvgRate != null
                     ? usdCostSummary.blended.weightedAvgRate.toFixed(4)
                     : '—'}
                 </p>
-                <p className="text-xs text-slate-500 mt-1">TTD per USD</p>
+                {/* The premium over your baseline is the number that actually
+                    matters here — surface it rather than making people subtract. */}
+                {usdCostSummary.blended.weightedAvgRate != null &&
+                exchangeRate?.selling ? (
+                  <p className="text-xs font-medium text-orange-600 mt-1">
+                    +
+                    {(
+                      (usdCostSummary.blended.weightedAvgRate /
+                        exchangeRate.selling -
+                        1) *
+                      100
+                    ).toFixed(1)}
+                    % over baseline
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-500 mt-1">TTD per USD</p>
+                )}
               </div>
-              <div className="rounded-xl border border-[#eef0f3] bg-slate-50/60 p-4">
+              <div className="rounded-xl border border-[#e8ecf3] bg-slate-50/60 p-4">
                 <p className="text-xs font-medium text-slate-500 mb-1">Direct buys</p>
                 <p className="text-xl font-semibold tabular-nums">
                   {usdCostSummary.directPurchases.weightedAvgRate != null
@@ -830,7 +845,7 @@ export default function Dashboard() {
                   ${usdCostSummary.directPurchases.totalUSD.toFixed(2)} USD
                 </p>
               </div>
-              <div className="rounded-xl border border-[#eef0f3] bg-slate-50/60 p-4">
+              <div className="rounded-xl border border-[#e8ecf3] bg-slate-50/60 p-4">
                 <p className="text-xs font-medium text-slate-500 mb-1">Projected cards</p>
                 <p className="text-xl font-semibold tabular-nums">
                   {usdCostSummary.projectedCards.weightedAvgRate != null
@@ -850,45 +865,56 @@ export default function Dashboard() {
 
       {loading ? (
         <div className="text-center py-12">
-          <p className="text-gray-500">Loading...</p>
+          <p className="text-slate-500">Loading...</p>
         </div>
       ) : summary ? (
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {/* Available and balance were two cards saying one thing — balance IS
+                available minus usage. One card with a fill bar shows the whole
+                story and how far through the month's access you are. */}
             <Card className="transition-shadow hover:shadow-[0_2px_8px_rgba(15,23,42,0.06)]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-[13px] font-medium text-slate-500">
-                  Total USD available
+                  USD available
                 </CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 ring-1 ring-emerald-100 flex items-center justify-center">
-                  <DollarSign className="h-4 w-4 text-emerald-600" />
+                <div className="w-8 h-8 rounded-lg bg-blue-50 ring-1 ring-blue-100 flex items-center justify-center">
+                  <DollarSign className="h-4 w-4 text-blue-600" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-emerald-700">
+                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-[#0d1220]">
                   ${summary.totalUSD.toFixed(2)}
                 </div>
-                <p className="text-xs text-slate-400 mt-1">
-                  Sum of all card availability amounts in USD
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="transition-shadow hover:shadow-[0_2px_8px_rgba(15,23,42,0.06)]">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-[13px] font-medium text-slate-500">
-                  Total USD balance
-                </CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 ring-1 ring-emerald-100 flex items-center justify-center">
-                  <Wallet className="h-4 w-4 text-emerald-600" />
+                <div className="mt-2.5 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-blue-600 transition-[width] duration-300"
+                    style={{
+                      width: `${
+                        summary.totalUSD > 0
+                          ? Math.min(
+                              100,
+                              Math.max(
+                                0,
+                                (summary.totalUsedUSD / summary.totalUSD) * 100
+                              )
+                            )
+                          : 0
+                      }%`,
+                    }}
+                  />
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-emerald-700">
-                  ${(summary.totalUSD - summary.totalUsedUSD).toFixed(2)}
-                </div>
-                <p className="text-xs text-slate-400 mt-1">
-                  USD available minus USD usage this month
+                <p className="text-xs text-slate-500 mt-2">
+                  ${(summary.totalUSD - summary.totalUsedUSD).toFixed(2)} unspent
+                  {summary.totalUSD > 0 && (
+                    <>
+                      {' · '}
+                      {((summary.totalUsedUSD / summary.totalUSD) * 100).toFixed(
+                        0
+                      )}
+                      % used
+                    </>
+                  )}
                 </p>
               </CardContent>
             </Card>
@@ -898,14 +924,14 @@ export default function Dashboard() {
                 <CardTitle className="text-[13px] font-medium text-slate-500">
                   Total TTD owed to people
                 </CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-rose-50 ring-1 ring-rose-100 flex items-center justify-center">
-                  <Scale className="h-4 w-4 text-rose-600" />
+                <div className="w-8 h-8 rounded-lg bg-red-50 ring-1 ring-red-100 flex items-center justify-center">
+                  <Scale className="h-4 w-4 text-red-600" />
                 </div>
               </CardHeader>
               <CardContent>
                 <div
                   className={`text-2xl font-semibold tabular-nums tracking-[-0.01em] ${
-                    totalOwedToPeopleTTD > 0 ? 'text-rose-600' : 'text-slate-900'
+                    totalOwedToPeopleTTD > 0 ? 'text-red-600' : 'text-[#0d1220]'
                   }`}
                 >
                   ${totalOwedToPeopleTTD.toFixed(2)}
@@ -928,7 +954,7 @@ export default function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-slate-900">{summary.totalCards}</div>
+                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-[#0d1220]">{summary.totalCards}</div>
                 <p className="text-xs text-slate-400 mt-1">
                   Cards with availability this month
                 </p>
@@ -940,12 +966,12 @@ export default function Dashboard() {
                 <CardTitle className="text-[13px] font-medium text-slate-500">
                   Average exchange rate
                 </CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 ring-1 ring-indigo-100 flex items-center justify-center">
-                  <TrendingUp className="h-4 w-4 text-indigo-600" />
+                <div className="w-8 h-8 rounded-lg bg-blue-50 ring-1 ring-blue-100 flex items-center justify-center">
+                  <TrendingUp className="h-4 w-4 text-blue-600" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-indigo-700">
+                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-[#0d1220]">
                   {summary.averageRate.toFixed(2)}
                 </div>
                 <p className="text-xs text-slate-400 mt-1">TTD per USD</p>
@@ -957,12 +983,12 @@ export default function Dashboard() {
                 <CardTitle className="text-[13px] font-medium text-slate-500">
                   Total TTD required
                 </CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-amber-50 ring-1 ring-amber-100 flex items-center justify-center">
-                  <DollarSign className="h-4 w-4 text-amber-600" />
+                <div className="w-8 h-8 rounded-lg bg-slate-50 ring-1 ring-[#e8ecf3] flex items-center justify-center">
+                  <DollarSign className="h-4 w-4 text-slate-500" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-amber-700">
+                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-[#0d1220]">
                   ${summary.totalTTD.toFixed(2)}
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
@@ -973,7 +999,7 @@ export default function Dashboard() {
           </div>
 
           <Card className="min-w-0">
-            <CardHeader className="border-b border-[#eef0f3]">
+            <CardHeader className="border-b border-[#e8ecf3]">
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
@@ -1035,7 +1061,7 @@ export default function Dashboard() {
                         type="checkbox"
                         checked={onlyWithBalance}
                         onChange={(e) => setOnlyWithBalance(e.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
                       />
                       Only cards with balance left (USD)
                     </label>
@@ -1044,7 +1070,7 @@ export default function Dashboard() {
                         type="checkbox"
                         checked={groupByOwner}
                         onChange={(e) => setGroupByOwner(e.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
                       />
                       Group by owner
                     </label>
@@ -1125,7 +1151,7 @@ export default function Dashboard() {
                     {showQuickUsage && (
                       <form
                         onSubmit={handleQuickUsageSubmit}
-                        className="rounded-lg border border-indigo-200 bg-indigo-50/40 p-4 space-y-3"
+                        className="rounded-lg border border-blue-200 bg-blue-50/40 p-4 space-y-3"
                       >
                         <p className="text-sm font-medium text-gray-800">
                           Add usage for {monthName}
@@ -1254,7 +1280,7 @@ export default function Dashboard() {
                   <div className="hidden md:block -mx-1 overflow-x-auto sm:mx-0 touch-pan-x pb-3 sm:pb-4">
                     <table className="w-full min-w-[62rem] text-sm">
                       <thead>
-                        <tr className="bg-slate-50/70 border-b border-[#e6e8ec]">
+                        <tr className="bg-slate-50/70 border-b border-[#dfe4ec]">
                           <th className="text-left py-3 px-3 sm:py-4 sm:px-6 font-medium text-slate-500 uppercase text-[11px] tracking-[0.06em]">
                             Card
                           </th>
@@ -1297,7 +1323,7 @@ export default function Dashboard() {
                               return [
                               <tr
                                 key={`owner-${owner.ownerId}`}
-                                className="bg-slate-50 border-y border-[#e6e8ec]"
+                                className="bg-slate-50 border-y border-[#dfe4ec]"
                               >
                                 <td
                                   colSpan={11}
@@ -1315,24 +1341,24 @@ export default function Dashboard() {
                                     <span className="text-xs sm:text-sm font-normal text-slate-700 tabular-nums leading-relaxed border-t border-slate-200/90 pt-2 sm:border-0 sm:pt-0 sm:pl-1">
                                       <span className="text-slate-500">Totals · </span>
                                       Bal{' '}
-                                      <strong className="text-slate-900">
+                                      <strong className="text-[#0d1220]">
                                         ${ot.balanceUSD.toFixed(2)}
                                       </strong>
                                       <span className="text-slate-400"> / </span>
                                       Avail{' '}
-                                      <strong className="text-slate-900">
+                                      <strong className="text-[#0d1220]">
                                         ${ot.amountUSD.toFixed(2)}
                                       </strong>
                                       USD · Used{' '}
-                                      <strong className="text-slate-900">
+                                      <strong className="text-[#0d1220]">
                                         ${ot.usageUSD.toFixed(2)}
                                       </strong>
                                       USD · TTD value{' '}
-                                      <strong className="text-slate-900">
+                                      <strong className="text-[#0d1220]">
                                         ${ot.ttdValue.toFixed(2)}
                                       </strong>
                                       · Owed{' '}
-                                      <strong className="text-slate-900">
+                                      <strong className="text-[#0d1220]">
                                         ${ot.owedTTD.toFixed(2)}
                                       </strong>
                                       TTD

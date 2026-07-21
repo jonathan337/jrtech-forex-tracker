@@ -264,7 +264,7 @@ export default function PaymentsPage() {
       </div>
 
       {showForm && (
-        <Card className="border border-indigo-200 bg-indigo-50/40 shadow-sm">
+        <Card className="border border-blue-200 bg-blue-50/40 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">New payment</CardTitle>
           </CardHeader>

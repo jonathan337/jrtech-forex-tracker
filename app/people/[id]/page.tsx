@@ -469,7 +469,7 @@ export default function PersonDashboardPage() {
               <span className="inline-flex flex-wrap items-center gap-1 min-w-0">
                 <span className="break-words hyphens-auto">{item.card.cardNickname}</span>
                 {item.isRecurringTemplate && (
-                  <span className="shrink-0 text-[10px] font-normal px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 sm:text-xs sm:px-2">
+                  <span className="shrink-0 text-[10px] font-normal px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800 sm:text-xs sm:px-2">
                     Monthly
                   </span>
                 )}
@@ -619,7 +619,7 @@ export default function PersonDashboardPage() {
                   <span className="inline-flex items-center gap-2 flex-wrap font-semibold text-gray-900">
                     {item.card.cardNickname}
                     {item.isRecurringTemplate && (
-                      <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                      <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
                         Monthly
                       </span>
                     )}
@@ -903,12 +903,12 @@ export default function PersonDashboardPage() {
                 <CardTitle className="text-sm font-medium">
                   Cards available
                 </CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
-                  <CreditCard className="h-4 w-4 text-indigo-600" />
+                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                  <CreditCard className="h-4 w-4 text-blue-600" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-indigo-600">{summary.totalCards}</div>
+                <div className="text-2xl font-bold text-blue-600">{summary.totalCards}</div>
                 <p className="text-xs text-gray-500">Cards with availability this month</p>
               </CardContent>
             </Card>
@@ -935,12 +935,12 @@ export default function PersonDashboardPage() {
                 <CardTitle className="text-sm font-medium">
                   Total TTD required
                 </CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
-                  <DollarSign className="h-4 w-4 text-indigo-600" />
+                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <DollarSign className="h-4 w-4 text-blue-600" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-indigo-600">
+                <div className="text-2xl font-bold text-blue-600">
                   ${summary.totalTTD.toFixed(2)}
                 </div>
                 <p className="text-xs text-gray-500">
@@ -951,7 +951,7 @@ export default function PersonDashboardPage() {
           </div>
 
           <Card className="shadow-md border-t-4 border-t-blue-500 min-w-0">
-            <CardHeader className="border-b border-[#eef0f3]">
+            <CardHeader className="border-b border-[#e8ecf3]">
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
@@ -973,7 +973,7 @@ export default function PersonDashboardPage() {
                       type="checkbox"
                       checked={onlyWithBalance}
                       onChange={(e) => setOnlyWithBalance(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
                     />
                     Only cards with balance left (USD)
                   </label>
@@ -1040,7 +1040,7 @@ export default function PersonDashboardPage() {
                     {showQuickUsage && (
                       <form
                         onSubmit={handleQuickUsageSubmit}
-                        className="rounded-lg border border-indigo-200 bg-indigo-50/40 p-4 space-y-3"
+                        className="rounded-lg border border-blue-200 bg-blue-50/40 p-4 space-y-3"
                       >
                         <p className="text-sm font-medium text-gray-800">
                           Add usage for {monthName}

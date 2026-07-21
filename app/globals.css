@@ -8,12 +8,12 @@
 :root {
   color-scheme: light;
 
-  --background: #f6f7f9;
+  --background: #eef1f5;
   --surface: #ffffff;
-  --foreground: #0f172a;
+  --foreground: #0d1220;
   --muted: #64748b;
-  --border: #e6e8ec;
-  --accent: #4f46e5;
+  --border: #dfe4ec;
+  --accent: #2563eb;
 }
 
 @theme inline {

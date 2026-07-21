@@ -109,7 +109,7 @@ function VerifyEmailContent() {
       case 'expired':
         return 'from-red-600 to-pink-600'
       default:
-        return 'from-blue-600 to-indigo-600'
+        return 'from-blue-600 to-blue-500'
     }
   }
 

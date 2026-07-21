@@ -85,9 +85,9 @@ export default function SettingsPage() {
       </div>
 
       <Card className="shadow-md w-full max-w-2xl min-w-0 overflow-hidden">
-        <CardHeader className="border-b border-[#eef0f3]">
+        <CardHeader className="border-b border-[#e8ecf3]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center">
               <SettingsIcon className="w-5 h-5 text-white" />
             </div>
             <div>

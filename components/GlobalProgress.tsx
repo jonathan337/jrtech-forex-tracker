@@ -135,7 +135,7 @@ export function GlobalProgress() {
       style={{ opacity: visible ? 1 : 0 }}
     >
       <div
-        className="h-full rounded-r-full bg-gradient-to-r from-indigo-500 via-blue-500 to-indigo-500 transition-[width] duration-200 ease-out"
+        className="h-full rounded-r-full bg-gradient-to-r from-blue-500 via-blue-400 to-blue-500 transition-[width] duration-200 ease-out"
         style={{
           width: `${progress}%`,
           boxShadow:
