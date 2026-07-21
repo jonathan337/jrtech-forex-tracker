@@ -1,18 +1,48 @@
 @import "tailwindcss";
 
+/*
+ * The app is light-only. Declaring color-scheme is what stops the browser from
+ * painting its dark canvas (and dark form controls / scrollbars) behind the UI
+ * when the OS is in dark mode.
+ */
 :root {
-  --foreground: #171717;
+  color-scheme: light;
+
+  --background: #f6f7f9;
+  --surface: #ffffff;
+  --foreground: #0f172a;
+  --muted: #64748b;
+  --border: #e6e8ec;
+  --accent: #4f46e5;
 }
 
 @theme inline {
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
+html {
+  background-color: var(--background);
+}
+
 body {
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* Geist is loaded in layout.tsx — this used to hard-code Arial, so the font
+     was downloaded on every page load but never actually used. */
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Figures line up column-to-column across tables and stat cards. */
+table,
+input[type="number"] {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Prevent iOS Safari from zooming the page when focusing form fields. */
@@ -24,16 +54,15 @@ body {
   }
 }
 
-/* Modern finishes */
 ::selection {
-  background: rgba(59, 130, 246, 0.18);
+  background: color-mix(in oklab, var(--accent) 18%, transparent);
 }
 
 select {
   transition: border-color 150ms ease;
 }
 select:hover:not(:disabled) {
-  border-color: #9ca3af;
+  border-color: #cbd0d8;
 }
 
 /* Slim, unobtrusive scrollbars (WebKit) */
@@ -42,12 +71,21 @@ select:hover:not(:disabled) {
   height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.45);
+  background: rgba(148, 163, 184, 0.4);
   border-radius: 9999px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.6);
+  background: rgba(100, 116, 139, 0.55);
 }
 *::-webkit-scrollbar-track {
   background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

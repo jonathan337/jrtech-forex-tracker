@@ -239,7 +239,7 @@ export function ChatWidget() {
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Open assistant"
-          className="fixed z-50 bottom-5 left-5 md:bottom-6 md:right-6 md:left-auto h-14 w-14 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-600/30 flex items-center justify-center active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+          className="fixed z-50 bottom-5 left-5 md:bottom-6 md:right-6 md:left-auto h-14 w-14 rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 flex items-center justify-center active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
         >
           <MessageCircle className="w-6 h-6" />
         </button>
@@ -255,7 +255,7 @@ export function ChatWidget() {
           aria-label="Assistant"
         >
           {/* Header */}
-          <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white shrink-0">
+          <div className="flex items-center gap-2 px-4 py-3 bg-indigo-600 text-white shrink-0">
             <Sparkles className="w-5 h-5" />
             <div className="font-semibold">Assistant</div>
             <button

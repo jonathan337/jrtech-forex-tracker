@@ -215,7 +215,7 @@ export default function UsdPurchasesPage() {
     <div className="space-y-6 min-w-0">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-[-0.02em] text-slate-900">
             USD Buys
           </h1>
           <p className="text-gray-600 mt-1 text-sm sm:text-base">

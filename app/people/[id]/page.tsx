@@ -757,7 +757,7 @@ export default function PersonDashboardPage() {
             <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden />
             People
           </Link>
-          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-[-0.02em] text-slate-900">
             {loadError ? 'Person' : displayName}
           </h1>
           <p className="text-gray-600 text-sm sm:text-base">
@@ -785,7 +785,7 @@ export default function PersonDashboardPage() {
       </div>
 
       {exchangeRate && (
-        <Card className="border-l-4 border-l-blue-500 shadow-md bg-gradient-to-r from-blue-50/50 to-indigo-50/50 min-w-0 overflow-hidden">
+        <Card className="border-l-4 border-l-blue-500 shadow-md bg-transparent min-w-0 overflow-hidden">
           <CardHeader className="pb-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between min-w-0">
               <div className="min-w-0">
@@ -903,12 +903,12 @@ export default function PersonDashboardPage() {
                 <CardTitle className="text-sm font-medium">
                   Cards available
                 </CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                  <CreditCard className="h-4 w-4 text-purple-600" />
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                  <CreditCard className="h-4 w-4 text-indigo-600" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-purple-600">{summary.totalCards}</div>
+                <div className="text-2xl font-bold text-indigo-600">{summary.totalCards}</div>
                 <p className="text-xs text-gray-500">Cards with availability this month</p>
               </CardContent>
             </Card>
@@ -951,7 +951,7 @@ export default function PersonDashboardPage() {
           </div>
 
           <Card className="shadow-md border-t-4 border-t-blue-500 min-w-0">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+            <CardHeader className="border-b border-[#eef0f3]">
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
@@ -1183,7 +1183,7 @@ export default function PersonDashboardPage() {
                         <col className="w-[12.5%]" />
                       </colgroup>
                       <thead>
-                        <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-blue-200">
+                        <tr className="bg-slate-50/70 border-b-2 border-blue-200">
                           <th className="text-left py-2 px-1 sm:px-1.5 lg:px-2 font-semibold text-gray-700 uppercase leading-tight tracking-wide text-[10px] sm:text-xs">
                             Card
                           </th>

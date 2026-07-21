@@ -76,7 +76,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6 min-w-0">
       <div className="min-w-0">
-        <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+        <h1 className="text-2xl sm:text-3xl font-semibold tracking-[-0.02em] text-slate-900">
           Settings
         </h1>
         <p className="text-gray-600 mt-1 text-sm sm:text-base">
@@ -85,9 +85,9 @@ export default function SettingsPage() {
       </div>
 
       <Card className="shadow-md w-full max-w-2xl min-w-0 overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+        <CardHeader className="border-b border-[#eef0f3]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center">
               <SettingsIcon className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -173,7 +173,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card className="shadow-md max-w-2xl bg-gradient-to-br from-gray-50 to-gray-100">
+      <Card className="shadow-md max-w-2xl bg-slate-50/70">
         <CardHeader>
           <CardTitle className="text-lg">Understanding Exchange Rate Markup</CardTitle>
         </CardHeader>

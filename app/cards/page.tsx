@@ -417,7 +417,7 @@ export default function CardsPage() {
       )}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-[-0.02em] text-slate-900">
             Cards
           </h1>
           <p className="text-gray-600 mt-1 text-sm sm:text-base">
@@ -445,7 +445,7 @@ export default function CardsPage() {
 
       {showForm && (
         <Card ref={formCardRef} className="border-2 border-blue-200 shadow-xl min-w-0 overflow-hidden scroll-mt-20">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+          <CardHeader className="border-b border-[#eef0f3]">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between min-w-0">
               <div className="min-w-0">
                 <CardTitle className="text-xl">
@@ -755,10 +755,10 @@ export default function CardsPage() {
                           }
                         }}
                       >
-                        <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b">
+                        <CardHeader className="border-b border-[#eef0f3] border-b">
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shrink-0">
+                              <div className="w-12 h-12 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0">
                                 <CreditCardIcon className="w-6 h-6 text-white" />
                               </div>
                               <div className="min-w-0">
@@ -840,10 +840,10 @@ export default function CardsPage() {
                     }
                   }}
                 >
-                  <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b">
+                  <CardHeader className="border-b border-[#eef0f3] border-b">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shrink-0">
+                        <div className="w-12 h-12 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0">
                           <CreditCardIcon className="w-6 h-6 text-white" />
                         </div>
                         <div className="min-w-0">

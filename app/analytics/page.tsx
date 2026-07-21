@@ -93,7 +93,7 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6 min-w-0">
       <div className="min-w-0">
-        <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+        <h1 className="text-2xl sm:text-3xl font-semibold tracking-[-0.02em] text-slate-900">
           Analytics & Insights
         </h1>
         <p className="text-gray-600 mt-1 text-sm sm:text-base">
@@ -145,12 +145,12 @@ export default function AnalyticsPage() {
         <Card className="shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Fees</CardTitle>
-            <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
-              <DollarSign className="h-4 w-4 text-purple-600" />
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+              <DollarSign className="h-4 w-4 text-indigo-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-600">${data.summary.totalFees.toFixed(2)}</div>
+            <div className="text-2xl font-bold text-indigo-600">${data.summary.totalFees.toFixed(2)}</div>
             <p className="text-xs text-gray-500 mt-1">USD - Processing & other fees</p>
           </CardContent>
         </Card>
@@ -277,7 +277,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Info Card */}
-      <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200">
+      <Card className="border-b border-[#eef0f3] border-2 border-blue-200">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <AlertCircle className="w-5 h-5 text-blue-600" />

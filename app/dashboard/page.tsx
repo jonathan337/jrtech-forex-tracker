@@ -487,33 +487,33 @@ export default function Dashboard() {
           {item.card.person.name}
         </td>
         <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-700">
+          <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium tabular-nums bg-slate-50 text-slate-700 ring-1 ring-[#eef0f3]">
             ${item.amountUSD.toFixed(2)}
           </span>
         </td>
         <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
           <span
-            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
+            className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium tabular-nums ${
               item.balanceUSD > 0.005
-                ? 'bg-emerald-100 text-emerald-800'
+                ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100'
                 : item.balanceUSD < -0.005
-                  ? 'bg-red-100 text-red-800'
-                  : 'bg-gray-100 text-gray-600'
+                  ? 'bg-rose-50 text-rose-700 ring-1 ring-rose-100'
+                  : 'bg-slate-50 text-slate-500 ring-1 ring-[#eef0f3]'
             }`}
           >
             ${item.balanceUSD.toFixed(2)}
           </span>
         </td>
         <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-amber-100 text-amber-800">
+          <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium tabular-nums bg-slate-50 text-slate-700 ring-1 ring-[#eef0f3]">
             ${item.usageUSD.toFixed(2)}
           </span>
         </td>
         <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
           <span
-            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
+            className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium tabular-nums ${
               item.owedTTD > 0
-                ? 'bg-red-100 text-red-800'
+                ? 'bg-rose-50 text-rose-700 ring-1 ring-rose-100'
                 : 'bg-teal-100 text-teal-800'
             }`}
           >
@@ -526,7 +526,7 @@ export default function Dashboard() {
           </span>
         </td>
         <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-700">
+          <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium tabular-nums bg-slate-50 text-slate-700 ring-1 ring-[#eef0f3]">
             ${item.ttdValue.toFixed(2)}
           </span>
         </td>
@@ -595,7 +595,7 @@ export default function Dashboard() {
     const last4 = item.card.lastFourDigits?.trim()
     return (
       <li key={item.id}>
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+        <div className="rounded-xl border border-[#e6e8ec] bg-white overflow-hidden">
           <div className="p-4">
             <div className="flex items-start justify-between gap-3">
               <button
@@ -648,7 +648,7 @@ export default function Dashboard() {
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-3">
-              <div className="rounded-lg bg-gray-50 px-3 py-2">
+              <div className="rounded-lg bg-slate-50 ring-1 ring-[#eef0f3] px-3 py-2">
                 <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
                   Balance (USD)
                 </div>
@@ -664,7 +664,7 @@ export default function Dashboard() {
                   ${item.balanceUSD.toFixed(2)}
                 </div>
               </div>
-              <div className="rounded-lg bg-gray-50 px-3 py-2">
+              <div className="rounded-lg bg-slate-50 ring-1 ring-[#eef0f3] px-3 py-2">
                 <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
                   Owed (TTD)
                 </div>
@@ -720,10 +720,10 @@ export default function Dashboard() {
     <div className="space-y-6 min-w-0">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between min-w-0">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-[-0.02em] text-slate-900">
             Dashboard
           </h1>
-          <p className="text-gray-600 mt-1 text-sm sm:text-base">
+          <p className="text-slate-500 mt-1 text-sm sm:text-base">
             Track your foreign currency availability
           </p>
         </div>
@@ -750,7 +750,7 @@ export default function Dashboard() {
 
       {/* Default Exchange Rate Card */}
       {exchangeRate && (
-        <Card className="border-l-4 border-l-blue-500 shadow-md bg-gradient-to-r from-blue-50/50 to-indigo-50/50 min-w-0 overflow-hidden">
+        <Card className="min-w-0 overflow-hidden">
           <CardHeader className="pb-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between min-w-0">
               <div className="min-w-0">
@@ -773,15 +773,15 @@ export default function Dashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="bg-white rounded-lg p-6 shadow-sm text-center">
+            <div className="rounded-xl border border-[#eef0f3] bg-slate-50/60 p-6 text-center">
               <p className="text-sm text-gray-600 mb-2">Official/Baseline Rate</p>
-              <p className="text-4xl font-bold text-blue-600 mb-2">
+              <p className="text-4xl font-semibold tabular-nums tracking-[-0.02em] text-slate-900 mb-2">
                 {exchangeRate.selling.toFixed(4)}
               </p>
               <p className="text-sm text-gray-500">TTD per USD</p>
             </div>
-            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-xs text-blue-800">
+            <div className="mt-4 bg-slate-50 border border-[#eef0f3] rounded-xl p-3">
+              <p className="text-xs text-slate-600 leading-relaxed">
                 💡 This is your baseline rate. Any rate above this represents a premium/extra cost for obtaining USD.
                 You can update this in Settings.
               </p>
@@ -791,7 +791,7 @@ export default function Dashboard() {
       )}
 
       {usdCostSummary && (
-        <Card className="border-l-4 border-l-emerald-500 shadow-md bg-gradient-to-r from-emerald-50/50 to-teal-50/50 min-w-0 overflow-hidden">
+        <Card className="min-w-0 overflow-hidden">
           <CardHeader className="pb-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between min-w-0">
               <div className="min-w-0">
@@ -810,16 +810,16 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-3">
-              <div className="bg-white rounded-lg p-4 shadow-sm text-center">
+              <div className="rounded-xl border border-[#eef0f3] bg-slate-50/60 p-4 text-center">
                 <p className="text-xs text-gray-500 mb-1">Blended avg</p>
-                <p className="text-3xl font-bold text-emerald-700 tabular-nums">
+                <p className="text-3xl font-semibold tabular-nums tracking-[-0.02em] text-slate-900">
                   {usdCostSummary.blended.weightedAvgRate != null
                     ? usdCostSummary.blended.weightedAvgRate.toFixed(4)
                     : '—'}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">TTD per USD</p>
               </div>
-              <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="rounded-xl border border-[#eef0f3] bg-slate-50/60 p-4">
                 <p className="text-xs text-gray-500 mb-1">Direct buys</p>
                 <p className="text-xl font-semibold tabular-nums">
                   {usdCostSummary.directPurchases.weightedAvgRate != null
@@ -830,7 +830,7 @@ export default function Dashboard() {
                   ${usdCostSummary.directPurchases.totalUSD.toFixed(2)} USD
                 </p>
               </div>
-              <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="rounded-xl border border-[#eef0f3] bg-slate-50/60 p-4">
                 <p className="text-xs text-gray-500 mb-1">Projected cards</p>
                 <p className="text-xl font-semibold tabular-nums">
                   {usdCostSummary.projectedCards.weightedAvgRate != null
@@ -855,62 +855,62 @@ export default function Dashboard() {
       ) : summary ? (
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <Card className="shadow-md hover:shadow-lg transition-shadow border-l-4 border-l-green-500">
+            <Card className="transition-shadow hover:shadow-[0_2px_8px_rgba(15,23,42,0.06)]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
+                <CardTitle className="text-[13px] font-medium text-slate-500">
                   Total USD available
                 </CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
-                  <DollarSign className="h-4 w-4 text-green-600" />
+                <div className="w-8 h-8 rounded-lg bg-slate-50 ring-1 ring-[#eef0f3] flex items-center justify-center">
+                  <DollarSign className="h-4 w-4 text-slate-400" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">
+                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-slate-900">
                   ${summary.totalUSD.toFixed(2)}
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-slate-400 mt-1">
                   Sum of all card availability amounts in USD
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="shadow-md hover:shadow-lg transition-shadow border-l-4 border-l-amber-500">
+            <Card className="transition-shadow hover:shadow-[0_2px_8px_rgba(15,23,42,0.06)]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
+                <CardTitle className="text-[13px] font-medium text-slate-500">
                   Total USD balance
                 </CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
-                  <Wallet className="h-4 w-4 text-amber-700" />
+                <div className="w-8 h-8 rounded-lg bg-slate-50 ring-1 ring-[#eef0f3] flex items-center justify-center">
+                  <Wallet className="h-4 w-4 text-slate-400" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-amber-700">
+                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-slate-900">
                   ${(summary.totalUSD - summary.totalUsedUSD).toFixed(2)}
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-slate-400 mt-1">
                   USD available minus USD usage this month
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="shadow-md hover:shadow-lg transition-shadow border-l-4 border-l-teal-500">
+            <Card className="transition-shadow hover:shadow-[0_2px_8px_rgba(15,23,42,0.06)]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
+                <CardTitle className="text-[13px] font-medium text-slate-500">
                   Total TTD owed to people
                 </CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
-                  <Scale className="h-4 w-4 text-teal-700" />
+                <div className="w-8 h-8 rounded-lg bg-slate-50 ring-1 ring-[#eef0f3] flex items-center justify-center">
+                  <Scale className="h-4 w-4 text-slate-400" />
                 </div>
               </CardHeader>
               <CardContent>
                 <div
-                  className={`text-2xl font-bold ${
-                    totalOwedToPeopleTTD > 0 ? 'text-red-600' : 'text-teal-700'
+                  className={`text-2xl font-semibold tabular-nums tracking-[-0.01em] ${
+                    totalOwedToPeopleTTD > 0 ? 'text-rose-600' : 'text-slate-900'
                   }`}
                 >
                   ${totalOwedToPeopleTTD.toFixed(2)}
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-slate-400 mt-1">
                   Sum of all people balances (TTD only)
                 </p>
               </CardContent>
@@ -918,62 +918,62 @@ export default function Dashboard() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <Card className="shadow-md hover:shadow-lg transition-shadow">
+            <Card className="transition-shadow hover:shadow-[0_2px_8px_rgba(15,23,42,0.06)]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
+                <CardTitle className="text-[13px] font-medium text-slate-500">
                   Total cards available
                 </CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                  <CreditCard className="h-4 w-4 text-purple-600" />
+                <div className="w-8 h-8 rounded-lg bg-slate-50 ring-1 ring-[#eef0f3] flex items-center justify-center">
+                  <CreditCard className="h-4 w-4 text-slate-400" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-purple-600">{summary.totalCards}</div>
-                <p className="text-xs text-gray-500">
+                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-slate-900">{summary.totalCards}</div>
+                <p className="text-xs text-slate-400 mt-1">
                   Cards with availability this month
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="shadow-md hover:shadow-lg transition-shadow">
+            <Card className="transition-shadow hover:shadow-[0_2px_8px_rgba(15,23,42,0.06)]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
+                <CardTitle className="text-[13px] font-medium text-slate-500">
                   Average exchange rate
                 </CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                  <TrendingUp className="h-4 w-4 text-blue-600" />
+                <div className="w-8 h-8 rounded-lg bg-slate-50 ring-1 ring-[#eef0f3] flex items-center justify-center">
+                  <TrendingUp className="h-4 w-4 text-slate-400" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-blue-600">
+                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-slate-900">
                   {summary.averageRate.toFixed(2)}
                 </div>
-                <p className="text-xs text-gray-500">TTD per USD</p>
+                <p className="text-xs text-slate-400 mt-1">TTD per USD</p>
               </CardContent>
             </Card>
 
-            <Card className="shadow-md hover:shadow-lg transition-shadow">
+            <Card className="transition-shadow hover:shadow-[0_2px_8px_rgba(15,23,42,0.06)]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
+                <CardTitle className="text-[13px] font-medium text-slate-500">
                   Total TTD required
                 </CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
-                  <DollarSign className="h-4 w-4 text-indigo-600" />
+                <div className="w-8 h-8 rounded-lg bg-slate-50 ring-1 ring-[#eef0f3] flex items-center justify-center">
+                  <DollarSign className="h-4 w-4 text-slate-400" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-indigo-600">
+                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-slate-900">
                   ${summary.totalTTD.toFixed(2)}
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-slate-400 mt-1">
                   TTD needed to cover all logged USD usage at each card&apos;s rate
                 </p>
               </CardContent>
             </Card>
           </div>
 
-          <Card className="shadow-md border-t-4 border-t-blue-500 min-w-0">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+          <Card className="min-w-0">
+            <CardHeader className="border-b border-[#eef0f3]">
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
@@ -1050,7 +1050,7 @@ export default function Dashboard() {
                     </label>
                   </div>
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-slate-400 mt-1">
                   Search narrows the table and quick-log card list by owner name or card digits
                   (stored last 4 or digits in the nickname). Click a card name to expand full usage
                   history (all months). Use Log to add usage for {monthName} without leaving the
@@ -1254,38 +1254,38 @@ export default function Dashboard() {
                   <div className="hidden md:block -mx-1 overflow-x-auto sm:mx-0 touch-pan-x pb-3 sm:pb-4">
                     <table className="w-full min-w-[62rem] text-sm">
                       <thead>
-                        <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-blue-200">
-                          <th className="text-left py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                        <tr className="bg-slate-50/70 border-b border-[#e6e8ec]">
+                          <th className="text-left py-3 px-3 sm:py-4 sm:px-6 font-medium text-slate-500 uppercase text-[11px] tracking-[0.06em]">
                             Card
                           </th>
-                          <th className="text-left py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                          <th className="text-left py-3 px-3 sm:py-4 sm:px-6 font-medium text-slate-500 uppercase text-[11px] tracking-[0.06em]">
                             Owner
                           </th>
-                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-medium text-slate-500 uppercase text-[11px] tracking-[0.06em]">
                             Available (USD)
                           </th>
-                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-medium text-slate-500 uppercase text-[11px] tracking-[0.06em]">
                             Balance (USD)
                           </th>
-                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-medium text-slate-500 uppercase text-[11px] tracking-[0.06em]">
                             Used (USD)
                           </th>
-                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-medium text-slate-500 uppercase text-[11px] tracking-[0.06em]">
                             Owed (TTD)
                           </th>
-                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-medium text-slate-500 uppercase text-[11px] tracking-[0.06em]">
                             Rate
                           </th>
-                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-medium text-slate-500 uppercase text-[11px] tracking-[0.06em]">
                             TTD Value
                           </th>
-                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-medium text-slate-500 uppercase text-[11px] tracking-[0.06em]">
                             Fee (TTD)
                           </th>
-                          <th className="text-left py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider whitespace-nowrap">
+                          <th className="text-left py-3 px-3 sm:py-4 sm:px-6 font-medium text-slate-500 uppercase text-[11px] tracking-[0.06em] whitespace-nowrap">
                             Pay date
                           </th>
-                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-semibold text-gray-700 uppercase text-xs tracking-wider">
+                          <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-medium text-slate-500 uppercase text-[11px] tracking-[0.06em]">
                             Actions
                           </th>
                         </tr>
@@ -1297,7 +1297,7 @@ export default function Dashboard() {
                               return [
                               <tr
                                 key={`owner-${owner.ownerId}`}
-                                className="bg-slate-100/95 border-y border-slate-200"
+                                className="bg-slate-50 border-y border-[#e6e8ec]"
                               >
                                 <td
                                   colSpan={11}
