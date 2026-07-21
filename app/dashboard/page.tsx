@@ -773,15 +773,15 @@ export default function Dashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="rounded-xl border border-[#eef0f3] bg-slate-50/60 p-6 text-center">
-              <p className="text-sm text-gray-600 mb-2">Official/Baseline Rate</p>
-              <p className="text-4xl font-semibold tabular-nums tracking-[-0.02em] text-slate-900 mb-2">
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-6 text-center">
+              <p className="text-[13px] font-medium text-slate-500 mb-2">Official/Baseline Rate</p>
+              <p className="text-4xl font-semibold tabular-nums tracking-[-0.02em] text-indigo-700 mb-2">
                 {exchangeRate.selling.toFixed(4)}
               </p>
-              <p className="text-sm text-gray-500">TTD per USD</p>
+              <p className="text-[13px] text-slate-500">TTD per USD</p>
             </div>
-            <div className="mt-4 bg-slate-50 border border-[#eef0f3] rounded-xl p-3">
-              <p className="text-xs text-slate-600 leading-relaxed">
+            <div className="mt-4 bg-amber-50/60 border border-amber-100 rounded-xl p-3">
+              <p className="text-xs text-amber-900/80 leading-relaxed">
                 💡 This is your baseline rate. Any rate above this represents a premium/extra cost for obtaining USD.
                 You can update this in Settings.
               </p>
@@ -810,34 +810,34 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-xl border border-[#eef0f3] bg-slate-50/60 p-4 text-center">
-                <p className="text-xs text-gray-500 mb-1">Blended avg</p>
-                <p className="text-3xl font-semibold tabular-nums tracking-[-0.02em] text-slate-900">
+              <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 text-center">
+                <p className="text-xs font-medium text-slate-500 mb-1">Blended avg</p>
+                <p className="text-3xl font-semibold tabular-nums tracking-[-0.02em] text-indigo-700">
                   {usdCostSummary.blended.weightedAvgRate != null
                     ? usdCostSummary.blended.weightedAvgRate.toFixed(4)
                     : '—'}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">TTD per USD</p>
+                <p className="text-xs text-slate-500 mt-1">TTD per USD</p>
               </div>
               <div className="rounded-xl border border-[#eef0f3] bg-slate-50/60 p-4">
-                <p className="text-xs text-gray-500 mb-1">Direct buys</p>
+                <p className="text-xs font-medium text-slate-500 mb-1">Direct buys</p>
                 <p className="text-xl font-semibold tabular-nums">
                   {usdCostSummary.directPurchases.weightedAvgRate != null
                     ? usdCostSummary.directPurchases.weightedAvgRate.toFixed(4)
                     : '—'}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   ${usdCostSummary.directPurchases.totalUSD.toFixed(2)} USD
                 </p>
               </div>
               <div className="rounded-xl border border-[#eef0f3] bg-slate-50/60 p-4">
-                <p className="text-xs text-gray-500 mb-1">Projected cards</p>
+                <p className="text-xs font-medium text-slate-500 mb-1">Projected cards</p>
                 <p className="text-xl font-semibold tabular-nums">
                   {usdCostSummary.projectedCards.weightedAvgRate != null
                     ? usdCostSummary.projectedCards.weightedAvgRate.toFixed(4)
                     : '—'}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   ${usdCostSummary.projectedCards.totalUSD.toFixed(2)} USD access
                   {' · '}incl.{' '}
                   {(usdCostSummary.cardProcessingFeeRate * 100).toFixed(1)}% fee
@@ -860,12 +860,12 @@ export default function Dashboard() {
                 <CardTitle className="text-[13px] font-medium text-slate-500">
                   Total USD available
                 </CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-slate-50 ring-1 ring-[#eef0f3] flex items-center justify-center">
-                  <DollarSign className="h-4 w-4 text-slate-400" />
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 ring-1 ring-emerald-100 flex items-center justify-center">
+                  <DollarSign className="h-4 w-4 text-emerald-600" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-slate-900">
+                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-emerald-700">
                   ${summary.totalUSD.toFixed(2)}
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
@@ -879,12 +879,12 @@ export default function Dashboard() {
                 <CardTitle className="text-[13px] font-medium text-slate-500">
                   Total USD balance
                 </CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-slate-50 ring-1 ring-[#eef0f3] flex items-center justify-center">
-                  <Wallet className="h-4 w-4 text-slate-400" />
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 ring-1 ring-emerald-100 flex items-center justify-center">
+                  <Wallet className="h-4 w-4 text-emerald-600" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-slate-900">
+                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-emerald-700">
                   ${(summary.totalUSD - summary.totalUsedUSD).toFixed(2)}
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
@@ -898,8 +898,8 @@ export default function Dashboard() {
                 <CardTitle className="text-[13px] font-medium text-slate-500">
                   Total TTD owed to people
                 </CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-slate-50 ring-1 ring-[#eef0f3] flex items-center justify-center">
-                  <Scale className="h-4 w-4 text-slate-400" />
+                <div className="w-8 h-8 rounded-lg bg-rose-50 ring-1 ring-rose-100 flex items-center justify-center">
+                  <Scale className="h-4 w-4 text-rose-600" />
                 </div>
               </CardHeader>
               <CardContent>
@@ -923,8 +923,8 @@ export default function Dashboard() {
                 <CardTitle className="text-[13px] font-medium text-slate-500">
                   Total cards available
                 </CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-slate-50 ring-1 ring-[#eef0f3] flex items-center justify-center">
-                  <CreditCard className="h-4 w-4 text-slate-400" />
+                <div className="w-8 h-8 rounded-lg bg-slate-50 ring-1 ring-slate-100 flex items-center justify-center">
+                  <CreditCard className="h-4 w-4 text-slate-500" />
                 </div>
               </CardHeader>
               <CardContent>
@@ -940,12 +940,12 @@ export default function Dashboard() {
                 <CardTitle className="text-[13px] font-medium text-slate-500">
                   Average exchange rate
                 </CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-slate-50 ring-1 ring-[#eef0f3] flex items-center justify-center">
-                  <TrendingUp className="h-4 w-4 text-slate-400" />
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 ring-1 ring-indigo-100 flex items-center justify-center">
+                  <TrendingUp className="h-4 w-4 text-indigo-600" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-slate-900">
+                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-indigo-700">
                   {summary.averageRate.toFixed(2)}
                 </div>
                 <p className="text-xs text-slate-400 mt-1">TTD per USD</p>
@@ -957,12 +957,12 @@ export default function Dashboard() {
                 <CardTitle className="text-[13px] font-medium text-slate-500">
                   Total TTD required
                 </CardTitle>
-                <div className="w-8 h-8 rounded-lg bg-slate-50 ring-1 ring-[#eef0f3] flex items-center justify-center">
-                  <DollarSign className="h-4 w-4 text-slate-400" />
+                <div className="w-8 h-8 rounded-lg bg-amber-50 ring-1 ring-amber-100 flex items-center justify-center">
+                  <DollarSign className="h-4 w-4 text-amber-600" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-slate-900">
+                <div className="text-2xl font-semibold tabular-nums tracking-[-0.01em] text-amber-700">
                   ${summary.totalTTD.toFixed(2)}
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
