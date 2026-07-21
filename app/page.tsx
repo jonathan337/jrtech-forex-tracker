@@ -12,7 +12,7 @@ export default function LandingPage() {
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 mb-8">
             <span className="text-white font-bold text-3xl">FX</span>
           </div>
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent px-1">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-[-0.03em] mb-6 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent px-1">
             Foreign Currency Payment Tracker
           </h1>
           <p className="text-lg sm:text-xl text-gray-600 mb-8 max-w-3xl mx-auto px-1">
@@ -37,7 +37,7 @@ export default function LandingPage() {
       {/* Features Section */}
       <section className="py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">Everything You Need to Manage Foreign Currency</h2>
+          <h2 className="text-3xl font-bold tabular-nums text-center mb-12">Everything You Need to Manage Foreign Currency</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             <Card className="border-2 hover:shadow-lg transition-shadow">
               <CardHeader>
@@ -117,7 +117,7 @@ export default function LandingPage() {
       {/* How It Works Section */}
       <section className="py-20 px-4">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">How It Works</h2>
+          <h2 className="text-3xl font-bold tabular-nums text-center mb-12">How It Works</h2>
           <div className="space-y-8">
             <div className="flex gap-6 items-start">
               <div className="flex-shrink-0 w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xl">
@@ -173,7 +173,7 @@ export default function LandingPage() {
       {/* CTA Section */}
       <section className="py-20 px-4 bg-gradient-to-r from-blue-600 to-indigo-600">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl font-bold text-white mb-6">
+          <h2 className="text-4xl font-bold tabular-nums text-white mb-6">
             Ready to Streamline Your Foreign Currency Management?
           </h2>
           <p className="text-xl text-blue-100 mb-8">

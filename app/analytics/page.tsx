@@ -93,7 +93,7 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6 min-w-0">
       <div className="min-w-0">
-        <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.02em] bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
           Analytics & Insights
         </h1>
         <p className="text-gray-600 mt-1 text-sm sm:text-base">
@@ -111,7 +111,7 @@ export default function AnalyticsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">${data.summary.totalUSD.toFixed(2)}</div>
+            <div className="text-2xl font-bold tabular-nums text-green-600">${data.summary.totalUSD.toFixed(2)}</div>
             <p className="text-xs text-gray-500 mt-1">Total foreign currency obtained</p>
           </CardContent>
         </Card>
@@ -124,7 +124,7 @@ export default function AnalyticsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">${data.summary.totalExtraCost.toFixed(2)}</div>
+            <div className="text-2xl font-bold tabular-nums text-red-600">${data.summary.totalExtraCost.toFixed(2)}</div>
             <p className="text-xs text-gray-500 mt-1">TTD - Beyond default rate</p>
           </CardContent>
         </Card>
@@ -137,7 +137,7 @@ export default function AnalyticsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{data.summary.avgPremiumPercentage.toFixed(2)}%</div>
+            <div className="text-2xl font-bold tabular-nums text-orange-600">{data.summary.avgPremiumPercentage.toFixed(2)}%</div>
             <p className="text-xs text-gray-500 mt-1">Above default rate of {data.summary.defaultRate.toFixed(4)}</p>
           </CardContent>
         </Card>
@@ -150,7 +150,7 @@ export default function AnalyticsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-600">${data.summary.totalFees.toFixed(2)}</div>
+            <div className="text-2xl font-bold tabular-nums text-purple-600">${data.summary.totalFees.toFixed(2)}</div>
             <p className="text-xs text-gray-500 mt-1">USD - Processing & other fees</p>
           </CardContent>
         </Card>

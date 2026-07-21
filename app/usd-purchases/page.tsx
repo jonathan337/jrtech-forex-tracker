@@ -215,7 +215,7 @@ export default function UsdPurchasesPage() {
     <div className="space-y-6 min-w-0">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.02em] bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
             USD Buys
           </h1>
           <p className="text-gray-600 mt-1 text-sm sm:text-base">
@@ -263,7 +263,7 @@ export default function UsdPurchasesPage() {
               <CardDescription>Direct buys + projected card access</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold text-emerald-700 tabular-nums">
+              <p className="text-3xl font-bold tabular-nums text-emerald-700 tabular-nums">
                 {fmtRate(summary.blended.weightedAvgRate)}
               </p>
               <p className="text-xs text-gray-500 mt-1">TTD per USD</p>
@@ -280,7 +280,7 @@ export default function UsdPurchasesPage() {
               <CardDescription>Cash, Zelle, wire</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold text-gray-900 tabular-nums">
+              <p className="text-2xl font-bold tabular-nums text-gray-900 tabular-nums">
                 {fmtRate(summary.directPurchases.weightedAvgRate)}
               </p>
               <p className="text-xs text-gray-500 mt-1">
@@ -299,7 +299,7 @@ export default function UsdPurchasesPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold text-gray-900 tabular-nums">
+              <p className="text-2xl font-bold tabular-nums text-gray-900 tabular-nums">
                 {fmtRate(summary.projectedCards.weightedAvgRate)}
               </p>
               <p className="text-xs text-gray-500 mt-1">

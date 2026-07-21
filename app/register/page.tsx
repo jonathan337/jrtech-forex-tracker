@@ -73,7 +73,7 @@ export default function RegisterPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 mb-4">
             <DollarSign className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">FX Payment Tracker</h1>
+          <h1 className="text-3xl font-bold tabular-nums text-gray-900">FX Payment Tracker</h1>
           <p className="mt-2 text-gray-600">Create an account to get started</p>
         </div>
 

@@ -120,7 +120,7 @@ function VerifyEmailContent() {
           <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br ${getStatusColor()} mb-4`}>
             {getStatusIcon()}
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Email Verification</h1>
+          <h1 className="text-3xl font-bold tabular-nums text-gray-900">Email Verification</h1>
           <p className="mt-2 text-gray-600">
             {status === 'idle' && 'Verify your email address to complete registration'}
             {status === 'verifying' && 'Verifying your email...'}

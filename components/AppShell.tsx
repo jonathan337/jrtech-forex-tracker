@@ -40,7 +40,7 @@ function Logo() {
       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shrink-0">
         <span className="text-white font-bold text-sm">FX</span>
       </div>
-      <span className="text-lg font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent truncate">
+      <span className="text-lg font-bold tracking-[-0.01em] bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent truncate">
         FX Tracker
       </span>
     </Link>

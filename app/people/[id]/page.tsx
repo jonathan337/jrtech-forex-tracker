@@ -757,7 +757,7 @@ export default function PersonDashboardPage() {
             <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden />
             People
           </Link>
-          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.02em] bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
             {loadError ? 'Person' : displayName}
           </h1>
           <p className="text-gray-600 text-sm sm:text-base">
@@ -810,7 +810,7 @@ export default function PersonDashboardPage() {
           <CardContent>
             <div className="bg-white rounded-lg p-6 shadow-sm text-center">
               <p className="text-sm text-gray-600 mb-2">Official/Baseline Rate</p>
-              <p className="text-4xl font-bold text-blue-600 mb-2">
+              <p className="text-4xl font-bold tabular-nums text-blue-600 mb-2">
                 {exchangeRate.selling.toFixed(4)}
               </p>
               <p className="text-sm text-gray-500">TTD per USD</p>
@@ -845,7 +845,7 @@ export default function PersonDashboardPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">
+                <div className="text-2xl font-bold tabular-nums text-green-600">
                   ${summary.totalUSD.toFixed(2)}
                 </div>
                 <p className="text-xs text-gray-500">
@@ -864,7 +864,7 @@ export default function PersonDashboardPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-amber-700">
+                <div className="text-2xl font-bold tabular-nums text-amber-700">
                   ${(summary.totalUSD - summary.totalUsedUSD).toFixed(2)}
                 </div>
                 <p className="text-xs text-gray-500">
@@ -908,7 +908,7 @@ export default function PersonDashboardPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-purple-600">{summary.totalCards}</div>
+                <div className="text-2xl font-bold tabular-nums text-purple-600">{summary.totalCards}</div>
                 <p className="text-xs text-gray-500">Cards with availability this month</p>
               </CardContent>
             </Card>
@@ -923,7 +923,7 @@ export default function PersonDashboardPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-blue-600">
+                <div className="text-2xl font-bold tabular-nums text-blue-600">
                   {summary.averageRate.toFixed(2)}
                 </div>
                 <p className="text-xs text-gray-500">TTD per USD (their cards this month)</p>
@@ -940,7 +940,7 @@ export default function PersonDashboardPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-indigo-600">
+                <div className="text-2xl font-bold tabular-nums text-indigo-600">
                   ${summary.totalTTD.toFixed(2)}
                 </div>
                 <p className="text-xs text-gray-500">

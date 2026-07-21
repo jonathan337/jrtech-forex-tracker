@@ -720,7 +720,7 @@ export default function Dashboard() {
     <div className="space-y-6 min-w-0">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between min-w-0">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.02em] bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
             Dashboard
           </h1>
           <p className="text-gray-600 mt-1 text-sm sm:text-base">
@@ -775,7 +775,7 @@ export default function Dashboard() {
           <CardContent>
             <div className="bg-white rounded-lg p-6 shadow-sm text-center">
               <p className="text-sm text-gray-600 mb-2">Official/Baseline Rate</p>
-              <p className="text-4xl font-bold text-blue-600 mb-2">
+              <p className="text-4xl font-bold tabular-nums text-blue-600 mb-2">
                 {exchangeRate.selling.toFixed(4)}
               </p>
               <p className="text-sm text-gray-500">TTD per USD</p>
@@ -812,7 +812,7 @@ export default function Dashboard() {
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="bg-white rounded-lg p-4 shadow-sm text-center">
                 <p className="text-xs text-gray-500 mb-1">Blended avg</p>
-                <p className="text-3xl font-bold text-emerald-700 tabular-nums">
+                <p className="text-3xl font-bold tabular-nums text-emerald-700 tabular-nums">
                   {usdCostSummary.blended.weightedAvgRate != null
                     ? usdCostSummary.blended.weightedAvgRate.toFixed(4)
                     : '—'}
@@ -865,7 +865,7 @@ export default function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">
+                <div className="text-2xl font-bold tabular-nums text-green-600">
                   ${summary.totalUSD.toFixed(2)}
                 </div>
                 <p className="text-xs text-gray-500">
@@ -884,7 +884,7 @@ export default function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-amber-700">
+                <div className="text-2xl font-bold tabular-nums text-amber-700">
                   ${(summary.totalUSD - summary.totalUsedUSD).toFixed(2)}
                 </div>
                 <p className="text-xs text-gray-500">
@@ -928,7 +928,7 @@ export default function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-purple-600">{summary.totalCards}</div>
+                <div className="text-2xl font-bold tabular-nums text-purple-600">{summary.totalCards}</div>
                 <p className="text-xs text-gray-500">
                   Cards with availability this month
                 </p>
@@ -945,7 +945,7 @@ export default function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-blue-600">
+                <div className="text-2xl font-bold tabular-nums text-blue-600">
                   {summary.averageRate.toFixed(2)}
                 </div>
                 <p className="text-xs text-gray-500">TTD per USD</p>
@@ -962,7 +962,7 @@ export default function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-indigo-600">
+                <div className="text-2xl font-bold tabular-nums text-indigo-600">
                   ${summary.totalTTD.toFixed(2)}
                 </div>
                 <p className="text-xs text-gray-500">
