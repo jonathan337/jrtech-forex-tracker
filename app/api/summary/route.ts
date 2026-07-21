@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { loadMonthAvailabilityWithUsage } from '@/lib/month-availability-with-usage'
+import { buildMonthSummary, monthUsageTotals } from '@/lib/month-summary'
 
 export const runtime = 'nodejs'
 
@@ -47,57 +48,22 @@ export async function GET(request: Request) {
       )
     }
 
-    const totalUSD = rows.reduce((sum, item) => sum + item.amountUSD, 0)
-    const totalUsedUSD = personIdParam
-      ? rows.reduce((sum, item) => sum + item.usageUSD, 0)
-      : usageRows.reduce(
-          (sum, u) =>
-            sum +
-            (typeof u.amountUSD === 'number' && Number.isFinite(u.amountUSD)
-              ? u.amountUSD
-              : 0),
-          0
-        )
-    const totalFeesTTD = rows.reduce(
-      (sum, item) => sum + item.impliedFeeTTD,
-      0
-    )
-    const totalFeesUSD = rows.reduce(
-      (sum, item) => sum + item.impliedFeeUSD,
-      0
-    )
-    const averageRate =
-      rows.length > 0
-        ? rows.reduce((sum, item) => sum + item.exchangeRate, 0) /
-          rows.length
-        : 0
+    // Person view scopes usage to that person's cards; the full view counts the
+    // whole month, including usage on cards with no availability row.
+    const { totalUsedUSD, totalUsedTTD } = personIdParam
+      ? {
+          totalUsedUSD: rows.reduce((sum, item) => sum + item.usageUSD, 0),
+          totalUsedTTD: rows.reduce((sum, item) => sum + item.usageTTD, 0),
+        }
+      : monthUsageTotals(usageRows)
 
-    const totalUsedTTD = personIdParam
-      ? rows.reduce((sum, item) => sum + item.usageTTD, 0)
-      : usageRows.reduce((sum, u) => sum + u.amountTTD, 0)
-
-    const totalTTD = rows.reduce((sum, item) => sum + item.ttdValue, 0)
-
-    const netUSD = totalUSD - totalFeesUSD
-    const balanceUSD = totalUSD - totalUsedUSD
-    const balanceTTD = totalTTD - totalUsedTTD
-
-    const summary = {
+    const summary = buildMonthSummary({
       year: y,
       month: m,
-      totalCards: rows.length,
-      totalUSD,
-      totalFeesTTD,
-      totalFeesUSD,
-      averageRate,
-      totalTTD,
-      netUSD,
+      rows,
       totalUsedUSD,
       totalUsedTTD,
-      balanceUSD,
-      balanceTTD,
-      availability: rows,
-    }
+    })
 
     return NextResponse.json(
       personMeta ? { ...summary, person: personMeta } : summary

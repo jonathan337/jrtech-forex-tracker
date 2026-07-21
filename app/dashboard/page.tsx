@@ -232,11 +232,13 @@ export default function Dashboard() {
     return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]))
   }, [balanceFilteredRows, filteredRows, tableSearch])
 
-  const fetchSummaryData = useCallback(
+  // One request for everything the dashboard shows — /api/dashboard computes
+  // the month bundle once server-side instead of four endpoints repeating it.
+  const fetchDashboardData = useCallback(
     async (signal?: AbortSignal) => {
       try {
         const url = new URL(
-          `/api/summary?year=${year}&month=${month}`,
+          `/api/dashboard?year=${year}&month=${month}`,
           window.location.origin
         ).toString()
         const response = await fetch(url, {
@@ -244,91 +246,34 @@ export default function Dashboard() {
           cache: 'no-store',
           signal,
         })
-        if (response.ok) {
-          const data = await response.json()
-          setSummary(data)
-        }
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') return
-        console.error('Error fetching summary:', error)
-      }
-    },
-    [year, month]
-  )
-
-  const fetchDefaultRateData = useCallback(async (signal?: AbortSignal) => {
-    try {
-      const url = new URL('/api/settings', window.location.origin).toString()
-      const response = await fetch(url, {
-        credentials: 'include',
-        cache: 'no-store',
-        signal,
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setExchangeRate({
-          selling: data.defaultExchangeRate,
-          buying: data.defaultExchangeRate,
-          source: 'Your Default Rate',
-          timestamp: new Date().toISOString(),
-        })
-      }
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return
-      console.error('Error fetching default rate:', error)
-    }
-  }, [])
-
-  const fetchPeopleOwedData = useCallback(async (signal?: AbortSignal) => {
-    try {
-      const url = new URL('/api/people', window.location.origin).toString()
-      const response = await fetch(url, {
-        credentials: 'include',
-        cache: 'no-store',
-        signal,
-      })
-      if (!response.ok) {
-        setTotalOwedToPeopleTTD(0)
-        return
-      }
-      const data: unknown = await response.json().catch(() => null)
-      if (!Array.isArray(data)) {
-        setTotalOwedToPeopleTTD(0)
-        return
-      }
-      const total = data.reduce((sum, p) => {
-        const owed = (p as { owedTTD?: unknown }).owedTTD
-        return sum + (typeof owed === 'number' && Number.isFinite(owed) ? owed : 0)
-      }, 0)
-      setTotalOwedToPeopleTTD(total)
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return
-      console.error('Error fetching people owed:', error)
-      setTotalOwedToPeopleTTD(0)
-    }
-  }, [])
-
-  const fetchUsdCostData = useCallback(
-    async (signal?: AbortSignal) => {
-      try {
-        const url = new URL(
-          `/api/usd-purchases?year=${year}&month=${month}`,
-          window.location.origin
-        ).toString()
-        const response = await fetch(url, {
-          credentials: 'include',
-          cache: 'no-store',
-          signal,
-        })
-        if (response.ok) {
-          const data = await response.json()
-          setUsdCostSummary(data.summary ?? null)
-        } else {
+        if (!response.ok) {
           setUsdCostSummary(null)
+          setTotalOwedToPeopleTTD(0)
+          return
+        }
+        const data = await response.json()
+        setSummary(data.summary ?? null)
+        setUsdCostSummary(data.usdCostSummary ?? null)
+        setTotalOwedToPeopleTTD(
+          typeof data.totalOwedToPeopleTTD === 'number' &&
+            Number.isFinite(data.totalOwedToPeopleTTD)
+            ? data.totalOwedToPeopleTTD
+            : 0
+        )
+        if (
+          typeof data.defaultExchangeRate === 'number' &&
+          Number.isFinite(data.defaultExchangeRate)
+        ) {
+          setExchangeRate({
+            selling: data.defaultExchangeRate,
+            buying: data.defaultExchangeRate,
+            source: 'Your Default Rate',
+            timestamp: new Date().toISOString(),
+          })
         }
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return
-        setUsdCostSummary(null)
+        console.error('Error fetching dashboard data:', error)
       }
     },
     [year, month]
@@ -361,12 +306,7 @@ export default function Dashboard() {
     let cancelled = false
     const ac = new AbortController()
     if (!didInitialLoadRef.current) setLoading(true)
-    void Promise.all([
-      fetchSummaryData(ac.signal),
-      fetchDefaultRateData(ac.signal),
-      fetchPeopleOwedData(ac.signal),
-      fetchUsdCostData(ac.signal),
-    ]).finally(() => {
+    void fetchDashboardData(ac.signal).finally(() => {
       if (!cancelled) {
         setLoading(false)
         didInitialLoadRef.current = true
@@ -376,7 +316,7 @@ export default function Dashboard() {
       cancelled = true
       ac.abort()
     }
-  }, [year, month, status, fetchSummaryData, fetchDefaultRateData, fetchPeopleOwedData, fetchUsdCostData])
+  }, [year, month, status, fetchDashboardData])
 
   useDataChanged(() => {
     if (status === 'authenticated') void afterUsageChange()
@@ -406,12 +346,8 @@ export default function Dashboard() {
     )
   }
 
-  const fetchSummary = async () => {
-    await fetchSummaryData()
-  }
-
   const afterUsageChange = async () => {
-    await Promise.all([fetchSummary(), fetchUsdCostData()])
+    await fetchDashboardData()
     setUsageRevision((n) => n + 1)
   }
 

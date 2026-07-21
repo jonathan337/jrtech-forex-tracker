@@ -5,10 +5,6 @@ export default auth((req) => {
   const { pathname } = req.nextUrl
   const isAuthenticated = !!req.auth
   
-  // Public routes that don't require authentication
-  const publicRoutes = ['/', '/login', '/register', '/verify-email', '/api/auth', '/api/register', '/api/verify-email', '/api/resend-verification']
-  const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route))
-  
   // Protected routes that require authentication
   const protectedRoutes = ['/dashboard', '/people', '/cards', '/availability', '/usage', '/payments', '/usd-purchases', '/analytics', '/settings']
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))

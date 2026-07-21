@@ -3,8 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { z } from 'zod'
 import { serverErrorResponse } from '@/lib/api-error'
-import { exchangeRateForUsageMonth } from '@/lib/exchange-rate-for-usage'
 import { loadMonthAvailabilityWithUsage } from '@/lib/month-availability-with-usage'
+import { loadOwedByPerson } from '@/lib/owed-by-person'
 import {
   mapPersonPhoneForResponse,
   parsePersonRequestBody,
@@ -31,113 +31,30 @@ export async function GET(request: Request) {
       budgetMonth = now.getMonth() + 1
     }
 
-    const [people, usageRows, baselineRow, monthBundle] = await Promise.all([
-      prisma.person.findMany({
-        where: {
-          userId: session.user.id,
-        },
-        include: {
-          cards: {
-            select: {
-              id: true,
-              cardNickname: true,
-              issuingBank: true,
+    // Owed totals are aggregated in the database (see lib/owed-by-person.ts) —
+    // the previous implementation fetched every CardUsage row ever recorded.
+    const [people, monthBundle, { owedTTDByPerson, owedUSDByPerson }] =
+      await Promise.all([
+        prisma.person.findMany({
+          where: {
+            userId: session.user.id,
+          },
+          include: {
+            cards: {
+              select: {
+                id: true,
+                cardNickname: true,
+                issuingBank: true,
+              },
             },
           },
-        },
-        orderBy: {
-          name: 'asc',
-        },
-      }),
-      prisma.cardUsage.findMany({
-        where: {
-          card: {
-            person: {
-              userId: session.user.id,
-            },
+          orderBy: {
+            name: 'asc',
           },
-        },
-        select: {
-          amountUSD: true,
-          amountTTD: true,
-          paidToOwnerTTD: true,
-          year: true,
-          month: true,
-          cardId: true,
-          card: {
-            select: {
-              personId: true,
-              alwaysAvailable: true,
-              recurringExchangeRate: true,
-            },
-          },
-        },
-      }),
-      prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { defaultExchangeRate: true },
-      }),
-      loadMonthAvailabilityWithUsage(session.user.id, budgetYear, budgetMonth),
-    ])
-
-    const baseline = baselineRow?.defaultExchangeRate ?? 0
-
-    const monthKeys = [
-      ...new Map(
-        usageRows.map((u) => [
-          `${u.cardId}\t${u.year}\t${u.month}`,
-          { cardId: u.cardId, year: u.year, month: u.month },
-        ])
-      ).values(),
-    ]
-
-    const monthlyRates =
-      monthKeys.length === 0
-        ? []
-        : await prisma.monthlyAvailability.findMany({
-            where: { OR: monthKeys },
-            select: {
-              cardId: true,
-              year: true,
-              month: true,
-              exchangeRate: true,
-            },
-          })
-
-    const rateByCardMonth = new Map(
-      monthlyRates.map((m) => [
-        `${m.cardId}\t${m.year}\t${m.month}`,
-        m.exchangeRate,
+        }),
+        loadMonthAvailabilityWithUsage(session.user.id, budgetYear, budgetMonth),
+        loadOwedByPerson(session.user.id),
       ])
-    )
-
-    const owedUSDByPerson = new Map<string, number>()
-    const owedTTDByPerson = new Map<string, number>()
-
-    for (const row of usageRows) {
-      const pid = row.card.personId
-      const rate = exchangeRateForUsageMonth(
-        row.cardId,
-        row.year,
-        row.month,
-        row.card,
-        rateByCardMonth,
-        baseline
-      )
-      if (rate == null || rate <= 0) continue
-
-      // Canonical owed formula:
-      // owedTTD = (usageUSD * card-rate-for-month) - paidToOwnerTTD
-      const usageUSD =
-        typeof row.amountUSD === 'number' && Number.isFinite(row.amountUSD)
-          ? row.amountUSD
-          : row.amountTTD / rate
-      const owedTTD = usageUSD * rate - row.paidToOwnerTTD
-      if (owedTTD <= 0.005) continue
-
-      owedTTDByPerson.set(pid, (owedTTDByPerson.get(pid) ?? 0) + owedTTD)
-      owedUSDByPerson.set(pid, (owedUSDByPerson.get(pid) ?? 0) + owedTTD / rate)
-    }
 
     const round2 = (n: number) => Math.round(n * 100) / 100
 

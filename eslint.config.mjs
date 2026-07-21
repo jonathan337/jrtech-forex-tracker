@@ -18,6 +18,8 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      // Plain-Node CommonJS entrypoint, run outside the Next.js toolchain.
+      "server.js",
     ],
   },
 ];

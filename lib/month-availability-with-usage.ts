@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { buildRecurringAvailabilityEntry } from '@/lib/recurring-availability'
 import { ratePremiumTtd, ratePremiumUsd } from '@/lib/rate-premium'
+import { DEFAULT_CARD_PROCESSING_FEE_PCT } from '@/lib/card-processing-fee'
 
 export type MonthUsageRow = {
   cardId: string
@@ -11,45 +12,70 @@ export type MonthUsageRow = {
 
 /**
  * Same availability + usage math as the Dashboard summary for one calendar month.
+ *
+ * All queries run in a single parallel wave — with a remote database (Supabase
+ * pooler) each round trip is expensive, so query count and sequencing dominate
+ * this function's latency. Availability/usage rows are scoped to the user by
+ * filtering through the card→person relation instead of pre-fetching card IDs.
  */
 export async function loadMonthAvailabilityWithUsage(
   userId: string,
   y: number,
   m: number
 ) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { defaultExchangeRate: true },
-  })
-  const baseline = user?.defaultExchangeRate ?? 0
-
-  const userCards = await prisma.card.findMany({
-    where: {
-      person: {
-        userId,
+  const [user, explicit, recurringCards, usageRows] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { defaultExchangeRate: true, cardProcessingFeePct: true },
+    }),
+    prisma.monthlyAvailability.findMany({
+      where: {
+        year: y,
+        month: m,
+        card: { person: { userId } },
       },
-    },
-    select: { id: true },
-  })
-
-  const cardIds = userCards.map((c) => c.id)
-
-  const explicit = await prisma.monthlyAvailability.findMany({
-    where: {
-      year: y,
-      month: m,
-      cardId: {
-        in: cardIds,
-      },
-    },
-    include: {
-      card: {
-        include: {
-          person: true,
+      include: {
+        card: {
+          include: {
+            person: true,
+          },
         },
       },
-    },
-  })
+    }),
+    prisma.card.findMany({
+      where: {
+        person: { userId },
+        alwaysAvailable: true,
+      },
+      include: { person: true },
+    }),
+    prisma.cardUsage
+      .findMany({
+        where: {
+          year: y,
+          month: m,
+          card: { person: { userId } },
+        },
+        select: {
+          cardId: true,
+          amountTTD: true,
+          amountUSD: true,
+          paidToOwnerTTD: true,
+        },
+      })
+      .catch((usageErr): MonthUsageRow[] => {
+        console.error('[month-availability] CardUsage query failed:', usageErr)
+        return []
+      }),
+  ])
+
+  const baseline = user?.defaultExchangeRate ?? 0
+  const cardProcessingFeePct =
+    typeof user?.cardProcessingFeePct === 'number' &&
+    Number.isFinite(user.cardProcessingFeePct) &&
+    user.cardProcessingFeePct >= 0
+      ? user.cardProcessingFeePct
+      : DEFAULT_CARD_PROCESSING_FEE_PCT
 
   // Rows flagged "unavailable" are not real availability — exclude them from the
   // numbers, but still let them suppress recurring availability (see `covered` below).
@@ -59,14 +85,6 @@ export async function loadMonthAvailabilityWithUsage(
       ...item,
       isRecurringTemplate: false as const,
     }))
-
-  const recurringCards = await prisma.card.findMany({
-    where: {
-      person: { userId },
-      alwaysAvailable: true,
-    },
-    include: { person: true },
-  })
 
   const covered = new Set(explicit.map((a) => a.cardId))
 
@@ -80,58 +98,30 @@ export async function loadMonthAvailabilityWithUsage(
       new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()
   )
 
-  let usageRows: MonthUsageRow[] = []
-  try {
-    usageRows = await prisma.cardUsage.findMany({
-      where: {
-        year: y,
-        month: m,
-        cardId: { in: cardIds },
-      },
-      select: {
-        cardId: true,
-        amountTTD: true,
-        amountUSD: true,
-        paidToOwnerTTD: true,
-      },
-    })
-  } catch (usageErr) {
-    console.error('[month-availability] CardUsage query failed:', usageErr)
-  }
-
-  const usageTTDByCard = new Map<string, number>()
+  const usageByCard = new Map<string, MonthUsageRow[]>()
   for (const u of usageRows) {
-    usageTTDByCard.set(
-      u.cardId,
-      (usageTTDByCard.get(u.cardId) ?? 0) + u.amountTTD
-    )
+    const list = usageByCard.get(u.cardId)
+    if (list) list.push(u)
+    else usageByCard.set(u.cardId, [u])
   }
 
   const availabilityWithUsage = availability.map((item) => {
-    const cid = item.cardId
-    const usageTTD = usageTTDByCard.get(cid) ?? 0
+    const cardRows = usageByCard.get(item.cardId) ?? []
+    let usageTTD = 0
+    let usageUSDForCard = 0
+    let owedTTDForCard = 0
+    for (const u of cardRows) {
+      usageTTD += u.amountTTD
+      const usageUSD =
+        typeof u.amountUSD === 'number' && Number.isFinite(u.amountUSD)
+          ? u.amountUSD
+          : u.amountTTD / item.exchangeRate
+      usageUSDForCard += usageUSD
+      const owed = usageUSD * item.exchangeRate - u.paidToOwnerTTD
+      owedTTDForCard += Math.max(0, owed)
+    }
     const availableTTD = item.amountUSD * item.exchangeRate
     const balanceTTD = availableTTD - usageTTD
-    const usageUSDForCard = usageRows
-      .filter((u) => u.cardId === cid)
-      .reduce(
-        (sum, u) =>
-          sum +
-          (typeof u.amountUSD === 'number' && Number.isFinite(u.amountUSD)
-            ? u.amountUSD
-            : u.amountTTD / item.exchangeRate),
-        0
-      )
-    const owedTTDForCard = usageRows
-      .filter((u) => u.cardId === cid)
-      .reduce((sum, u) => {
-        const usageUSD =
-          typeof u.amountUSD === 'number' && Number.isFinite(u.amountUSD)
-            ? u.amountUSD
-            : u.amountTTD / item.exchangeRate
-        const owed = usageUSD * item.exchangeRate - u.paidToOwnerTTD
-        return sum + Math.max(0, owed)
-      }, 0)
     const ttdValue = item.amountUSD * item.exchangeRate
     const balanceUSD = item.amountUSD - usageUSDForCard
     const impliedFeeTTD = ratePremiumTtd(
@@ -157,5 +147,5 @@ export async function loadMonthAvailabilityWithUsage(
     }
   })
 
-  return { baseline, usageRows, availabilityWithUsage }
+  return { baseline, cardProcessingFeePct, usageRows, availabilityWithUsage }
 }

@@ -12,44 +12,35 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's default rate
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { defaultExchangeRate: true },
-    })
+    // Default rate + availability in one parallel wave; availability is scoped
+    // to the user through the card→person relation (no card-ID pre-fetch).
+    const [user, availability] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { defaultExchangeRate: true },
+      }),
+      prisma.monthlyAvailability.findMany({
+        where: {
+          card: {
+            person: {
+              userId: session.user.id,
+            },
+          },
+        },
+        include: {
+          card: {
+            include: {
+              person: true,
+            },
+          },
+        },
+        orderBy: [{ year: 'asc' }, { month: 'asc' }],
+      }),
+    ])
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
-
-    // Get all cards for the user
-    const userCards = await prisma.card.findMany({
-      where: {
-        person: {
-          userId: session.user.id,
-        },
-      },
-      select: { id: true },
-    })
-
-    const cardIds = userCards.map((c) => c.id)
-
-    // Get all availability data
-    const availability = await prisma.monthlyAvailability.findMany({
-      where: {
-        cardId: {
-          in: cardIds,
-        },
-      },
-      include: {
-        card: {
-          include: {
-            person: true,
-          },
-        },
-      },
-      orderBy: [{ year: 'asc' }, { month: 'asc' }],
-    })
 
     // Calculate analytics
     const defaultRate = user.defaultExchangeRate
