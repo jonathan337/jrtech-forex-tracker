@@ -1,48 +1,29 @@
 @import "tailwindcss";
 
-/*
- * The app is light-only. Declaring color-scheme is what stops the browser from
- * painting its dark canvas (and dark form controls / scrollbars) behind the UI
- * when the OS is in dark mode.
- */
 :root {
+  /*
+   * The app is light-only. Without this, a browser in OS dark mode paints its
+   * default dark canvas behind the UI — the body's Tailwind gradient is a
+   * background-image, not a background-color, so it doesn't cover it. This is
+   * purely a dark-mode fix: it changes nothing when the OS is in light mode.
+   */
   color-scheme: light;
-
-  --background: #eef1f5;
-  --surface: #ffffff;
-  --foreground: #0d1220;
-  --muted: #64748b;
-  --border: #dfe4ec;
-  --accent: #2563eb;
+  --foreground: #171717;
 }
 
 @theme inline {
   --color-foreground: var(--foreground);
-  --color-muted: var(--muted);
-  --color-accent: var(--accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 html {
-  background-color: var(--background);
+  background-color: #f9fafb;
 }
 
 body {
-  background-color: var(--background);
   color: var(--foreground);
-  /* Geist is loaded in layout.tsx — this used to hard-code Arial, so the font
-     was downloaded on every page load but never actually used. */
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
-    "Segoe UI", Roboto, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-}
-
-/* Figures line up column-to-column across tables and stat cards. */
-table,
-input[type="number"] {
-  font-variant-numeric: tabular-nums;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
 /* Prevent iOS Safari from zooming the page when focusing form fields. */
@@ -54,15 +35,16 @@ input[type="number"] {
   }
 }
 
+/* Modern finishes */
 ::selection {
-  background: color-mix(in oklab, var(--accent) 18%, transparent);
+  background: rgba(59, 130, 246, 0.18);
 }
 
 select {
   transition: border-color 150ms ease;
 }
 select:hover:not(:disabled) {
-  border-color: #cbd0d8;
+  border-color: #9ca3af;
 }
 
 /* Slim, unobtrusive scrollbars (WebKit) */
@@ -71,21 +53,12 @@ select:hover:not(:disabled) {
   height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.4);
+  background: rgba(148, 163, 184, 0.45);
   border-radius: 9999px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.55);
+  background: rgba(100, 116, 139, 0.6);
 }
 *::-webkit-scrollbar-track {
   background: transparent;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-  }
 }

@@ -239,7 +239,7 @@ export function ChatWidget() {
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Open assistant"
-          className="fixed z-50 bottom-5 left-5 md:bottom-6 md:right-6 md:left-auto h-14 w-14 rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/30 flex items-center justify-center active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+          className="fixed z-50 bottom-5 left-5 md:bottom-6 md:right-6 md:left-auto h-14 w-14 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-600/30 flex items-center justify-center active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
         >
           <MessageCircle className="w-6 h-6" />
         </button>
@@ -255,7 +255,7 @@ export function ChatWidget() {
           aria-label="Assistant"
         >
           {/* Header */}
-          <div className="flex items-center gap-2 px-4 py-3 bg-blue-600 text-white shrink-0">
+          <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white shrink-0">
             <Sparkles className="w-5 h-5" />
             <div className="font-semibold">Assistant</div>
             <button
@@ -304,7 +304,7 @@ export function ChatWidget() {
                   <div
                     className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm break-words ${
                       m.role === 'user'
-                        ? 'bg-blue-600 text-white rounded-br-sm whitespace-pre-wrap'
+                        ? 'bg-indigo-600 text-white rounded-br-sm whitespace-pre-wrap'
                         : 'bg-gray-100 text-gray-800 rounded-bl-sm'
                     }`}
                   >
@@ -389,13 +389,13 @@ export function ChatWidget() {
               onChange={(e) => setInput(e.target.value)}
               placeholder="Type a message…"
               /* 16px on mobile prevents iOS Safari from auto-zooming the page on focus. */
-              className="min-w-0 flex-1 rounded-full border border-gray-300 px-4 py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+              className="min-w-0 flex-1 rounded-full border border-gray-300 px-4 py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
             <button
               type="submit"
               disabled={loading || !input.trim()}
               aria-label="Send"
-              className="h-9 w-9 shrink-0 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 disabled:opacity-50"
+              className="h-9 w-9 shrink-0 rounded-full bg-indigo-600 text-white flex items-center justify-center hover:bg-indigo-700 disabled:opacity-50"
             >
               <Send className="w-4 h-4" />
             </button>

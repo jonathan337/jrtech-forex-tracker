@@ -9,10 +9,10 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="py-14 sm:py-20 px-4">
         <div className="max-w-6xl mx-auto text-center min-w-0">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-blue-600 mb-8">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 mb-8">
             <span className="text-white font-bold text-3xl">FX</span>
           </div>
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-semibold tracking-[-0.03em] text-slate-900 mb-6 px-1">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent px-1">
             Foreign Currency Payment Tracker
           </h1>
           <p className="text-lg sm:text-xl text-gray-600 mb-8 max-w-3xl mx-auto px-1">
@@ -41,8 +41,8 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             <Card className="border-2 hover:shadow-lg transition-shadow">
               <CardHeader>
-                <div className="w-12 h-12 rounded-lg bg-blue-50 flex items-center justify-center mb-4">
-                  <Users className="w-6 h-6 text-blue-600" />
+                <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center mb-4">
+                  <Users className="w-6 h-6 text-purple-600" />
                 </div>
                 <CardTitle>People Management</CardTitle>
                 <CardDescription>
@@ -77,8 +77,8 @@ export default function LandingPage() {
 
             <Card className="border-2 hover:shadow-lg transition-shadow">
               <CardHeader>
-                <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center mb-4">
-                  <TrendingUp className="w-6 h-6 text-blue-600" />
+                <div className="w-12 h-12 rounded-lg bg-indigo-100 flex items-center justify-center mb-4">
+                  <TrendingUp className="w-6 h-6 text-indigo-600" />
                 </div>
                 <CardTitle>Live Exchange Rates</CardTitle>
                 <CardDescription>
@@ -171,7 +171,7 @@ export default function LandingPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-4 bg-blue-600">
+      <section className="py-20 px-4 bg-gradient-to-r from-blue-600 to-indigo-600">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl font-bold text-white mb-6">
             Ready to Streamline Your Foreign Currency Management?

@@ -417,7 +417,7 @@ export default function CardsPage() {
       )}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-[-0.02em] text-slate-900">
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
             Cards
           </h1>
           <p className="text-gray-600 mt-1 text-sm sm:text-base">
@@ -430,7 +430,7 @@ export default function CardsPage() {
               type="checkbox"
               checked={groupByOwner}
               onChange={(e) => setGroupByOwner(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+              className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
             />
             Group by owner
           </label>
@@ -445,7 +445,7 @@ export default function CardsPage() {
 
       {showForm && (
         <Card ref={formCardRef} className="border-2 border-blue-200 shadow-xl min-w-0 overflow-hidden scroll-mt-20">
-          <CardHeader className="border-b border-[#e8ecf3]">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between min-w-0">
               <div className="min-w-0">
                 <CardTitle className="text-xl">
@@ -557,7 +557,7 @@ export default function CardsPage() {
                 />
               </div>
 
-              <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4 space-y-4">
+              <div className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-4 space-y-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -579,7 +579,7 @@ export default function CardsPage() {
                       })
                     }}
                     disabled={saving}
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                    className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                   />
                   <span className="font-medium text-gray-900">
                     Always available (every month)
@@ -592,7 +592,7 @@ export default function CardsPage() {
                 </p>
 
                 {formData.alwaysAvailable && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-blue-100">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-indigo-100">
                     <div>
                       <Label htmlFor="recurringAmountUSD">Amount (USD) *</Label>
                       <Input
@@ -755,10 +755,10 @@ export default function CardsPage() {
                           }
                         }}
                       >
-                        <CardHeader className="border-b border-[#e8ecf3] border-b">
+                        <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b">
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-12 h-12 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
+                              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shrink-0">
                                 <CreditCardIcon className="w-6 h-6 text-white" />
                               </div>
                               <div className="min-w-0">
@@ -775,7 +775,7 @@ export default function CardsPage() {
                                 )}
                                 <RateBadge card={card} />
                                 {card.alwaysAvailable && (
-                                  <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                                  <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
                                     Every month
                                   </span>
                                 )}
@@ -840,10 +840,10 @@ export default function CardsPage() {
                     }
                   }}
                 >
-                  <CardHeader className="border-b border-[#e8ecf3] border-b">
+                  <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-12 h-12 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
+                        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shrink-0">
                           <CreditCardIcon className="w-6 h-6 text-white" />
                         </div>
                         <div className="min-w-0">
@@ -858,7 +858,7 @@ export default function CardsPage() {
                           )}
                           <RateBadge card={card} />
                           {card.alwaysAvailable && (
-                            <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                            <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
                               Every month
                             </span>
                           )}

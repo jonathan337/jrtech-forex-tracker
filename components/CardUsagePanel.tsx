@@ -342,7 +342,7 @@ export function CardUsagePanel({
   const monthName = format(new Date(year, month - 1, 1), 'MMMM yyyy')
 
   return (
-    <div className="px-4 sm:px-6 py-4 bg-slate-50/70 border-t border-slate-200 space-y-4">
+    <div className="px-4 sm:px-6 py-4 bg-gradient-to-b from-slate-50 to-slate-100/80 border-t border-slate-200 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <h4 className="font-semibold text-gray-900 text-sm sm:text-base">
           Usage history — {cardLabel}
@@ -625,7 +625,7 @@ export function CardUsagePanel({
 
       <form
         onSubmit={handleAdd}
-        className="rounded-lg border border-blue-200 bg-white p-4 space-y-3"
+        className="rounded-lg border border-indigo-200 bg-white p-4 space-y-3"
       >
         <p className="text-sm font-medium text-gray-800">
           Add usage for {monthName}

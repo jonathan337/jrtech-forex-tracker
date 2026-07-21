@@ -163,7 +163,7 @@ export default function CardDetailPage() {
             Cards
           </Button>
           <div className="min-w-0">
-            <h1 className="text-2xl sm:text-3xl font-semibold tracking-[-0.02em] text-slate-900 truncate">
+            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent truncate">
               {loading ? 'Card' : card?.cardNickname ?? 'Card'}
             </h1>
             {card && (
@@ -195,7 +195,7 @@ export default function CardDetailPage() {
           <Card className="shadow-md border-l-4 border-l-blue-500">
             <CardHeader>
               <div className="flex items-start gap-3">
-                <div className="w-12 h-12 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
+                <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shrink-0">
                   <CreditCard className="w-6 h-6 text-white" />
                 </div>
                 <div className="min-w-0">
@@ -210,7 +210,7 @@ export default function CardDetailPage() {
                       </span>
                     )}
                     {card.alwaysAvailable && (
-                      <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                      <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
                         Every month (recurring template)
                       </span>
                     )}
@@ -233,7 +233,7 @@ export default function CardDetailPage() {
               {card.alwaysAvailable &&
                 card.recurringAmountUSD != null &&
                 card.recurringExchangeRate != null && (
-                  <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-4 text-sm">
+                  <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-4 text-sm">
                     <p className="font-medium text-gray-900 mb-2">
                       Recurring template
                     </p>
@@ -270,7 +270,7 @@ export default function CardDetailPage() {
           <Card className="shadow-md min-w-0 overflow-hidden">
             <CardHeader>
               <div className="flex items-center gap-2 min-w-0">
-                <Calendar className="w-5 h-5 text-blue-600 shrink-0" />
+                <Calendar className="w-5 h-5 text-purple-600 shrink-0" />
                 <CardTitle className="text-lg min-w-0">Monthly availability entries</CardTitle>
               </div>
               <CardDescription>

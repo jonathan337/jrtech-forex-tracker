@@ -98,9 +98,9 @@ export function PersonAddPaymentPanel({
   }
 
   return (
-    <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50/50 p-4 space-y-3">
+    <div className="mb-4 rounded-lg border border-violet-200 bg-violet-50/50 p-4 space-y-3">
       <div className="flex items-start gap-2">
-        <Banknote className="w-5 h-5 text-blue-700 shrink-0 mt-0.5" aria-hidden />
+        <Banknote className="w-5 h-5 text-violet-700 shrink-0 mt-0.5" aria-hidden />
         <div className="min-w-0 space-y-1">
           <p className="text-sm font-medium text-gray-900">Add payment</p>
           <p className="text-xs text-gray-600 leading-snug">
