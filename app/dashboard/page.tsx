@@ -812,12 +812,29 @@ export default function Dashboard() {
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="bg-white rounded-lg p-4 shadow-sm text-center">
                 <p className="text-xs text-gray-500 mb-1">Blended avg</p>
-                <p className="text-3xl font-bold tabular-nums text-emerald-700 tabular-nums">
+                <p className="text-3xl font-bold tabular-nums text-emerald-700">
                   {usdCostSummary.blended.weightedAvgRate != null
                     ? usdCostSummary.blended.weightedAvgRate.toFixed(4)
                     : '—'}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">TTD per USD</p>
+                {/* The premium over baseline is the number that actually matters
+                    here — it was previously left as mental arithmetic against
+                    the baseline card above. */}
+                {usdCostSummary.blended.weightedAvgRate != null &&
+                exchangeRate?.selling ? (
+                  <p className="text-xs font-semibold text-red-600 mt-1">
+                    +
+                    {(
+                      (usdCostSummary.blended.weightedAvgRate /
+                        exchangeRate.selling -
+                        1) *
+                      100
+                    ).toFixed(1)}
+                    % over baseline
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-500 mt-1">TTD per USD</p>
+                )}
               </div>
               <div className="bg-white rounded-lg p-4 shadow-sm">
                 <p className="text-xs text-gray-500 mb-1">Direct buys</p>
@@ -855,6 +872,9 @@ export default function Dashboard() {
       ) : summary ? (
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {/* Available and balance were two cards telling one story — balance IS
+                available minus usage. One card with a usage bar says both, and
+                shows how far through the month's access you are. */}
             <Card className="shadow-md hover:shadow-lg transition-shadow border-l-4 border-l-green-500">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
@@ -868,8 +888,38 @@ export default function Dashboard() {
                 <div className="text-2xl font-bold tabular-nums text-green-600">
                   ${summary.totalUSD.toFixed(2)}
                 </div>
-                <p className="text-xs text-gray-500">
-                  Sum of all card availability amounts in USD
+                <div className="mt-2.5 h-2 rounded-full bg-gray-100 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-amber-500 transition-[width] duration-300"
+                    style={{
+                      width: `${
+                        summary.totalUSD > 0
+                          ? Math.min(
+                              100,
+                              Math.max(
+                                0,
+                                (summary.totalUsedUSD / summary.totalUSD) * 100
+                              )
+                            )
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  <span className="font-semibold text-amber-700 tabular-nums">
+                    ${(summary.totalUSD - summary.totalUsedUSD).toFixed(2)}
+                  </span>{' '}
+                  balance left
+                  {summary.totalUSD > 0 && (
+                    <>
+                      {' · '}
+                      {((summary.totalUsedUSD / summary.totalUSD) * 100).toFixed(
+                        0
+                      )}
+                      % used this month
+                    </>
+                  )}
                 </p>
               </CardContent>
             </Card>
@@ -877,7 +927,7 @@ export default function Dashboard() {
             <Card className="shadow-md hover:shadow-lg transition-shadow border-l-4 border-l-amber-500">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Total USD balance
+                  Total USD used
                 </CardTitle>
                 <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
                   <Wallet className="h-4 w-4 text-amber-700" />
@@ -885,10 +935,10 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold tabular-nums text-amber-700">
-                  ${(summary.totalUSD - summary.totalUsedUSD).toFixed(2)}
+                  ${summary.totalUsedUSD.toFixed(2)}
                 </div>
                 <p className="text-xs text-gray-500">
-                  USD available minus USD usage this month
+                  Logged USD usage across all cards this month
                 </p>
               </CardContent>
             </Card>
