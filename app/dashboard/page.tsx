@@ -161,6 +161,11 @@ export default function Dashboard() {
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
   const [showQuickUsage, setShowQuickUsage] = useState(false)
+  // The quick-log form sits above the availability table. Clicking "Log" on a
+  // row far down the table opened it off-screen, so it looked like the button
+  // did nothing — bumping this scrolls the form into view and focuses it.
+  const quickFormRef = useRef<HTMLFormElement>(null)
+  const [quickFormFocusTick, setQuickFormFocusTick] = useState(0)
   const [quickForm, setQuickForm] = useState({
     cardId: '',
     amountUSD: '',
@@ -288,6 +293,16 @@ export default function Dashboard() {
       return f
     })
   }, [quickCardOptions])
+
+  useEffect(() => {
+    if (!quickFormFocusTick) return
+    const form = quickFormRef.current
+    if (!form) return
+    form.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    // preventScroll so focusing the field doesn't fight the smooth scroll.
+    const amount = document.getElementById('quick-usage-amt')
+    if (amount instanceof HTMLInputElement) amount.focus({ preventScroll: true })
+  }, [quickFormFocusTick])
 
   useEffect(() => {
     setQuickError('')
@@ -431,6 +446,7 @@ export default function Dashboard() {
     setQuickError('')
     setShowQuickUsage(true)
     setExpandedCardId(null)
+    setQuickFormFocusTick((n) => n + 1)
   }
 
   const previousMonth = () => {
@@ -1174,6 +1190,7 @@ export default function Dashboard() {
                     </div>
                     {showQuickUsage && (
                       <form
+                        ref={quickFormRef}
                         onSubmit={handleQuickUsageSubmit}
                         className="rounded-lg border border-indigo-200 bg-indigo-50/40 p-4 space-y-3"
                       >
