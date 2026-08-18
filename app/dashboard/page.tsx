@@ -65,6 +65,8 @@ interface Summary {
     balanceTTD: number
     impliedFeeTTD: number
     impliedFeeUSD: number
+    cycleDay?: number
+    cycleLabel?: string
     card: {
       cardNickname: string
       issuingBank?: string | null
@@ -491,6 +493,11 @@ export default function Dashboard() {
               <span className="text-xs font-normal text-gray-500 break-words">
                 {issuingBankLabel(item.card.issuingBank)}
               </span>
+              {item.cycleLabel ? (
+                <span className="text-[10px] font-medium text-indigo-600 sm:text-xs">
+                  Cycle {item.cycleLabel}
+                </span>
+              ) : null}
             </span>
             {expandedCardId === item.cardId ? (
               <ChevronUp className="w-4 h-4 shrink-0 text-gray-500" />
@@ -640,6 +647,11 @@ export default function Dashboard() {
                   <span className="text-xs text-gray-500 break-words">
                     {item.card.person.name} · {issuingBankLabel(item.card.issuingBank)}
                   </span>
+                  {item.cycleLabel ? (
+                    <span className="text-[10px] font-medium text-indigo-600">
+                      Cycle {item.cycleLabel}
+                    </span>
+                  ) : null}
                 </span>
                 {expanded ? (
                   <ChevronUp className="w-4 h-4 shrink-0 text-gray-500 mt-0.5" />

@@ -26,6 +26,7 @@ import {
   issuingBankLabel,
   type IssuingBankCode,
 } from '@/lib/card-bank'
+import { bankDefaultCycleDay } from '@/lib/card-cycle'
 
 interface Person {
   id: string
@@ -43,6 +44,7 @@ interface CardType {
   recurringExchangeRate: number | null
   recurringPaymentDay: number | null
   recurringNotes: string | null
+  cycleDay: number | null
   person: Person
   monthlyAvailability: Array<{
     id: string
@@ -92,6 +94,7 @@ const emptyForm = () => ({
   recurringExchangeRate: '',
   recurringPaymentDay: '',
   recurringNotes: '',
+  cycleDay: '',
 })
 
 export default function CardsPage() {
@@ -270,6 +273,9 @@ export default function CardsPage() {
       lastFourDigits: formData.lastFourDigits || undefined,
       notes: formData.notes || undefined,
       alwaysAvailable: formData.alwaysAvailable,
+      // Independent of recurring availability — a blank field clears the
+      // override so the card falls back to the bank default cycle day.
+      cycleDay: formData.cycleDay ? parseInt(formData.cycleDay, 10) : null,
     }
     if (!formData.alwaysAvailable) {
       return base
@@ -348,6 +354,7 @@ export default function CardsPage() {
       recurringPaymentDay:
         card.recurringPaymentDay != null ? String(card.recurringPaymentDay) : '',
       recurringNotes: card.recurringNotes || '',
+      cycleDay: card.cycleDay != null ? String(card.cycleDay) : '',
     })
     setShowForm(true)
   }
@@ -542,6 +549,33 @@ export default function CardsPage() {
                   maxLength={4}
                   disabled={saving}
                 />
+              </div>
+              <div>
+                <Label htmlFor="cycleDay">Statement / cycle day</Label>
+                <Input
+                  id="cycleDay"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={31}
+                  value={formData.cycleDay}
+                  onChange={(e) =>
+                    setFormData({ ...formData, cycleDay: e.target.value })
+                  }
+                  placeholder={
+                    formData.issuingBank
+                      ? `${bankDefaultCycleDay(formData.issuingBank)} (${issuingBankLabel(
+                          formData.issuingBank
+                        )} default)`
+                      : '1 (calendar month)'
+                  }
+                  disabled={saving}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Day the card&apos;s USD cycle resets. Leave blank to use the
+                  bank default. Usage is counted against the cycle it falls in,
+                  not the calendar month.
+                </p>
               </div>
               <div>
                 <Label htmlFor="notes">Notes</Label>

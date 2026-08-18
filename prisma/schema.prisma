@@ -58,6 +58,9 @@ model Card {
   recurringExchangeRate  Float?
   recurringPaymentDay    Int?
   recurringNotes         String?
+  /** Statement/forex cycle anchor day (1-31). null = fall back to the bank
+      default (Republic Bank 21, First Citizens 14, others 1 = calendar month). */
+  cycleDay               Int?
   createdAt              DateTime              @default(now())
   updatedAt              DateTime              @updatedAt
   person                 Person                @relation(fields: [personId], references: [id], onDelete: Cascade)

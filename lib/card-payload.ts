@@ -13,6 +13,8 @@ export const cardBodySchema = z
     recurringExchangeRate: z.number().positive().optional(),
     recurringPaymentDay: z.number().int().min(1).max(31).optional(),
     recurringNotes: z.string().optional(),
+    /** Statement/forex cycle day override; null/omitted = bank default. */
+    cycleDay: z.number().int().min(1).max(31).optional().nullable(),
   })
   .superRefine((data, ctx) => {
     if (!data.alwaysAvailable) return
@@ -54,5 +56,6 @@ export function prismaDataFromCardBody(data: CardBodyInput) {
     recurringExchangeRate: on ? data.recurringExchangeRate! : null,
     recurringPaymentDay: on ? data.recurringPaymentDay! : null,
     recurringNotes: on ? (data.recurringNotes || null) : null,
+    cycleDay: data.cycleDay ?? null,
   }
 }
