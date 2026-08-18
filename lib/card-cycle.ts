@@ -62,26 +62,31 @@ function fmt(d: Date): string {
 }
 
 /**
- * The cycle "anchored in" the given calendar month — i.e. the cycle that opens
- * on `cycleDay` of (year, month) and runs until the next month's anchor.
+ * The cycle that CLOSES in the given calendar month — it opens on `cycleDay` of
+ * the previous month and runs until (not including) `cycleDay` of this month.
  *
- * Viewing July with cycleDay 21 -> [Jul 21, Aug 21), labelled "Jul 21 – Aug 20".
- * Availability rows are keyed by (year, month), so this is the window that the
- * (year, month) bucket represents for an off-calendar card.
+ * Viewing August with cycleDay 21 -> [Jul 21, Aug 21), labelled "Jul 21 – Aug 20".
+ * This is the cycle that is *active during* most of August, so on Aug 18 the
+ * default (current month) view shows the cycle your spending is actually in.
+ * Availability rows are keyed by (year, month) and post within this window.
  */
 export function cycleWindowForMonth(
   cycleDay: number,
   year: number,
   month: number
 ): CycleWindow {
-  const start = anchorMidnightUTC(year, month, cycleDay)
-  const nextMonth = month === 12 ? 1 : month + 1
-  const nextYear = month === 12 ? year + 1 : year
-  const end = anchorMidnightUTC(nextYear, nextMonth, cycleDay)
-
   if (isCalendarCycle(cycleDay)) {
-    return { start, end, label: '' }
+    return {
+      start: new Date(Date.UTC(year, month - 1, 1)),
+      end: new Date(Date.UTC(year, month, 1)),
+      label: '',
+    }
   }
+
+  const prevMonth = month === 1 ? 12 : month - 1
+  const prevYear = month === 1 ? year - 1 : year
+  const start = anchorMidnightUTC(prevYear, prevMonth, cycleDay)
+  const end = anchorMidnightUTC(year, month, cycleDay)
 
   // Last included day is the day before `end`.
   const lastDay = new Date(end.getTime() - 86_400_000)
@@ -92,4 +97,25 @@ export function cycleWindowForMonth(
 export function dateInWindow(date: Date, window: CycleWindow): boolean {
   const t = date.getTime()
   return t >= window.start.getTime() && t < window.end.getTime()
+}
+
+/**
+ * The calendar (year, month) whose cycle contains `date`, matching the
+ * "closes in this month" convention above. Used to label a usage row's period
+ * consistently with how the dashboard buckets it. cycleDay 1 = the date's own
+ * calendar month.
+ */
+export function cycleMonthForDate(
+  cycleDay: number,
+  date: Date
+): { year: number; month: number } {
+  const y = date.getUTCFullYear()
+  const m = date.getUTCMonth() + 1
+  if (isCalendarCycle(cycleDay)) return { year: y, month: m }
+  // On/after this month's anchor -> the cycle that closes next month.
+  const anchor = anchorMidnightUTC(y, m, cycleDay)
+  if (date.getTime() >= anchor.getTime()) {
+    return m === 12 ? { year: y + 1, month: 1 } : { year: y, month: m + 1 }
+  }
+  return { year: y, month: m }
 }

@@ -92,10 +92,11 @@ export async function loadMonthAvailabilityWithUsage(
     ;(isCalendarCycle(day) ? calendarCardIds : cycleCardIds).push(cardId)
   }
 
-  // Off-cycle windows anchored in month m all fall within [month m, month m+2),
-  // so fetch that span and filter each card to its exact window below.
-  const spanStart = new Date(Date.UTC(y, m - 1, 1))
-  const spanEnd = new Date(Date.UTC(y, m + 1, 1))
+  // A cycle closing in month m opens in month m-1, so its window falls within
+  // [first of m-1, first of m+1). Fetch that span and filter each card to its
+  // exact window below. (Date.UTC normalizes the month underflow/overflow.)
+  const spanStart = new Date(Date.UTC(y, m - 2, 1))
+  const spanEnd = new Date(Date.UTC(y, m, 1))
 
   const safeUsage = (p: Promise<MonthUsageRow[]>) =>
     p.catch((err): MonthUsageRow[] => {

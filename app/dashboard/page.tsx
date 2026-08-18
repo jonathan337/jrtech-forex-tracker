@@ -597,6 +597,7 @@ export default function Dashboard() {
               onUsageChanged={afterUsageChange}
               usageRevision={usageRevision}
               monthExchangeRate={item.exchangeRate}
+            cycleDay={item.cycleDay}
             />
           </td>
         </tr>
@@ -736,6 +737,7 @@ export default function Dashboard() {
                 onUsageChanged={afterUsageChange}
                 usageRevision={usageRevision}
                 monthExchangeRate={item.exchangeRate}
+              cycleDay={item.cycleDay}
               />
             </div>
           ) : null}

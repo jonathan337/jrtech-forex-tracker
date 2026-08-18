@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Loader2, Trash2, Pencil, CheckCircle2 } from 'lucide-react'
 import { usageAmountPaidSyncFromUsdInputs } from '@/lib/usage-paid-sync'
+import { cycleMonthForDate } from '@/lib/card-cycle'
 
 const MONTHS = [
   'Jan',
@@ -64,6 +65,9 @@ export function CardUsagePanel({
   usageRevision = 0,
   /** Card/month TTD per USD from availability; used to derive TTD from stored USD for legacy rows. */
   monthExchangeRate,
+  /** Effective statement/cycle day; when > 1 the Period column is derived from
+      the usage date's cycle so it matches how the dashboard buckets usage. */
+  cycleDay,
 }: {
   cardId: string
   cardLabel: string
@@ -73,6 +77,7 @@ export function CardUsagePanel({
   /** Increment when usage may have changed from outside this panel (e.g. dashboard quick log). */
   usageRevision?: number
   monthExchangeRate?: number | null
+  cycleDay?: number | null
 }) {
   const [entries, setEntries] = useState<UsageEntryRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -403,7 +408,16 @@ export function CardUsagePanel({
                       </button>
                     </td>
                     <td className="py-2 px-3 text-gray-600">
-                      {MONTHS[u.month - 1]} {u.year}
+                      {(() => {
+                        // Off-cycle cards: label the period by the cycle the
+                        // usage date falls in, matching the dashboard. Calendar
+                        // cards keep the stored (year, month).
+                        const p =
+                          typeof cycleDay === 'number' && cycleDay > 1
+                            ? cycleMonthForDate(cycleDay, new Date(u.usageDate))
+                            : { year: u.year, month: u.month }
+                        return `${MONTHS[p.month - 1]} ${p.year}`
+                      })()}
                     </td>
                     <td className="py-2 px-3 text-right font-medium text-amber-800">
                       <span className="block tabular-nums">
