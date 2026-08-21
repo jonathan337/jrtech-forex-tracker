@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { buildRecurringAvailabilityEntry } from '@/lib/recurring-availability'
 import { ratePremiumTtd, ratePremiumUsd } from '@/lib/rate-premium'
 import { DEFAULT_CARD_PROCESSING_FEE_PCT } from '@/lib/card-processing-fee'
-import { effectiveCycleDay } from '@/lib/card-cycle'
+import { effectiveCycleDay, type BankCycleDays } from '@/lib/card-cycle'
 import { usageTtd, usageUsd } from '@/lib/usage-ttd'
 
 export type MonthUsageRow = {
@@ -32,7 +32,11 @@ export async function loadMonthAvailabilityWithUsage(
   const [user, explicit, recurringCards, usageRowsRaw] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      select: { defaultExchangeRate: true, cardProcessingFeePct: true },
+      select: {
+        defaultExchangeRate: true,
+        cardProcessingFeePct: true,
+        bankCycleDays: true,
+      },
     }),
     prisma.monthlyAvailability.findMany({
       where: { year: y, month: m, card: { person: { userId } } },
@@ -86,14 +90,18 @@ export async function loadMonthAvailabilityWithUsage(
       new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()
   )
 
-  // Effective cycle day per card (explicit override, else 1 = calendar month).
-  // Used only to label each card's reset day — not to bucket usage.
+  // Effective cycle day per card (explicit override, else per-bank config, else
+  // 1 = calendar month). Used to label the reset day and the current-cycle
+  // figure — not to bucket usage.
+  const bankCycleDays = (user?.bankCycleDays ?? null) as BankCycleDays | null
   const cycleDayByCard = new Map<string, number>()
   for (const item of explicitWithFlag) {
-    cycleDayByCard.set(item.cardId, effectiveCycleDay(item.card))
+    cycleDayByCard.set(item.cardId, effectiveCycleDay(item.card, bankCycleDays))
   }
   for (const c of recurringCards) {
-    if (!cycleDayByCard.has(c.id)) cycleDayByCard.set(c.id, effectiveCycleDay(c))
+    if (!cycleDayByCard.has(c.id)) {
+      cycleDayByCard.set(c.id, effectiveCycleDay(c, bankCycleDays))
+    }
   }
 
   const usageByCard = new Map<string, MonthUsageRow[]>()

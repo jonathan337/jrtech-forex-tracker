@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Settings as SettingsIcon, Save } from 'lucide-react'
+import { Settings as SettingsIcon, Save, CalendarClock } from 'lucide-react'
+import { ISSUING_BANK_CODES, ISSUING_BANK_LABELS } from '@/lib/card-bank'
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
@@ -14,6 +15,8 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState(false)
   const [defaultRate, setDefaultRate] = useState('6.7993')
   const [cardFeePct, setCardFeePct] = useState('4.5')
+  // Cycle reset day per issuing bank, as strings for the inputs ('' = the 1st).
+  const [bankCycleDays, setBankCycleDays] = useState<Record<string, string>>({})
 
   useEffect(() => {
     fetchSettings()
@@ -27,6 +30,15 @@ export default function SettingsPage() {
         setDefaultRate(data.defaultExchangeRate.toString())
         if (typeof data.cardProcessingFeePct === 'number') {
           setCardFeePct(data.cardProcessingFeePct.toString())
+        }
+        const cfg = data.bankCycleDays
+        if (cfg && typeof cfg === 'object') {
+          const next: Record<string, string> = {}
+          for (const code of ISSUING_BANK_CODES) {
+            const v = cfg[code]
+            if (typeof v === 'number') next[code] = String(v)
+          }
+          setBankCycleDays(next)
         }
       }
     } catch (error) {
@@ -50,6 +62,13 @@ export default function SettingsPage() {
         body: JSON.stringify({
           defaultExchangeRate: parseFloat(defaultRate),
           cardProcessingFeePct: parseFloat(cardFeePct),
+          bankCycleDays: Object.fromEntries(
+            ISSUING_BANK_CODES.map((code) => {
+              const raw = (bankCycleDays[code] ?? '').trim()
+              const n = raw === '' ? null : parseInt(raw, 10)
+              return [code, n != null && n >= 1 && n <= 31 ? n : null]
+            })
+          ),
         }),
       })
 
@@ -165,6 +184,78 @@ export default function SettingsPage() {
                   <>
                     <Save className="w-4 h-4 mr-2" />
                     Save Settings
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-md w-full max-w-2xl min-w-0 overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center">
+              <CalendarClock className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <CardTitle>Statement cycle day by bank</CardTitle>
+              <CardDescription>
+                When each bank&apos;s USD limit resets. Cards of that bank use it
+                automatically; leave blank for the 1st of the month.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {ISSUING_BANK_CODES.map((code) => (
+                <div key={code}>
+                  <Label htmlFor={`cycle-${code}`}>
+                    {ISSUING_BANK_LABELS[code]}
+                  </Label>
+                  <Input
+                    id={`cycle-${code}`}
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={31}
+                    value={bankCycleDays[code] ?? ''}
+                    onChange={(e) =>
+                      setBankCycleDays((prev) => ({
+                        ...prev,
+                        [code]: e.target.value,
+                      }))
+                    }
+                    placeholder="1 (1st of month)"
+                    className="mt-1"
+                  />
+                </div>
+              ))}
+            </div>
+            <p className="text-sm text-gray-500">
+              This drives each card&apos;s reset date and the &quot;used this
+              cycle&quot; figure. Usage still counts in the calendar month it was
+              logged — a cycle day never moves a charge between months. A per-card
+              override on the card itself takes precedence.
+            </p>
+            {success && (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
+                Settings saved successfully!
+              </div>
+            )}
+            <div className="flex gap-2 pt-4 border-t">
+              <Button type="submit" disabled={saving} className="px-8">
+                {saving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save cycle days
                   </>
                 )}
               </Button>

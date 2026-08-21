@@ -34,3 +34,52 @@ export function effectiveCycleDay(
   if (typeof day === 'number' && day >= 1 && day <= 31) return day
   return bankDefaultCycleDay(card.issuingBank, bankCycleDays)
 }
+
+const MONTHS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+]
+
+/** Clamp a day to a month's length (e.g. 31 in Feb -> 28/29), at UTC midnight. */
+function anchorUTC(year: number, monthIdx0: number, day: number): Date {
+  const lastDay = new Date(Date.UTC(year, monthIdx0 + 1, 0)).getUTCDate()
+  return new Date(Date.UTC(year, monthIdx0, Math.min(day, lastDay)))
+}
+
+export interface CurrentCycle {
+  start: Date
+  /** Exclusive end (next reset). */
+  end: Date
+  /** Whole days from `now` until the next reset. */
+  resetsInDays: number
+  label: string
+}
+
+/**
+ * The statement cycle that contains `now`, for a card resetting on `cycleDay`.
+ * This is a "right now" view of spending power (used this cycle / resets in N
+ * days) and is independent of the calendar-month toggle used for the ledger.
+ */
+export function currentCycleWindow(cycleDay: number, now: Date): CurrentCycle {
+  const y = now.getUTCFullYear()
+  const mIdx = now.getUTCMonth()
+  const thisAnchor = anchorUTC(y, mIdx, cycleDay)
+  let start: Date
+  if (now.getTime() >= thisAnchor.getTime()) {
+    start = thisAnchor
+  } else {
+    start = anchorUTC(y, mIdx - 1, cycleDay) // Date.UTC normalizes underflow
+  }
+  const end = anchorUTC(
+    start.getUTCFullYear(),
+    start.getUTCMonth() + 1,
+    cycleDay
+  )
+  const resetsInDays = Math.max(
+    0,
+    Math.ceil((end.getTime() - now.getTime()) / 86_400_000)
+  )
+  const lastDay = new Date(end.getTime() - 86_400_000)
+  const label = `${MONTHS[start.getUTCMonth()]} ${start.getUTCDate()} – ${MONTHS[lastDay.getUTCMonth()]} ${lastDay.getUTCDate()}`
+  return { start, end, resetsInDays, label }
+}

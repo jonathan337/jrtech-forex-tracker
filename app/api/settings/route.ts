@@ -2,8 +2,18 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { z } from 'zod'
+import { ISSUING_BANK_CODES } from '@/lib/card-bank'
 
 export const runtime = 'nodejs'
+
+// Cycle day per issuing bank; null clears that bank back to the 1st. Keys are
+// validated against known bank codes in the handler (z.record with an enum key
+// would demand every bank be present in Zod v4).
+const bankCycleDaysSchema = z
+  .record(z.string(), z.number().int().min(1).max(31).nullable())
+  .optional()
+
+const KNOWN_BANKS = new Set<string>(ISSUING_BANK_CODES)
 
 const settingsSchema = z.object({
   defaultExchangeRate: z.number().positive('Exchange rate must be positive'),
@@ -12,6 +22,7 @@ const settingsSchema = z.object({
     .min(0, 'Fee cannot be negative')
     .max(25, 'Fee looks too high — enter a percentage like 4.5')
     .optional(),
+  bankCycleDays: bankCycleDaysSchema,
 })
 
 export async function GET() {
@@ -27,6 +38,7 @@ export async function GET() {
         defaultExchangeRate: true,
         cardProcessingFeePct: true,
         businessName: true,
+        bankCycleDays: true,
       },
     })
 
@@ -61,11 +73,21 @@ export async function PUT(request: Request) {
         ...(validatedData.cardProcessingFeePct !== undefined && {
           cardProcessingFeePct: validatedData.cardProcessingFeePct,
         }),
+        ...(validatedData.bankCycleDays !== undefined && {
+          // Keep only known banks with a real day; drop nulls/unknowns so
+          // cleared banks fall back to the 1st.
+          bankCycleDays: Object.fromEntries(
+            Object.entries(validatedData.bankCycleDays).filter(
+              ([k, v]) => typeof v === 'number' && KNOWN_BANKS.has(k)
+            )
+          ),
+        }),
       },
       select: {
         defaultExchangeRate: true,
         cardProcessingFeePct: true,
         businessName: true,
+        bankCycleDays: true,
       },
     })
 

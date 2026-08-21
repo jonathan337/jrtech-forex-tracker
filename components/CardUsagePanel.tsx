@@ -9,6 +9,7 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { Loader2, Trash2, Pencil, CheckCircle2 } from 'lucide-react'
 import { usageAmountPaidSyncFromUsdInputs } from '@/lib/usage-paid-sync'
 import { usageTtd, usageUsd } from '@/lib/usage-ttd'
+import { currentCycleWindow } from '@/lib/card-cycle'
 
 const MONTHS = [
   'Jan',
@@ -57,6 +58,10 @@ export function CardUsagePanel({
   usageRevision = 0,
   /** Card/month TTD per USD from availability; used to derive TTD from stored USD for legacy rows. */
   monthExchangeRate,
+  /** Effective statement cycle day (>1 = off-calendar); powers the current-cycle figure. */
+  cycleDay,
+  /** This month's USD availability for the card; the current-cycle denominator. */
+  availableUsd,
 }: {
   cardId: string
   cardLabel: string
@@ -66,6 +71,8 @@ export function CardUsagePanel({
   /** Increment when usage may have changed from outside this panel (e.g. dashboard quick log). */
   usageRevision?: number
   monthExchangeRate?: number | null
+  cycleDay?: number | null
+  availableUsd?: number | null
 }) {
   const [entries, setEntries] = useState<UsageEntryRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -326,6 +333,30 @@ export function CardUsagePanel({
 
   const monthName = format(new Date(year, month - 1, 1), 'MMMM yyyy')
 
+  // Current-cycle spending power (only meaningful for off-calendar cards viewed
+  // in the current month). Usage still lives in its calendar month; this is a
+  // "right now" read of how much of the cycle's limit is left.
+  const now = new Date()
+  const isCurrentMonth =
+    year === now.getFullYear() && month === now.getMonth() + 1
+  const cycle =
+    typeof cycleDay === 'number' && cycleDay > 1 && isCurrentMonth
+      ? currentCycleWindow(cycleDay, now)
+      : null
+  let cycleUsedUsd = 0
+  if (cycle) {
+    for (const e of entries) {
+      const t = new Date(e.usageDate).getTime()
+      if (t >= cycle.start.getTime() && t < cycle.end.getTime()) {
+        cycleUsedUsd += usageUsd(e, monthExchangeRate) ?? 0
+      }
+    }
+  }
+  const cycleLeftUsd =
+    cycle && typeof availableUsd === 'number' && Number.isFinite(availableUsd)
+      ? availableUsd - cycleUsedUsd
+      : null
+
   return (
     <div className="px-4 sm:px-6 py-4 bg-gradient-to-b from-slate-50 to-slate-100/80 border-t border-slate-200 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -336,6 +367,27 @@ export function CardUsagePanel({
           Click a row or Edit to update paid-to-owner; Settled marks full payment in one step.
         </p>
       </div>
+
+      {cycle && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50/60 px-3 py-2 text-sm text-blue-900">
+          <span className="font-semibold">This cycle</span> ({cycle.label}):{' '}
+          <span className="tabular-nums font-medium">
+            ${cycleUsedUsd.toFixed(2)}
+          </span>{' '}
+          used
+          {cycleLeftUsd != null && (
+            <>
+              {' · '}
+              <span className="tabular-nums font-medium">
+                ${cycleLeftUsd.toFixed(2)}
+              </span>{' '}
+              left
+            </>
+          )}
+          {' · '}resets in {cycle.resetsInDays} day
+          {cycle.resetsInDays === 1 ? '' : 's'}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center gap-2 text-gray-600 py-4">
