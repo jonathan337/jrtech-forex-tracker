@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Loader2, Trash2, Pencil, CheckCircle2 } from 'lucide-react'
 import { usageAmountPaidSyncFromUsdInputs } from '@/lib/usage-paid-sync'
-import { cycleMonthForDate } from '@/lib/card-cycle'
+import { usageTtd, usageUsd } from '@/lib/usage-ttd'
 
 const MONTHS = [
   'Jan',
@@ -39,21 +39,13 @@ export interface UsageEntryRow {
   notes: string | null
 }
 
-/** Prefer USD × monthly rate when both exist (fixes legacy rows where amountTTD duplicated USD). */
+/** Rate-locked TTD: uses the amount stored at log time (see lib/usage-ttd.ts),
+ *  so a later rate change never rewrites this row. */
 function usageAmountTtd(
   row: UsageEntryRow,
   monthExchangeRate: number | null | undefined
 ): number {
-  const rate = monthExchangeRate
-  if (
-    typeof row.amountUSD === 'number' &&
-    Number.isFinite(row.amountUSD) &&
-    rate != null &&
-    rate > 0
-  ) {
-    return row.amountUSD * rate
-  }
-  return row.amountTTD
+  return usageTtd(row, monthExchangeRate)
 }
 
 export function CardUsagePanel({
@@ -65,9 +57,6 @@ export function CardUsagePanel({
   usageRevision = 0,
   /** Card/month TTD per USD from availability; used to derive TTD from stored USD for legacy rows. */
   monthExchangeRate,
-  /** Effective statement/cycle day; when > 1 the Period column is derived from
-      the usage date's cycle so it matches how the dashboard buckets usage. */
-  cycleDay,
 }: {
   cardId: string
   cardLabel: string
@@ -77,7 +66,6 @@ export function CardUsagePanel({
   /** Increment when usage may have changed from outside this panel (e.g. dashboard quick log). */
   usageRevision?: number
   monthExchangeRate?: number | null
-  cycleDay?: number | null
 }) {
   const [entries, setEntries] = useState<UsageEntryRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -212,15 +200,7 @@ export function CardUsagePanel({
   const usageUsdForRow = (
     row: UsageEntryRow,
     rate: number | null | undefined
-  ): number | null => {
-    if (typeof row.amountUSD === 'number' && Number.isFinite(row.amountUSD)) {
-      return row.amountUSD
-    }
-    const r =
-      typeof rate === 'number' && Number.isFinite(rate) && rate > 0 ? rate : null
-    if (r == null) return null
-    return usageAmountTtd(row, rate) / r
-  }
+  ): number | null => usageUsd(row, rate)
 
   const openEntryEdit = (row: UsageEntryRow) => {
     setEditRowError('')
@@ -408,16 +388,7 @@ export function CardUsagePanel({
                       </button>
                     </td>
                     <td className="py-2 px-3 text-gray-600">
-                      {(() => {
-                        // Off-cycle cards: label the period by the cycle the
-                        // usage date falls in, matching the dashboard. Calendar
-                        // cards keep the stored (year, month).
-                        const p =
-                          typeof cycleDay === 'number' && cycleDay > 1
-                            ? cycleMonthForDate(cycleDay, new Date(u.usageDate))
-                            : { year: u.year, month: u.month }
-                        return `${MONTHS[p.month - 1]} ${p.year}`
-                      })()}
+                      {MONTHS[u.month - 1]} {u.year}
                     </td>
                     <td className="py-2 px-3 text-right font-medium text-amber-800">
                       <span className="block tabular-nums">

@@ -495,7 +495,7 @@ export default function Dashboard() {
               </span>
               {item.cycleLabel ? (
                 <span className="text-[10px] font-medium text-indigo-600 sm:text-xs">
-                  Cycle {item.cycleLabel}
+                  {item.cycleLabel}
                 </span>
               ) : null}
             </span>
@@ -597,7 +597,6 @@ export default function Dashboard() {
               onUsageChanged={afterUsageChange}
               usageRevision={usageRevision}
               monthExchangeRate={item.exchangeRate}
-            cycleDay={item.cycleDay}
             />
           </td>
         </tr>
@@ -650,7 +649,7 @@ export default function Dashboard() {
                   </span>
                   {item.cycleLabel ? (
                     <span className="text-[10px] font-medium text-indigo-600">
-                      Cycle {item.cycleLabel}
+                      {item.cycleLabel}
                     </span>
                   ) : null}
                 </span>
@@ -737,7 +736,6 @@ export default function Dashboard() {
                 onUsageChanged={afterUsageChange}
                 usageRevision={usageRevision}
                 monthExchangeRate={item.exchangeRate}
-              cycleDay={item.cycleDay}
               />
             </div>
           ) : null}

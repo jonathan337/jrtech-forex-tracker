@@ -13,13 +13,12 @@ export type OwedByPerson = {
  * recorded — a query that got slower every month. The same math now runs as a
  * single aggregate in Postgres, so only one row per person crosses the wire.
  *
- * Semantics mirror the original `exchangeRateForUsageMonth` chain exactly:
- *   rate = MonthlyAvailability rate for that card+month
- *        → else recurringExchangeRate when the card is alwaysAvailable (even 0,
- *          which then fails the rate > 0 filter rather than falling back)
- *        → else the user's default rate when > 0
- *   usageUSD = amountUSD, else amountTTD / rate
- *   owed     = usageUSD * rate - paidToOwnerTTD, counted only when > 0.005
+ * TTD is rate-locked: a usage row's owed amount comes from the amountTTD stored
+ * at log time, so raising a card's rate later never rewrites past owed balances.
+ * Only legacy rows that duplicated USD into amountTTD (amountTTD ≈ amountUSD, an
+ * impossible ~1.0 rate) recompute from the availability rate. `rate` is still
+ * resolved (MonthlyAvailability → recurring → user default) for those legacy
+ * rows and for the owed-USD conversion.
  */
 export async function loadOwedByPerson(userId: string): Promise<OwedByPerson> {
   const rows = await prisma.$queryRaw<
@@ -50,18 +49,34 @@ export async function loadOwedByPerson(userId: string): Promise<OwedByPerson> {
        AND ma."year" = u."year"
        AND ma."month" = u."month"
     ),
-    owed_rows AS (
+    resolved AS (
       SELECT
         person_id,
         rate,
-        COALESCE(amount_usd, amount_ttd / rate) * rate - paid_ttd AS owed_ttd
+        -- legacy row (USD stored as TTD) -> recompute; otherwise trust stored TTD
+        (amount_usd IS NOT NULL AND abs(amount_ttd - amount_usd) < 0.01) AS legacy,
+        amount_usd,
+        amount_ttd,
+        paid_ttd
       FROM usage_rates
       WHERE rate IS NOT NULL AND rate > 0
+    ),
+    owed_rows AS (
+      SELECT
+        person_id,
+        (CASE WHEN legacy THEN amount_usd * rate ELSE amount_ttd END) - paid_ttd AS owed_ttd,
+        -- historical rate for the USD conversion: implied from the stored row
+        CASE
+          WHEN NOT legacy AND amount_usd IS NOT NULL AND amount_usd > 0
+            THEN amount_ttd / amount_usd
+          ELSE rate
+        END AS hist_rate
+      FROM resolved
     )
     SELECT
       person_id AS "personId",
       SUM(owed_ttd) AS "owedTTD",
-      SUM(owed_ttd / rate) AS "owedUSD"
+      SUM(owed_ttd / hist_rate) AS "owedUSD"
     FROM owed_rows
     WHERE owed_ttd > 0.005
     GROUP BY person_id

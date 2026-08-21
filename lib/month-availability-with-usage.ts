@@ -2,40 +2,34 @@ import { prisma } from '@/lib/prisma'
 import { buildRecurringAvailabilityEntry } from '@/lib/recurring-availability'
 import { ratePremiumTtd, ratePremiumUsd } from '@/lib/rate-premium'
 import { DEFAULT_CARD_PROCESSING_FEE_PCT } from '@/lib/card-processing-fee'
-import {
-  cycleWindowForMonth,
-  dateInWindow,
-  effectiveCycleDay,
-  isCalendarCycle,
-  type CycleWindow,
-} from '@/lib/card-cycle'
+import { effectiveCycleDay } from '@/lib/card-cycle'
+import { usageTtd, usageUsd } from '@/lib/usage-ttd'
 
 export type MonthUsageRow = {
   cardId: string
   amountTTD: number
   amountUSD: number | null
   paidToOwnerTTD: number
-  usageDate?: Date
 }
 
 /**
- * Same availability + usage math as the Dashboard summary for one calendar month.
+ * Availability + usage math for one calendar month.
  *
- * Availability is keyed by (year, month): for an off-calendar card, the (year,
- * month) row represents the cycle *anchored* in that month. Usage, however, is
- * matched to the card's real statement cycle:
- *   - calendar-month cards (effective cycle day 1) keep exact (year, month)
- *     matching, so nothing about their numbers changes;
- *   - off-cycle cards (e.g. Republic Bank on the 21st) match usage by
- *     `usageDate` falling within the cycle window, so a charge early in the
- *     month counts against the previous cycle rather than this one.
+ * Usage is bucketed by the calendar month it was logged in (year, month), so a
+ * charge always shows in the month you made it — regardless of the card's
+ * statement cycle. (Earlier we tried matching usage to statement-cycle windows,
+ * but no window convention can put a charge on both sides of a mid-month reset
+ * into the month the user expects; they think in calendar months.)
+ *
+ * TTD figures are rate-locked via usageTtd(): each usage keeps the rate it was
+ * logged at, so changing a card's rate later never rewrites past usage.
  */
 export async function loadMonthAvailabilityWithUsage(
   userId: string,
   y: number,
   m: number
 ) {
-  const [user, explicit, recurringCards] = await Promise.all([
+  const [user, explicit, recurringCards, usageRowsRaw] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { defaultExchangeRate: true, cardProcessingFeePct: true },
@@ -48,7 +42,23 @@ export async function loadMonthAvailabilityWithUsage(
       where: { person: { userId }, alwaysAvailable: true },
       include: { person: true },
     }),
+    prisma.cardUsage
+      .findMany({
+        where: { year: y, month: m, card: { person: { userId } } },
+        select: {
+          cardId: true,
+          amountTTD: true,
+          amountUSD: true,
+          paidToOwnerTTD: true,
+        },
+      })
+      .catch((err): MonthUsageRow[] => {
+        console.error('[month-availability] CardUsage query failed:', err)
+        return []
+      }),
   ])
+
+  const usageRows: MonthUsageRow[] = usageRowsRaw
 
   const baseline = user?.defaultExchangeRate ?? 0
   const cardProcessingFeePct =
@@ -76,8 +86,8 @@ export async function loadMonthAvailabilityWithUsage(
       new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()
   )
 
-  // Effective cycle day per card in play this month (explicit rows carry the
-  // full card; recurring rows come from the fetched card objects).
+  // Effective cycle day per card (explicit override, else 1 = calendar month).
+  // Used only to label each card's reset day — not to bucket usage.
   const cycleDayByCard = new Map<string, number>()
   for (const item of explicitWithFlag) {
     cycleDayByCard.set(item.cardId, effectiveCycleDay(item.card))
@@ -86,80 +96,11 @@ export async function loadMonthAvailabilityWithUsage(
     if (!cycleDayByCard.has(c.id)) cycleDayByCard.set(c.id, effectiveCycleDay(c))
   }
 
-  const calendarCardIds: string[] = []
-  const cycleCardIds: string[] = []
-  for (const [cardId, day] of cycleDayByCard) {
-    ;(isCalendarCycle(day) ? calendarCardIds : cycleCardIds).push(cardId)
-  }
-
-  // A cycle closing in month m opens in month m-1, so its window falls within
-  // [first of m-1, first of m+1). Fetch that span and filter each card to its
-  // exact window below. (Date.UTC normalizes the month underflow/overflow.)
-  const spanStart = new Date(Date.UTC(y, m - 2, 1))
-  const spanEnd = new Date(Date.UTC(y, m, 1))
-
-  const safeUsage = (p: Promise<MonthUsageRow[]>) =>
-    p.catch((err): MonthUsageRow[] => {
-      console.error('[month-availability] CardUsage query failed:', err)
-      return []
-    })
-
-  const [calendarUsage, cycleUsage] = await Promise.all([
-    calendarCardIds.length
-      ? safeUsage(
-          prisma.cardUsage.findMany({
-            where: { year: y, month: m, cardId: { in: calendarCardIds } },
-            select: {
-              cardId: true,
-              amountTTD: true,
-              amountUSD: true,
-              paidToOwnerTTD: true,
-            },
-          })
-        )
-      : Promise.resolve<MonthUsageRow[]>([]),
-    cycleCardIds.length
-      ? safeUsage(
-          prisma.cardUsage.findMany({
-            where: {
-              cardId: { in: cycleCardIds },
-              usageDate: { gte: spanStart, lt: spanEnd },
-            },
-            select: {
-              cardId: true,
-              amountTTD: true,
-              amountUSD: true,
-              paidToOwnerTTD: true,
-              usageDate: true,
-            },
-          })
-        )
-      : Promise.resolve<MonthUsageRow[]>([]),
-  ])
-
-  // Window per off-cycle card, used both to filter usage and to label the row.
-  const windowByCard = new Map<string, CycleWindow>()
-  for (const cardId of cycleCardIds) {
-    windowByCard.set(
-      cardId,
-      cycleWindowForMonth(cycleDayByCard.get(cardId) ?? 1, y, m)
-    )
-  }
-
   const usageByCard = new Map<string, MonthUsageRow[]>()
-  const usageRows: MonthUsageRow[] = []
-  const pushUsage = (u: MonthUsageRow) => {
+  for (const u of usageRows) {
     const list = usageByCard.get(u.cardId)
     if (list) list.push(u)
     else usageByCard.set(u.cardId, [u])
-    usageRows.push(u)
-  }
-  for (const u of calendarUsage) pushUsage(u)
-  for (const u of cycleUsage) {
-    const win = windowByCard.get(u.cardId)
-    if (win && u.usageDate && dateInWindow(new Date(u.usageDate), win)) {
-      pushUsage(u)
-    }
   }
 
   const availabilityWithUsage = availability.map((item) => {
@@ -168,14 +109,11 @@ export async function loadMonthAvailabilityWithUsage(
     let usageUSDForCard = 0
     let owedTTDForCard = 0
     for (const u of cardRows) {
-      usageTTD += u.amountTTD
-      const usageUSD =
-        typeof u.amountUSD === 'number' && Number.isFinite(u.amountUSD)
-          ? u.amountUSD
-          : u.amountTTD / item.exchangeRate
-      usageUSDForCard += usageUSD
-      const owed = usageUSD * item.exchangeRate - u.paidToOwnerTTD
-      owedTTDForCard += Math.max(0, owed)
+      // Rate-locked: read the TTD stored at log time, not USD × the current rate.
+      const ttd = usageTtd(u, item.exchangeRate)
+      usageTTD += ttd
+      usageUSDForCard += usageUsd(u, item.exchangeRate) ?? 0
+      owedTTDForCard += Math.max(0, ttd - u.paidToOwnerTTD)
     }
     const availableTTD = item.amountUSD * item.exchangeRate
     const balanceTTD = availableTTD - usageTTD
@@ -184,9 +122,6 @@ export async function loadMonthAvailabilityWithUsage(
     const impliedFeeTTD = ratePremiumTtd(item.amountUSD, item.exchangeRate, baseline)
     const impliedFeeUSD = ratePremiumUsd(item.amountUSD, item.exchangeRate, baseline)
     const cycleDay = cycleDayByCard.get(item.cardId) ?? 1
-    const cycleLabel = isCalendarCycle(cycleDay)
-      ? ''
-      : windowByCard.get(item.cardId)?.label ?? ''
     return {
       ...item,
       usageTTD,
@@ -198,9 +133,16 @@ export async function loadMonthAvailabilityWithUsage(
       impliedFeeTTD,
       impliedFeeUSD,
       cycleDay,
-      cycleLabel,
+      // Reset-day note for off-calendar cards; usage still counts by calendar month.
+      cycleLabel: cycleDay > 1 ? `Resets on the ${ordinal(cycleDay)}` : '',
     }
   })
 
   return { baseline, cardProcessingFeePct, usageRows, availabilityWithUsage }
+}
+
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`
 }
