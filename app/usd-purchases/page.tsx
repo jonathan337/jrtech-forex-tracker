@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Pencil,
   Plus,
   Trash2,
   TrendingUp,
@@ -49,6 +50,7 @@ export default function UsdPurchasesPage() {
   const [saving, setSaving] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({
     amountUSD: '',
     rate: '',
@@ -154,20 +156,23 @@ export default function UsdPurchasesPage() {
     setSaving(true)
     setFormError('')
     try {
-      const res = await fetch('/api/usd-purchases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          year,
-          month,
-          amountUSD: usd,
-          amountTTD: ttd,
-          method: form.method,
-          purchasedAt: new Date(form.purchasedAt).toISOString(),
-          notes: form.notes.trim() || undefined,
-        }),
-      })
+      const res = await fetch(
+        editingId ? `/api/usd-purchases/${editingId}` : '/api/usd-purchases',
+        {
+          method: editingId ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            year,
+            month,
+            amountUSD: usd,
+            amountTTD: ttd,
+            method: form.method,
+            purchasedAt: new Date(form.purchasedAt).toISOString(),
+            notes: form.notes.trim() || undefined,
+          }),
+        }
+      )
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         setFormError(typeof data.error === 'string' ? data.error : 'Could not save.')
@@ -181,6 +186,7 @@ export default function UsdPurchasesPage() {
         purchasedAt: format(new Date(), 'yyyy-MM-dd'),
         notes: '',
       })
+      setEditingId(null)
       setShowForm(false)
       emitDataChanged({})
       await fetchData()
@@ -189,6 +195,26 @@ export default function UsdPurchasesPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const startEdit = (p: PurchaseRow) => {
+    setEditingId(p.id)
+    setFormError('')
+    setForm({
+      amountUSD: p.amountUSD.toString(),
+      rate: (p.amountTTD / p.amountUSD).toFixed(4),
+      amountTTD: p.amountTTD.toString(),
+      method: p.method,
+      purchasedAt: format(new Date(p.purchasedAt), 'yyyy-MM-dd'),
+      notes: p.notes ?? '',
+    })
+    setShowForm(true)
+  }
+
+  const closeForm = () => {
+    setShowForm(false)
+    setEditingId(null)
+    setFormError('')
   }
 
   const handleDelete = async (id: string) => {
@@ -208,6 +234,20 @@ export default function UsdPurchasesPage() {
     }
   }
 
+  const startAdd = () => {
+    setEditingId(null)
+    setFormError('')
+    setForm({
+      amountUSD: '',
+      rate: '',
+      amountTTD: '',
+      method: form.method,
+      purchasedAt: format(new Date(), 'yyyy-MM-dd'),
+      notes: '',
+    })
+    setShowForm(true)
+  }
+
   const fmtRate = (r: number | null) =>
     r != null && Number.isFinite(r) ? r.toFixed(4) : '—'
 
@@ -222,7 +262,7 @@ export default function UsdPurchasesPage() {
             Log cash, Zelle, or wire USD purchases and track your average cost
           </p>
         </div>
-        <Button onClick={() => setShowForm(true)} className="w-full sm:w-auto shrink-0">
+        <Button onClick={startAdd} className="w-full sm:w-auto shrink-0">
           <Plus className="w-4 h-4 mr-2" />
           Log purchase
         </Button>
@@ -313,7 +353,7 @@ export default function UsdPurchasesPage() {
       {showForm && (
         <Card className="border-2 border-emerald-200 shadow-lg">
           <CardHeader>
-            <CardTitle>Log USD purchase</CardTitle>
+            <CardTitle>{editingId ? 'Edit USD purchase' : 'Log USD purchase'}</CardTitle>
             <CardDescription>
               Record what you paid in TTD for USD bought outside card availability
             </CardDescription>
@@ -409,6 +449,8 @@ export default function UsdPurchasesPage() {
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Saving…
                     </>
+                  ) : editingId ? (
+                    'Save changes'
                   ) : (
                     'Save'
                   )}
@@ -417,7 +459,7 @@ export default function UsdPurchasesPage() {
                   type="button"
                   variant="outline"
                   disabled={saving}
-                  onClick={() => setShowForm(false)}
+                  onClick={closeForm}
                 >
                   Cancel
                 </Button>
@@ -493,20 +535,32 @@ export default function UsdPurchasesPage() {
               ]}
               actions={{
                 render: (p) => (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={deletingId === p.id}
-                    onClick={() => handleDelete(p.id)}
-                    aria-label="Delete"
-                  >
-                    {deletingId === p.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-4 h-4 text-red-600" />
-                    )}
-                  </Button>
+                  <div className="flex items-center justify-end gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={deletingId === p.id}
+                      onClick={() => startEdit(p)}
+                      aria-label="Edit"
+                    >
+                      <Pencil className="w-4 h-4 text-gray-600" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={deletingId === p.id}
+                      onClick={() => handleDelete(p.id)}
+                      aria-label="Delete"
+                    >
+                      {deletingId === p.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4 text-red-600" />
+                      )}
+                    </Button>
+                  </div>
                 ),
               }}
             />
@@ -514,7 +568,7 @@ export default function UsdPurchasesPage() {
         </CardContent>
       </Card>
 
-      <MobileAddButton onClick={() => setShowForm(true)} label="Log USD purchase" />
+      <MobileAddButton onClick={startAdd} label="Log USD purchase" />
     </div>
   )
 }
