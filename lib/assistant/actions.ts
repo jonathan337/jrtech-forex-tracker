@@ -300,27 +300,59 @@ export async function resolvePerson(
   userId: string,
   query: string
 ): Promise<ResolvePersonResult> {
-  const q = query.trim()
-  if (!q) return { ok: false, error: 'No person name provided.' }
-  const matches = await prisma.person.findMany({
-    where: { userId, name: { contains: q, mode: 'insensitive' } },
+  const raw = query.trim()
+  if (!raw) return { ok: false, error: 'No person name provided.' }
+
+  const people = await prisma.person.findMany({
+    where: { userId },
     select: { id: true, name: true },
-    take: 10,
   })
-  if (matches.length === 0) {
-    return { ok: false, error: `No person found matching "${q}".` }
+  if (people.length === 0) {
+    return { ok: false, error: `No person found matching "${raw}".` }
   }
-  const exact = matches.filter((m) => m.name.toLowerCase() === q.toLowerCase())
-  const chosen = exact.length === 1 ? exact : matches
-  if (chosen.length > 1) {
-    return {
-      ok: false,
-      error: `Multiple people match "${q}": ${chosen
-        .map((m) => m.name)
-        .join(', ')}. Ask the user which one.`,
-    }
+
+  const cleaned = raw
+    .toLowerCase()
+    .replace(/['’`]/g, '')
+    .replace(/[(),]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  // Exact full-name match wins outright.
+  const exact = people.filter((p) => p.name.toLowerCase() === cleaned)
+  if (exact.length === 1) {
+    return { ok: true, personId: exact[0].id, name: exact[0].name }
   }
-  return { ok: true, personId: chosen[0].id, name: chosen[0].name }
+
+  const tokens = cleaned
+    .split(' ')
+    .filter((t) => t.length > 0 && !CARD_QUERY_STOPWORDS.has(t))
+  if (tokens.length === 0) {
+    return { ok: false, error: `No person found matching "${raw}".` }
+  }
+
+  // Score by how many tokens fuzzily match the person's name — tolerant of
+  // typos ("ramcharitarrr") and partial names ("esther").
+  const scored = people.map((p) => {
+    const name = p.name.toLowerCase()
+    let score = 0
+    for (const t of tokens) if (tokenMatchesField(t, name)) score++
+    return { p, score }
+  })
+  const maxScore = Math.max(...scored.map((s) => s.score))
+  if (maxScore === 0) {
+    return { ok: false, error: `No person found matching "${raw}".` }
+  }
+  const best = scored.filter((s) => s.score === maxScore).map((s) => s.p)
+  if (best.length === 1) {
+    return { ok: true, personId: best[0].id, name: best[0].name }
+  }
+  return {
+    ok: false,
+    error: `Multiple people match "${raw}": ${best
+      .map((p) => p.name)
+      .join(', ')}. Ask the user which one.`,
+  }
 }
 
 type ResolveCardResult =
@@ -333,10 +365,15 @@ type ResolveCardResult =
     }
   | { ok: false; error: string }
 
-/** Words a card query can contain that carry no matching signal. */
+/** Words a card query can contain that carry no matching signal — filler,
+ *  verbs, and the generic word "card" itself (nicknames like "Black Card" are
+ *  still matched on their distinctive word, "black"). */
 const CARD_QUERY_STOPWORDS = new Set([
-  'the', 'a', 'an', 'card', 'cards', 'for', 'on', 'to', 'of', 'and',
-  'usage', 'use', 'used', 'atm', 'withdrawal', 'add', 'log', 'note', 'notes',
+  'the', 'a', 'an', 'card', 'cards', 'for', 'on', 'to', 'of', 'and', 'with',
+  'from', 'this', 'that', 'these', 'those', 'my', 'his', 'her', 'their', 'our',
+  'i', 'you', 'please', 'entry', 'transaction', 'transfer', 'one', 'it',
+  'usage', 'use', 'used', 'using', 'spend', 'spent', 'put', 'charge', 'charged',
+  'atm', 'withdrawal', 'pull', 'add', 'log', 'note', 'notes', 'made', 'make',
 ])
 
 /** Words that should resolve to each stored issuingBank code, including the
@@ -354,6 +391,48 @@ function bankSynonyms(code: string | null | undefined): string[] {
     default:
       return code ? [code.toLowerCase()] : []
   }
+}
+
+/** Levenshtein edit distance (small strings; iterative, one row). */
+function editDistance(a: string, b: string): number {
+  const m = a.length
+  const n = b.length
+  if (m === 0) return n
+  if (n === 0) return m
+  const dp = Array.from({ length: n + 1 }, (_, j) => j)
+  for (let i = 1; i <= m; i++) {
+    let prev = dp[0]
+    dp[0] = i
+    for (let j = 1; j <= n; j++) {
+      const tmp = dp[j]
+      dp[j] = Math.min(
+        dp[j] + 1,
+        dp[j - 1] + 1,
+        prev + (a[i - 1] === b[j - 1] ? 0 : 1)
+      )
+      prev = tmp
+    }
+  }
+  return dp[n]
+}
+
+/** Does a query token match a single word, allowing prefixes and typos?
+ *  "ramcharitarrr" ~ "ramcharitar", "mohamed" ~ "mohammed", "esth" ~ "esther". */
+function fuzzyWordMatch(token: string, word: string): boolean {
+  if (!token || !word) return false
+  if (token === word) return true
+  if (token.length >= 3 && (word.includes(token) || token.includes(word))) {
+    return true
+  }
+  const len = Math.max(token.length, word.length)
+  if (len < 4) return false
+  const maxDist = len <= 6 ? 1 : len <= 9 ? 2 : 3
+  return editDistance(token, word) <= maxDist
+}
+
+/** Does a token match any word of a field value (owner name, nickname)? */
+function tokenMatchesField(token: string, field: string): boolean {
+  return field.split(/\s+/).some((w) => fuzzyWordMatch(token, w))
 }
 
 type CardRow = {
@@ -385,9 +464,9 @@ function resolvedCard(c: CardRow): ResolveCardResult {
  *   "Esther Mohammed (FCB Platinum ••9141 · First Citizens)".
  *
  * A 4-digit run that uniquely matches a card's last four wins outright.
- * Otherwise every meaningful token must match some field of a card (owner name,
- * nickname, last four, or bank synonym); the card matching all tokens wins, and
- * a tie asks the user to choose.
+ * Otherwise cards are scored by how many query tokens they match (fuzzily, so
+ * typos and possessives count); the best-scoring card wins and a tie asks the
+ * user to choose.
  */
 export async function resolveCard(
   userId: string,
@@ -410,10 +489,11 @@ export async function resolveCard(
     return { ok: false, error: `No card found matching "${raw}".` }
   }
 
-  // Strip the punctuation the emitted label uses (parens, ••, ·) so it parses
-  // back cleanly, then lowercase.
+  // Strip apostrophes ("lyloon's" → "lyloons") and the punctuation the emitted
+  // label uses (parens, ••, ·) so it parses back cleanly, then lowercase.
   const cleaned = raw
     .toLowerCase()
+    .replace(/['’`]/g, '')
     .replace(/[()[\]•·,]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
@@ -436,34 +516,40 @@ export async function resolveCard(
     return { ok: false, error: `No card found matching "${raw}".` }
   }
 
-  // A token matches a card if it appears in the owner name, nickname, or last
-  // four, or names the card's bank. A card is a candidate only if EVERY token
-  // matches it, so naming an owner who has no such card doesn't fall through to
-  // some unrelated card by bank alone.
-  const candidates = cards.filter((c) => {
-    const haystack = [
-      c.person.name.toLowerCase(),
-      c.cardNickname.toLowerCase(),
-      c.lastFourDigits ?? '',
-      ...bankSynonyms(c.issuingBank),
-    ]
-    return tokens.every((t) => {
-      if (haystack.some((h) => h.includes(t))) return true
-      const bank = normalizeIssuingBank(t)
-      return bank != null && bank === c.issuingBank
-    })
-  })
-
-  if (candidates.length === 1) return resolvedCard(candidates[0])
-  if (candidates.length > 1) {
-    return {
-      ok: false,
-      error: `Multiple cards match "${raw}": ${candidates
-        .map((m) => cardLabel(m))
-        .join('; ')}. Ask the user which one.`,
+  // Score every card by how many query tokens it matches (owner name, nickname,
+  // last four, or bank synonym — all fuzzy, so typos and possessives still
+  // count). Best score wins; a tie means genuinely ambiguous, so ask. Filler
+  // words that match nothing simply don't add score instead of disqualifying the
+  // card, which is what lets ordinary phrasing resolve.
+  const scoreCard = (c: CardRow): number => {
+    const nameFields = [c.person.name.toLowerCase(), c.cardNickname.toLowerCase()]
+    const bankWords = bankSynonyms(c.issuingBank)
+    const last4 = c.lastFourDigits ?? ''
+    let score = 0
+    for (const t of tokens) {
+      const hit =
+        nameFields.some((f) => tokenMatchesField(t, f)) ||
+        bankWords.some((w) => fuzzyWordMatch(t, w)) ||
+        (last4 !== '' && (last4 === t || last4.includes(t))) ||
+        (c.issuingBank != null && normalizeIssuingBank(t) === c.issuingBank)
+      if (hit) score++
     }
+    return score
   }
-  return { ok: false, error: `No card found matching "${raw}".` }
+
+  const scored = cards.map((c) => ({ card: c, score: scoreCard(c) }))
+  const maxScore = Math.max(...scored.map((s) => s.score))
+  if (maxScore === 0) {
+    return { ok: false, error: `No card found matching "${raw}".` }
+  }
+  const best = scored.filter((s) => s.score === maxScore).map((s) => s.card)
+  if (best.length === 1) return resolvedCard(best[0])
+  return {
+    ok: false,
+    error: `Multiple cards match "${raw}": ${best
+      .map((m) => cardLabel(m))
+      .join('; ')}. Ask the user which one.`,
+  }
 }
 
 /** ---- Write executors (called only after user confirmation) ---------- */

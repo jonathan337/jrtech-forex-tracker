@@ -82,8 +82,20 @@ export async function POST(request: Request) {
         },
       })
 
-      const textReply = (response.text ?? '').trim()
-      const calls = response.functionCalls ?? []
+      // These are getters in the SDK that can throw on a blocked/empty response;
+      // never let that turn into a 500 for the user.
+      let textReply = ''
+      try {
+        textReply = (response.text ?? '').trim()
+      } catch {
+        textReply = ''
+      }
+      let calls: NonNullable<typeof response.functionCalls> = []
+      try {
+        calls = response.functionCalls ?? []
+      } catch {
+        calls = []
+      }
 
       if (calls.length === 0) {
         return NextResponse.json({ reply: textReply || 'Done.' })
