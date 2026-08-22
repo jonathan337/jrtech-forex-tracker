@@ -20,13 +20,8 @@ import {
 import { useGroupByOwner } from '@/hooks/use-group-by-owner'
 import { useDataChanged } from '@/lib/use-data-changed'
 import { MobileAddButton } from '@/components/ui/mobile-add-button'
-import {
-  ISSUING_BANK_CODES,
-  ISSUING_BANK_LABELS,
-  issuingBankLabel,
-  type IssuingBankCode,
-} from '@/lib/card-bank'
-import { bankDefaultCycleDay } from '@/lib/card-cycle'
+import { issuingBankLabel, type Bank } from '@/lib/card-bank'
+import { bankCycleDayFor } from '@/lib/card-cycle'
 
 interface Person {
   id: string
@@ -86,7 +81,7 @@ function RateBadge({ card }: { card: CardType }) {
 const emptyForm = () => ({
   personId: '',
   cardNickname: '',
-  issuingBank: '' as '' | IssuingBankCode,
+  issuingBank: '',
   lastFourDigits: '',
   notes: '',
   alwaysAvailable: false,
@@ -116,6 +111,7 @@ export default function CardsPage() {
   const [defaultExchangeRate, setDefaultExchangeRate] = useState<number | null>(
     null
   )
+  const [banks, setBanks] = useState<Bank[]>([])
 
   const ownerGroups = useMemo(() => {
     const map = new Map<string, { person: Person; cards: CardType[] }>()
@@ -137,6 +133,17 @@ export default function CardsPage() {
       [...cards].sort((a, b) => a.cardNickname.localeCompare(b.cardNickname)),
     [cards]
   )
+
+  // Bank dropdown options: the user's banks, plus the card's current bank if it
+  // isn't in the list (e.g. editing a legacy card with a bank since removed).
+  const bankOptions = useMemo(() => {
+    const names = banks.map((b) => b.name)
+    const cur = formData.issuingBank.trim()
+    if (cur && !names.some((n) => n.toLowerCase() === cur.toLowerCase())) {
+      return [cur, ...names]
+    }
+    return names
+  }, [banks, formData.issuingBank])
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -168,6 +175,7 @@ export default function CardsPage() {
           if (typeof s.defaultExchangeRate === 'number') {
             setDefaultExchangeRate(s.defaultExchangeRate)
           }
+          if (Array.isArray(s.banks)) setBanks(s.banks as Bank[])
         }
 
         if (cardsRes.ok) {
@@ -267,9 +275,7 @@ export default function CardsPage() {
     const base = {
       personId: formData.personId,
       cardNickname: formData.cardNickname,
-      issuingBank: formData.issuingBank
-        ? (formData.issuingBank as IssuingBankCode)
-        : null,
+      issuingBank: formData.issuingBank.trim() || null,
       lastFourDigits: formData.lastFourDigits || undefined,
       notes: formData.notes || undefined,
       alwaysAvailable: formData.alwaysAvailable,
@@ -343,7 +349,9 @@ export default function CardsPage() {
     setFormData({
       personId: card.person.id,
       cardNickname: card.cardNickname,
-      issuingBank: (card.issuingBank as IssuingBankCode | null) ?? '',
+      // Canonicalize a legacy code (e.g. FIRST_CITIZENS) to its bank name so the
+      // dropdown matches; a stored name passes through unchanged.
+      issuingBank: card.issuingBank ? issuingBankLabel(card.issuingBank) : '',
       lastFourDigits: card.lastFourDigits || '',
       notes: card.notes || '',
       alwaysAvailable: card.alwaysAvailable ?? false,
@@ -520,22 +528,26 @@ export default function CardsPage() {
                   id="issuingBank"
                   value={formData.issuingBank}
                   onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      issuingBank: e.target.value as IssuingBankCode | '',
-                    })
+                    setFormData({ ...formData, issuingBank: e.target.value })
                   }
                   required
                   disabled={saving}
                   className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <option value="">Select bank</option>
-                  {ISSUING_BANK_CODES.map((code) => (
-                    <option key={code} value={code}>
-                      {ISSUING_BANK_LABELS[code]}
+                  {bankOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
                     </option>
                   ))}
                 </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Manage the bank list in{' '}
+                  <a href="/settings" className="text-blue-700 underline">
+                    Settings
+                  </a>
+                  .
+                </p>
               </div>
               <div>
                 <Label htmlFor="lastFourDigits">Last 4 Digits</Label>
@@ -564,9 +576,7 @@ export default function CardsPage() {
                   }
                   placeholder={
                     formData.issuingBank
-                      ? `${bankDefaultCycleDay(formData.issuingBank)} (${issuingBankLabel(
-                          formData.issuingBank
-                        )} default)`
+                      ? `${bankCycleDayFor(formData.issuingBank, banks)} (${formData.issuingBank} default)`
                       : '1 (calendar month)'
                   }
                   disabled={saving}

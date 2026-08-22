@@ -31,8 +31,9 @@ export function cardLabel(card: {
   if (card.person?.name) parts.push(card.person.name)
   let core = card.cardNickname
   if (card.lastFourDigits) core += ` ••${card.lastFourDigits}`
-  if (card.issuingBank && BANK_LABELS[card.issuingBank]) {
-    core += ` · ${BANK_LABELS[card.issuingBank]}`
+  if (card.issuingBank) {
+    // Legacy code -> label; a stored bank name shows as-is.
+    core += ` · ${BANK_LABELS[card.issuingBank] ?? card.issuingBank}`
   }
   parts.push(`(${core})`)
   return parts.join(' ')
@@ -376,21 +377,21 @@ const CARD_QUERY_STOPWORDS = new Set([
   'atm', 'withdrawal', 'pull', 'add', 'log', 'note', 'notes', 'made', 'make',
 ])
 
-/** Words that should resolve to each stored issuingBank code, including the
- *  abbreviations people actually type (FCB = First Citizens, RBL = Republic). */
-function bankSynonyms(code: string | null | undefined): string[] {
-  switch (code) {
-    case 'SCOTIABANK':
-      return ['scotia', 'scotiabank']
-    case 'REPUBLIC_BANK':
-      return ['republic', 'rbl', 'republicbank']
-    case 'FIRST_CITIZENS':
-      return ['first', 'citizens', 'fcb', 'firstcitizens']
-    case 'RBC':
-      return ['rbc', 'royal']
-    default:
-      return code ? [code.toLowerCase()] : []
-  }
+/** Words that should match a card's bank — the words of its name plus the
+ *  abbreviations people actually type (FCB = First Citizens, RBL = Republic).
+ *  Works whether issuingBank stores a legacy code or a bank name. */
+function bankSynonyms(value: string | null | undefined): string[] {
+  if (!value) return []
+  const name = (BANK_LABELS[value] ?? value).toLowerCase()
+  const words = name
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && w !== 'bank' && w !== 'the' && w !== 'of')
+  const extra: string[] = []
+  if (name.includes('scotia')) extra.push('scotia')
+  if (name.includes('republic')) extra.push('rbl', 'republic')
+  if (name.includes('first citizen')) extra.push('fcb')
+  if (name.includes('rbc') || name.includes('royal')) extra.push('rbc', 'royal')
+  return [...new Set([...words, ...extra])]
 }
 
 /** Levenshtein edit distance (small strings; iterative, one row). */
@@ -530,8 +531,7 @@ export async function resolveCard(
       const hit =
         nameFields.some((f) => tokenMatchesField(t, f)) ||
         bankWords.some((w) => fuzzyWordMatch(t, w)) ||
-        (last4 !== '' && (last4 === t || last4.includes(t))) ||
-        (c.issuingBank != null && normalizeIssuingBank(t) === c.issuingBank)
+        (last4 !== '' && (last4 === t || last4.includes(t)))
       if (hit) score++
     }
     return score
@@ -847,15 +847,18 @@ export async function executeLogPayment(params: {
   }
 }
 
-/** Map free-text bank names to the stored issuingBank codes. */
+/** Map free-text to a canonical bank name; unknown text is kept as a custom
+ *  bank name (banks are user-defined now). Empty input returns null. */
 export function normalizeIssuingBank(input: string | null | undefined): string | null {
-  const q = (input ?? '').trim().toLowerCase()
-  if (!q) return null
-  if (q.includes('scotia')) return 'SCOTIABANK'
-  if (q.includes('republic') || q.includes('rbl')) return 'REPUBLIC_BANK'
-  if (q.includes('first citizen') || q.includes('fcb')) return 'FIRST_CITIZENS'
-  if (q.includes('rbc') || q.includes('royal')) return 'RBC'
-  return null
+  const raw = (input ?? '').trim()
+  if (!raw) return null
+  const q = raw.toLowerCase()
+  if (q.includes('scotia')) return 'Scotiabank'
+  if (q.includes('republic') || q.includes('rbl')) return 'Republic Bank'
+  if (q.includes('first citizen') || q.includes('fcb')) return 'First Citizens Bank'
+  if (q.includes('rbc') || q.includes('royal')) return 'Royal Bank of Canada'
+  // Not a known bank — treat the typed text as a custom bank name.
+  return raw
 }
 
 export async function executeAddCard(params: {

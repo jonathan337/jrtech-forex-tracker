@@ -187,18 +187,21 @@ export default function UsagePage() {
   }, [entries])
 
   const bankOptions = useMemo(() => {
+    // Canonicalize via issuingBankLabel so a legacy code and its bank name
+    // collapse to one option/value.
     const banks = new Set<string>()
-    for (const e of entries) if (e.card.issuingBank) banks.add(e.card.issuingBank)
-    return [...banks].sort((a, b) =>
-      issuingBankLabel(a).localeCompare(issuingBankLabel(b))
-    )
+    for (const e of entries) {
+      if (e.card.issuingBank) banks.add(issuingBankLabel(e.card.issuingBank))
+    }
+    return [...banks].sort((a, b) => a.localeCompare(b))
   }, [entries])
 
   const filteredEntries = useMemo(() => {
     const q = filterSearch.trim().toLowerCase()
     return entries.filter((e) => {
       if (filterOwner && e.card.person.name !== filterOwner) return false
-      if (filterBank && e.card.issuingBank !== filterBank) return false
+      if (filterBank && issuingBankLabel(e.card.issuingBank) !== filterBank)
+        return false
       if (filterStatus !== 'all') {
         const card = cards.find((c) => c.id === e.cardId)
         const rate =
@@ -928,7 +931,7 @@ export default function UsagePage() {
                       <option value="">All banks</option>
                       {bankOptions.map((b) => (
                         <option key={b} value={b}>
-                          {issuingBankLabel(b)}
+                          {b}
                         </option>
                       ))}
                     </select>

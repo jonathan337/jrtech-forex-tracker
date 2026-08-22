@@ -1,11 +1,11 @@
 import { z } from 'zod'
-import { issuingBankSchema } from '@/lib/card-bank'
 
 export const cardBodySchema = z
   .object({
     personId: z.string().min(1, 'Person is required'),
     cardNickname: z.string().min(1, 'Card nickname is required'),
-    issuingBank: issuingBankSchema.optional().nullable(),
+    // A user-defined bank name (or a legacy code on older cards).
+    issuingBank: z.string().trim().max(60).optional().nullable(),
     lastFourDigits: z.string().optional(),
     notes: z.string().optional(),
     alwaysAvailable: z.boolean().optional().default(false),

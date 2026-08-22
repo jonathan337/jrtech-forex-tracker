@@ -10,17 +10,21 @@
  * bank config falls back to the 1st (calendar month).
  */
 
-/** Per-bank cycle-day map, e.g. { REPUBLIC_BANK: 21, FIRST_CITIZENS: 14 }. */
-export type BankCycleDays = Record<string, number>
+import { issuingBankLabel, type Bank } from '@/lib/card-bank'
 
-/** The 1st unless the user configured a cycle day for this issuing bank. */
-export function bankDefaultCycleDay(
+/** The 1st unless the matching bank in the user's list sets a cycle day. A
+ *  card's stored issuingBank (legacy code or bank name) is canonicalized via
+ *  issuingBankLabel so both resolve to the same bank. */
+export function bankCycleDayFor(
   issuingBank: string | null | undefined,
-  bankCycleDays?: BankCycleDays | null
+  banks?: Bank[] | null
 ): number {
-  if (issuingBank && bankCycleDays) {
-    const d = bankCycleDays[issuingBank]
-    if (typeof d === 'number' && d >= 1 && d <= 31) return d
+  if (issuingBank && banks && banks.length) {
+    const name = issuingBankLabel(issuingBank).toLowerCase()
+    const match = banks.find((b) => b.name.toLowerCase() === name)
+    if (match && typeof match.cycleDay === 'number' && match.cycleDay >= 1 && match.cycleDay <= 31) {
+      return match.cycleDay
+    }
   }
   return 1
 }
@@ -28,11 +32,11 @@ export function bankDefaultCycleDay(
 /** Effective cycle day: explicit per-card override, else bank config, else 1. */
 export function effectiveCycleDay(
   card: { cycleDay?: number | null; issuingBank?: string | null },
-  bankCycleDays?: BankCycleDays | null
+  banks?: Bank[] | null
 ): number {
   const day = card.cycleDay
   if (typeof day === 'number' && day >= 1 && day <= 31) return day
-  return bankDefaultCycleDay(card.issuingBank, bankCycleDays)
+  return bankCycleDayFor(card.issuingBank, banks)
 }
 
 const MONTHS = [

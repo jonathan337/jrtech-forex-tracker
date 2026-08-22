@@ -5,8 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Settings as SettingsIcon, Save, CalendarClock } from 'lucide-react'
-import { ISSUING_BANK_CODES, ISSUING_BANK_LABELS } from '@/lib/card-bank'
+import { Settings as SettingsIcon, Save, Landmark, Plus, Trash2 } from 'lucide-react'
+import { type Bank } from '@/lib/card-bank'
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
@@ -15,8 +15,8 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState(false)
   const [defaultRate, setDefaultRate] = useState('6.7993')
   const [cardFeePct, setCardFeePct] = useState('4.5')
-  // Cycle reset day per issuing bank, as strings for the inputs ('' = the 1st).
-  const [bankCycleDays, setBankCycleDays] = useState<Record<string, string>>({})
+  // Editable bank list. cycleDay '' = resets on the 1st.
+  const [banks, setBanks] = useState<Array<{ name: string; cycleDay: string }>>([])
 
   useEffect(() => {
     fetchSettings()
@@ -31,14 +31,13 @@ export default function SettingsPage() {
         if (typeof data.cardProcessingFeePct === 'number') {
           setCardFeePct(data.cardProcessingFeePct.toString())
         }
-        const cfg = data.bankCycleDays
-        if (cfg && typeof cfg === 'object') {
-          const next: Record<string, string> = {}
-          for (const code of ISSUING_BANK_CODES) {
-            const v = cfg[code]
-            if (typeof v === 'number') next[code] = String(v)
-          }
-          setBankCycleDays(next)
+        if (Array.isArray(data.banks)) {
+          setBanks(
+            (data.banks as Bank[]).map((b) => ({
+              name: b.name,
+              cycleDay: typeof b.cycleDay === 'number' ? String(b.cycleDay) : '',
+            }))
+          )
         }
       }
     } catch (error) {
@@ -62,13 +61,17 @@ export default function SettingsPage() {
         body: JSON.stringify({
           defaultExchangeRate: parseFloat(defaultRate),
           cardProcessingFeePct: parseFloat(cardFeePct),
-          bankCycleDays: Object.fromEntries(
-            ISSUING_BANK_CODES.map((code) => {
-              const raw = (bankCycleDays[code] ?? '').trim()
+          banks: banks
+            .map((b) => {
+              const name = b.name.trim()
+              const raw = b.cycleDay.trim()
               const n = raw === '' ? null : parseInt(raw, 10)
-              return [code, n != null && n >= 1 && n <= 31 ? n : null]
+              return {
+                name,
+                cycleDay: n != null && n >= 1 && n <= 31 ? n : null,
+              }
             })
-          ),
+            .filter((b) => b.name !== ''),
         }),
       })
 
@@ -196,49 +199,104 @@ export default function SettingsPage() {
         <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center">
-              <CalendarClock className="w-5 h-5 text-white" />
+              <Landmark className="w-5 h-5 text-white" />
             </div>
             <div>
-              <CardTitle>Statement cycle day by bank</CardTitle>
+              <CardTitle>Banks</CardTitle>
               <CardDescription>
-                When each bank&apos;s USD limit resets. Cards of that bank use it
-                automatically; leave blank for the 1st of the month.
+                The banks you can assign to cards, and when each one&apos;s USD
+                limit resets. Leave the reset day blank for the 1st of the month.
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {ISSUING_BANK_CODES.map((code) => (
-                <div key={code}>
-                  <Label htmlFor={`cycle-${code}`}>
-                    {ISSUING_BANK_LABELS[code]}
-                  </Label>
-                  <Input
-                    id={`cycle-${code}`}
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    max={31}
-                    value={bankCycleDays[code] ?? ''}
-                    onChange={(e) =>
-                      setBankCycleDays((prev) => ({
-                        ...prev,
-                        [code]: e.target.value,
-                      }))
+            <div className="hidden sm:grid grid-cols-[1fr_9rem_2.5rem] gap-3 px-1 text-xs font-medium uppercase tracking-wide text-gray-500">
+              <span>Bank name</span>
+              <span>Reset day</span>
+              <span className="sr-only">Remove</span>
+            </div>
+            <div className="space-y-3">
+              {banks.length === 0 && (
+                <p className="text-sm text-gray-500">
+                  No banks yet — add your first one below.
+                </p>
+              )}
+              {banks.map((b, i) => (
+                <div
+                  key={i}
+                  className="grid grid-cols-1 sm:grid-cols-[1fr_9rem_2.5rem] gap-3 sm:items-center"
+                >
+                  <div>
+                    <Label htmlFor={`bank-name-${i}`} className="sm:sr-only">
+                      Bank name
+                    </Label>
+                    <Input
+                      id={`bank-name-${i}`}
+                      value={b.name}
+                      onChange={(e) =>
+                        setBanks((prev) =>
+                          prev.map((x, j) =>
+                            j === i ? { ...x, name: e.target.value } : x
+                          )
+                        )
+                      }
+                      placeholder="e.g. First Citizens Bank"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor={`bank-day-${i}`} className="sm:sr-only">
+                      Reset day
+                    </Label>
+                    <Input
+                      id={`bank-day-${i}`}
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={31}
+                      value={b.cycleDay}
+                      onChange={(e) =>
+                        setBanks((prev) =>
+                          prev.map((x, j) =>
+                            j === i ? { ...x, cycleDay: e.target.value } : x
+                          )
+                        )
+                      }
+                      placeholder="1st"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="justify-self-start sm:justify-self-center text-red-600 hover:bg-red-50"
+                    aria-label={`Remove ${b.name || 'bank'}`}
+                    onClick={() =>
+                      setBanks((prev) => prev.filter((_, j) => j !== i))
                     }
-                    placeholder="1 (1st of month)"
-                    className="mt-1"
-                  />
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
               ))}
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setBanks((prev) => [...prev, { name: '', cycleDay: '' }])
+              }
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Add bank
+            </Button>
             <p className="text-sm text-gray-500">
-              This drives each card&apos;s reset date and the &quot;used this
-              cycle&quot; figure. Usage still counts in the calendar month it was
-              logged — a cycle day never moves a charge between months. A per-card
-              override on the card itself takes precedence.
+              The reset day drives each card&apos;s reset date and its &quot;used
+              this cycle&quot; figure. Usage still counts in the calendar month it
+              was logged — a cycle day never moves a charge between months. A
+              per-card override on the card itself takes precedence.
             </p>
             {success && (
               <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
@@ -255,7 +313,7 @@ export default function SettingsPage() {
                 ) : (
                   <>
                     <Save className="w-4 h-4 mr-2" />
-                    Save cycle days
+                    Save banks
                   </>
                 )}
               </Button>

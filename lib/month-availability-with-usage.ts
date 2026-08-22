@@ -2,7 +2,8 @@ import { prisma } from '@/lib/prisma'
 import { buildRecurringAvailabilityEntry } from '@/lib/recurring-availability'
 import { ratePremiumTtd, ratePremiumUsd } from '@/lib/rate-premium'
 import { DEFAULT_CARD_PROCESSING_FEE_PCT } from '@/lib/card-processing-fee'
-import { effectiveCycleDay, type BankCycleDays } from '@/lib/card-cycle'
+import { effectiveCycleDay } from '@/lib/card-cycle'
+import { resolveUserBanks } from '@/lib/card-bank'
 import { usageTtd, usageUsd } from '@/lib/usage-ttd'
 
 export type MonthUsageRow = {
@@ -36,6 +37,7 @@ export async function loadMonthAvailabilityWithUsage(
         defaultExchangeRate: true,
         cardProcessingFeePct: true,
         bankCycleDays: true,
+        banks: true,
       },
     }),
     prisma.monthlyAvailability.findMany({
@@ -93,14 +95,14 @@ export async function loadMonthAvailabilityWithUsage(
   // Effective cycle day per card (explicit override, else per-bank config, else
   // 1 = calendar month). Used to label the reset day and the current-cycle
   // figure — not to bucket usage.
-  const bankCycleDays = (user?.bankCycleDays ?? null) as BankCycleDays | null
+  const banks = resolveUserBanks(user ?? {})
   const cycleDayByCard = new Map<string, number>()
   for (const item of explicitWithFlag) {
-    cycleDayByCard.set(item.cardId, effectiveCycleDay(item.card, bankCycleDays))
+    cycleDayByCard.set(item.cardId, effectiveCycleDay(item.card, banks))
   }
   for (const c of recurringCards) {
     if (!cycleDayByCard.has(c.id)) {
-      cycleDayByCard.set(c.id, effectiveCycleDay(c, bankCycleDays))
+      cycleDayByCard.set(c.id, effectiveCycleDay(c, banks))
     }
   }
 

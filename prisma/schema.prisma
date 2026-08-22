@@ -17,9 +17,13 @@ model User {
   password                 String
   businessName             String
   defaultExchangeRate      Float          @default(6.7993)
-  /** Per-issuing-bank statement cycle day, e.g. {"REPUBLIC_BANK":21}. Cards of
-      that bank default to this reset day; a per-card cycleDay still overrides. */
+  /** Legacy per-issuing-bank statement cycle day, e.g. {"REPUBLIC_BANK":21}.
+      Superseded by `banks`; kept to seed it. */
   bankCycleDays            Json?
+  /** User's editable bank list: [{ "name": "First Citizens Bank", "cycleDay": 14 }].
+      Bank names are stored on Card.issuingBank; cycleDay (or null = 1st) is the
+      statement reset day a card of that bank defaults to. */
+  banks                    Json?
   /** Percent fee charged on card transactions (e.g. 4.5). Applied to projected card cost only — direct USD buys are never marked up. */
   cardProcessingFeePct     Float          @default(4.5)
   createdAt                DateTime       @default(now())
