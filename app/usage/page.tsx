@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useDataChanged } from '@/lib/use-data-changed'
@@ -18,6 +18,8 @@ import {
   Trash2,
   Pencil,
   CheckCircle2,
+  Search,
+  X,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import {
@@ -72,6 +74,13 @@ export default function UsagePage() {
   const [editEntryError, setEditEntryError] = useState('')
   const [savingEntryId, setSavingEntryId] = useState<string | null>(null)
   const [listActionError, setListActionError] = useState('')
+  // Filters for the entries list.
+  const [filterOwner, setFilterOwner] = useState('')
+  const [filterBank, setFilterBank] = useState('')
+  const [filterStatus, setFilterStatus] = useState<'all' | 'unsettled' | 'settled'>(
+    'all'
+  )
+  const [filterSearch, setFilterSearch] = useState('')
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth() + 1
@@ -155,6 +164,10 @@ export default function UsagePage() {
     setEditingEntryId(null)
     setEditEntryError('')
     setListActionError('')
+    setFilterOwner('')
+    setFilterBank('')
+    setFilterStatus('all')
+    setFilterSearch('')
   }, [year, month])
 
   useEffect(() => {
@@ -166,6 +179,54 @@ export default function UsagePage() {
       return f
     })
   }, [cards])
+
+  const ownerOptions = useMemo(() => {
+    const names = new Set<string>()
+    for (const e of entries) names.add(e.card.person.name)
+    return [...names].sort((a, b) => a.localeCompare(b))
+  }, [entries])
+
+  const bankOptions = useMemo(() => {
+    const banks = new Set<string>()
+    for (const e of entries) if (e.card.issuingBank) banks.add(e.card.issuingBank)
+    return [...banks].sort((a, b) =>
+      issuingBankLabel(a).localeCompare(issuingBankLabel(b))
+    )
+  }, [entries])
+
+  const filteredEntries = useMemo(() => {
+    const q = filterSearch.trim().toLowerCase()
+    return entries.filter((e) => {
+      if (filterOwner && e.card.person.name !== filterOwner) return false
+      if (filterBank && e.card.issuingBank !== filterBank) return false
+      if (filterStatus !== 'all') {
+        const card = cards.find((c) => c.id === e.cardId)
+        const rate =
+          card && typeof card.effectiveExchangeRate === 'number'
+            ? card.effectiveExchangeRate
+            : null
+        const usd = typeof e.amountUSD === 'number' ? e.amountUSD : null
+        const owed =
+          usd != null && rate && rate > 0 ? usd * rate - e.paidToOwnerTTD : 0
+        const settled = owed <= 0.005
+        if (filterStatus === 'settled' && !settled) return false
+        if (filterStatus === 'unsettled' && settled) return false
+      }
+      if (q) {
+        const hay = [
+          e.card.cardNickname,
+          e.card.lastFourDigits ?? '',
+          e.card.person.name,
+          e.card.issuingBank ? issuingBankLabel(e.card.issuingBank) : '',
+          e.notes ?? '',
+        ]
+          .join(' ')
+          .toLowerCase()
+        if (!hay.includes(q)) return false
+      }
+      return true
+    })
+  }, [entries, cards, filterOwner, filterBank, filterStatus, filterSearch])
 
   if (status === 'loading') {
     return (
@@ -371,6 +432,15 @@ export default function UsagePage() {
   }
 
   const monthName = format(currentDate, 'MMMM yyyy')
+
+  const filtersActive =
+    !!filterOwner || !!filterBank || filterStatus !== 'all' || !!filterSearch.trim()
+  const clearFilters = () => {
+    setFilterOwner('')
+    setFilterBank('')
+    setFilterStatus('all')
+    setFilterSearch('')
+  }
 
   const renderUsageEditForm = (row: UsageEntry) => (
     <>
@@ -824,6 +894,91 @@ export default function UsagePage() {
                   {listActionError}
                 </div>
               )}
+              <div className="flex flex-col gap-2 border-b bg-gray-50/60 px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative min-w-[9rem] flex-1">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <Input
+                      value={filterSearch}
+                      onChange={(e) => setFilterSearch(e.target.value)}
+                      placeholder="Search card or notes…"
+                      className="h-9 pl-8"
+                    />
+                  </div>
+                  <select
+                    aria-label="Filter by owner"
+                    value={filterOwner}
+                    onChange={(e) => setFilterOwner(e.target.value)}
+                    className="h-9 rounded-lg border border-gray-300 bg-white px-2 text-sm"
+                  >
+                    <option value="">All owners</option>
+                    {ownerOptions.map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </select>
+                  {bankOptions.length > 0 && (
+                    <select
+                      aria-label="Filter by bank"
+                      value={filterBank}
+                      onChange={(e) => setFilterBank(e.target.value)}
+                      className="h-9 rounded-lg border border-gray-300 bg-white px-2 text-sm"
+                    >
+                      <option value="">All banks</option>
+                      {bankOptions.map((b) => (
+                        <option key={b} value={b}>
+                          {issuingBankLabel(b)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <select
+                    aria-label="Filter by settlement status"
+                    value={filterStatus}
+                    onChange={(e) =>
+                      setFilterStatus(
+                        e.target.value as 'all' | 'unsettled' | 'settled'
+                      )
+                    }
+                    className="h-9 rounded-lg border border-gray-300 bg-white px-2 text-sm"
+                  >
+                    <option value="all">All statuses</option>
+                    <option value="unsettled">Unsettled</option>
+                    <option value="settled">Settled</option>
+                  </select>
+                  {filtersActive && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 text-gray-600"
+                      onClick={clearFilters}
+                    >
+                      <X className="mr-1 h-4 w-4" />
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500">
+                  Showing {filteredEntries.length} of {entries.length}{' '}
+                  {entries.length === 1 ? 'entry' : 'entries'}
+                  {filtersActive ? ' (filtered)' : ''}.
+                </p>
+              </div>
+              {filteredEntries.length === 0 ? (
+                <div className="px-6 py-12 text-center text-gray-500">
+                  No entries match your filters.{' '}
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="font-medium text-blue-700 underline"
+                  >
+                    Clear filters
+                  </button>
+                </div>
+              ) : (
+                <>
               <div className="hidden md:block overflow-x-auto touch-pan-x [scrollbar-gutter:stable]">
               <table className="w-full min-w-[46rem] text-sm">
                 <thead>
@@ -847,7 +1002,7 @@ export default function UsagePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {entries.map((row) => (
+                  {filteredEntries.map((row) => (
                     <Fragment key={row.id}>
                       <tr
                         className={`hover:bg-gray-50 ${
@@ -1110,8 +1265,10 @@ export default function UsagePage() {
               </div>
 
               <ul className="md:hidden space-y-3 p-4">
-                {entries.map((row) => renderUsageMobileCard(row))}
+                {filteredEntries.map((row) => renderUsageMobileCard(row))}
               </ul>
+                </>
+              )}
             </div>
           )}
         </CardContent>
