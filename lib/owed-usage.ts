@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
-export type PendingCard = {
+export type OwedCard = {
   cardId: string
   cardNickname: string
   lastFourDigits: string | null
@@ -13,7 +13,7 @@ export type PendingCard = {
   entryCount: number
 }
 
-export type PendingPerson = {
+export type OwedPerson = {
   personId: string
   personName: string
   pendingTTD: number
@@ -22,9 +22,9 @@ export type PendingPerson = {
   cardCount: number
 }
 
-export type PendingUsage = {
-  cards: PendingCard[]
-  people: PendingPerson[]
+export type OwedUsage = {
+  cards: OwedCard[]
+  people: OwedPerson[]
   totalTTD: number
   totalUSD: number
 }
@@ -43,7 +43,7 @@ function round2(n: number): number {
  * with a positive remaining balance count. Person totals are the sum of their
  * cards', so the two views reconcile.
  */
-export async function loadPendingUsage(userId: string): Promise<PendingUsage> {
+export async function loadOwedUsage(userId: string): Promise<OwedUsage> {
   const rows = await prisma.$queryRaw<
     Array<{
       cardId: string
@@ -123,7 +123,7 @@ export async function loadPendingUsage(userId: string): Promise<PendingUsage> {
     ORDER BY "pendingTTD" DESC
   `)
 
-  const cards: PendingCard[] = rows.map((r) => ({
+  const cards: OwedCard[] = rows.map((r) => ({
     cardId: r.cardId,
     cardNickname: r.cardNickname,
     lastFourDigits: r.lastFourDigits,
@@ -135,7 +135,7 @@ export async function loadPendingUsage(userId: string): Promise<PendingUsage> {
     entryCount: Number(r.entryCount),
   }))
 
-  const byPerson = new Map<string, PendingPerson>()
+  const byPerson = new Map<string, OwedPerson>()
   for (const c of cards) {
     const existing = byPerson.get(c.personId)
     if (existing) {

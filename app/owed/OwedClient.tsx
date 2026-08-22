@@ -5,39 +5,33 @@ import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { CreditCard, Users, Search, X, Wallet } from 'lucide-react'
+import { CreditCard, Users, Search, X, CheckCircle2 } from 'lucide-react'
 import { issuingBankLabel } from '@/lib/card-bank'
-import type { PendingAllocations } from '@/lib/pending-allocations'
+import type { OwedUsage } from '@/lib/owed-usage'
 
 type View = 'cards' | 'people'
 
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-]
-
-const fmtUSD = (n: number) =>
-  `USD $${n.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
 const fmtTTD = (n: number) =>
   `TTD $${n.toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`
+const fmtUSD = (n: number) =>
+  `$${n.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} USD`
 
-export function PendingClient({ data }: { data: PendingAllocations }) {
+export function OwedClient({ data }: { data: OwedUsage }) {
   const [view, setView] = useState<View>('cards')
   const [search, setSearch] = useState('')
-  const q = search.trim().toLowerCase()
 
-  const monthLabel = `${MONTHS[data.month - 1] ?? ''} ${data.year}`
+  const q = search.trim().toLowerCase()
 
   const cards = useMemo(() => {
     if (!q) return data.cards
-    return data.cards.filter((c) =>
-      [
+    return data.cards.filter((c) => {
+      const hay = [
         c.personName,
         c.cardNickname,
         c.lastFourDigits ?? '',
@@ -45,8 +39,8 @@ export function PendingClient({ data }: { data: PendingAllocations }) {
       ]
         .join(' ')
         .toLowerCase()
-        .includes(q)
-    )
+      return hay.includes(q)
+    })
   }, [data.cards, q])
 
   const people = useMemo(() => {
@@ -56,36 +50,36 @@ export function PendingClient({ data }: { data: PendingAllocations }) {
 
   const shownCount = view === 'cards' ? cards.length : people.length
   const totalCount = view === 'cards' ? data.cards.length : data.people.length
-  const nothingLeft = data.cards.length === 0
+  const nothingPending = data.cards.length === 0
 
   return (
     <div className="space-y-6 min-w-0">
       <div className="min-w-0">
         <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.02em] bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-          Pending usage
+          Owed to owners
         </h1>
         <p className="text-gray-600 mt-1 text-sm sm:text-base">
-          USD forex allocation still available to use this cycle ({monthLabel}) —
-          by card and by owner.
+          What&apos;s still owed to card owners across all months — usage you
+          haven&apos;t fully paid back yet.
         </p>
       </div>
 
       {/* Summary tiles */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="border-l-4 border-l-emerald-500 shadow-md">
+        <Card className="border-l-4 border-l-red-500 shadow-md">
           <CardContent className="pt-5">
-            <p className="text-sm font-medium text-gray-600">Total available</p>
-            <p className="mt-1 text-3xl font-bold tabular-nums text-emerald-700">
-              {fmtUSD(data.totalLeftUSD)}
+            <p className="text-sm font-medium text-gray-600">Total pending</p>
+            <p className="mt-1 text-3xl font-bold tabular-nums text-red-700">
+              {fmtTTD(data.totalTTD)}
             </p>
             <p className="mt-1 text-xs text-gray-500 tabular-nums">
-              ≈ {fmtTTD(data.totalLeftTTD)}
+              ≈ {fmtUSD(data.totalUSD)}
             </p>
           </CardContent>
         </Card>
         <Card className="shadow-md">
           <CardContent className="pt-5">
-            <p className="text-sm font-medium text-gray-600">Cards with allocation left</p>
+            <p className="text-sm font-medium text-gray-600">Cards with a balance</p>
             <p className="mt-1 text-3xl font-bold tabular-nums text-gray-900">
               {data.cards.length}
             </p>
@@ -93,7 +87,7 @@ export function PendingClient({ data }: { data: PendingAllocations }) {
         </Card>
         <Card className="shadow-md">
           <CardContent className="pt-5">
-            <p className="text-sm font-medium text-gray-600">Owners with headroom</p>
+            <p className="text-sm font-medium text-gray-600">People owed</p>
             <p className="mt-1 text-3xl font-bold tabular-nums text-gray-900">
               {data.people.length}
             </p>
@@ -153,14 +147,13 @@ export function PendingClient({ data }: { data: PendingAllocations }) {
         </div>
       </div>
 
-      {nothingLeft ? (
+      {nothingPending ? (
         <Card className="shadow-md">
           <CardContent className="py-12 text-center">
-            <Wallet className="mx-auto mb-3 h-10 w-10 text-gray-400" />
-            <p className="font-medium text-gray-900">No allocation left</p>
+            <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-green-500" />
+            <p className="font-medium text-gray-900">All settled up</p>
             <p className="mt-1 text-sm text-gray-500">
-              Every card&apos;s forex allocation for {monthLabel} is fully used, or
-              no availability is set for this month.
+              Nothing is currently owed to any card owner.
             </p>
           </CardContent>
         </Card>
@@ -193,16 +186,15 @@ export function PendingClient({ data }: { data: PendingAllocations }) {
                           {c.personName}
                           {c.issuingBank ? ` · ${issuingBankLabel(c.issuingBank)}` : ''}
                           {' · '}
-                          {`$${c.usedUSD.toLocaleString('en-US')} of $${c.allocationUSD.toLocaleString('en-US')} used`}
-                          {c.cycleLabel ? ` · ${c.cycleLabel}` : ''}
+                          {c.entryCount} unpaid {c.entryCount === 1 ? 'entry' : 'entries'}
                         </p>
                       </div>
                       <div className="shrink-0 text-right">
-                        <p className="font-semibold tabular-nums text-emerald-700">
-                          {fmtUSD(c.leftUSD)}
+                        <p className="font-semibold tabular-nums text-red-700">
+                          {fmtTTD(c.pendingTTD)}
                         </p>
                         <p className="text-xs tabular-nums text-gray-500">
-                          ≈ {fmtTTD(c.leftTTD)}
+                          {fmtUSD(c.pendingUSD)}
                         </p>
                       </div>
                     </Link>
@@ -223,15 +215,16 @@ export function PendingClient({ data }: { data: PendingAllocations }) {
                     <div className="min-w-0">
                       <p className="font-semibold text-gray-900">{p.personName}</p>
                       <p className="mt-0.5 truncate text-xs text-gray-500">
-                        {p.cardCount} {p.cardCount === 1 ? 'card' : 'cards'} with allocation left
+                        {p.cardCount} {p.cardCount === 1 ? 'card' : 'cards'} · {p.entryCount}{' '}
+                        unpaid {p.entryCount === 1 ? 'entry' : 'entries'}
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="font-semibold tabular-nums text-emerald-700">
-                        {fmtUSD(p.leftUSD)}
+                      <p className="font-semibold tabular-nums text-red-700">
+                        {fmtTTD(p.pendingTTD)}
                       </p>
                       <p className="text-xs tabular-nums text-gray-500">
-                        ≈ {fmtTTD(p.leftTTD)}
+                        {fmtUSD(p.pendingUSD)}
                       </p>
                     </div>
                   </Link>

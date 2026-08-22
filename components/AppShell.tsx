@@ -17,7 +17,8 @@ import {
   Menu,
   X,
   Banknote,
-  Clock,
+  Coins,
+  HandCoins,
 } from 'lucide-react'
 import { signOut, useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
@@ -30,7 +31,8 @@ const LINKS = [
   { href: '/cards', label: 'Cards', icon: CreditCard },
   { href: '/availability', label: 'Availability', icon: Calendar },
   { href: '/usage', label: 'Usage', icon: Wallet },
-  { href: '/pending', label: 'Pending', icon: Clock },
+  { href: '/pending', label: 'Pending', icon: Coins },
+  { href: '/owed', label: 'Owed', icon: HandCoins },
   { href: '/payments', label: 'Payments', icon: Receipt },
   { href: '/usd-purchases', label: 'USD Buys', icon: Banknote },
   { href: '/settings', label: 'Settings', icon: Settings },
