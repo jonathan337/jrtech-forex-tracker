@@ -333,42 +333,38 @@ type ResolveCardResult =
     }
   | { ok: false; error: string }
 
-export async function resolveCard(
-  userId: string,
-  query: string
-): Promise<ResolveCardResult> {
-  const q = query.trim()
-  if (!q) return { ok: false, error: 'No card provided.' }
-  const matches = await prisma.card.findMany({
-    where: {
-      person: { userId },
-      OR: [
-        { cardNickname: { contains: q, mode: 'insensitive' } },
-        { lastFourDigits: { contains: q } },
-        { person: { name: { contains: q, mode: 'insensitive' } } },
-      ],
-    },
-    select: {
-      id: true,
-      cardNickname: true,
-      lastFourDigits: true,
-      issuingBank: true,
-      person: { select: { id: true, name: true } },
-    },
-    take: 10,
-  })
-  if (matches.length === 0) {
-    return { ok: false, error: `No card found matching "${q}".` }
+/** Words a card query can contain that carry no matching signal. */
+const CARD_QUERY_STOPWORDS = new Set([
+  'the', 'a', 'an', 'card', 'cards', 'for', 'on', 'to', 'of', 'and',
+  'usage', 'use', 'used', 'atm', 'withdrawal', 'add', 'log', 'note', 'notes',
+])
+
+/** Words that should resolve to each stored issuingBank code, including the
+ *  abbreviations people actually type (FCB = First Citizens, RBL = Republic). */
+function bankSynonyms(code: string | null | undefined): string[] {
+  switch (code) {
+    case 'SCOTIABANK':
+      return ['scotia', 'scotiabank']
+    case 'REPUBLIC_BANK':
+      return ['republic', 'rbl', 'republicbank']
+    case 'FIRST_CITIZENS':
+      return ['first', 'citizens', 'fcb', 'firstcitizens']
+    case 'RBC':
+      return ['rbc', 'royal']
+    default:
+      return code ? [code.toLowerCase()] : []
   }
-  if (matches.length > 1) {
-    return {
-      ok: false,
-      error: `Multiple cards match "${q}": ${matches
-        .map((m) => cardLabel(m))
-        .join('; ')}. Ask the user which one.`,
-    }
-  }
-  const c = matches[0]
+}
+
+type CardRow = {
+  id: string
+  cardNickname: string
+  lastFourDigits: string | null
+  issuingBank: string | null
+  person: { id: string; name: string }
+}
+
+function resolvedCard(c: CardRow): ResolveCardResult {
   return {
     ok: true,
     cardId: c.id,
@@ -376,6 +372,98 @@ export async function resolveCard(
     personId: c.person.id,
     personName: c.person.name,
   }
+}
+
+/**
+ * Resolve a card from the user's free-text reference.
+ *
+ * Handles what the old single-field `contains` match could not:
+ * - the issuing bank, including abbreviations (fcb → First Citizens, rbl →
+ *   Republic Bank);
+ * - multi-token queries that span fields ("Esther fcb" = owner + bank);
+ * - the label this assistant emits itself, e.g.
+ *   "Esther Mohammed (FCB Platinum ••9141 · First Citizens)".
+ *
+ * A 4-digit run that uniquely matches a card's last four wins outright.
+ * Otherwise every meaningful token must match some field of a card (owner name,
+ * nickname, last four, or bank synonym); the card matching all tokens wins, and
+ * a tie asks the user to choose.
+ */
+export async function resolveCard(
+  userId: string,
+  query: string
+): Promise<ResolveCardResult> {
+  const raw = query.trim()
+  if (!raw) return { ok: false, error: 'No card provided.' }
+
+  const cards: CardRow[] = await prisma.card.findMany({
+    where: { person: { userId } },
+    select: {
+      id: true,
+      cardNickname: true,
+      lastFourDigits: true,
+      issuingBank: true,
+      person: { select: { id: true, name: true } },
+    },
+  })
+  if (cards.length === 0) {
+    return { ok: false, error: `No card found matching "${raw}".` }
+  }
+
+  // Strip the punctuation the emitted label uses (parens, ••, ·) so it parses
+  // back cleanly, then lowercase.
+  const cleaned = raw
+    .toLowerCase()
+    .replace(/[()[\]•·,]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  // Strongest signal: a 4-digit run that matches exactly one card's last four.
+  for (const digits of cleaned.match(/\b\d{4}\b/g) ?? []) {
+    const hits = cards.filter((c) => c.lastFourDigits === digits)
+    if (hits.length === 1) return resolvedCard(hits[0])
+  }
+
+  const allTokens = cleaned
+    .split(' ')
+    .filter((t) => t.length > 0 && !CARD_QUERY_STOPWORDS.has(t))
+  // A 4-digit last four is already handled above; any other bare number in a
+  // card reference is an amount/quantity, not an identifier. Drop numeric tokens
+  // when a textual one remains, so "add 500 ... Jonathan fcb" still resolves.
+  const textTokens = allTokens.filter((t) => !/^\d+$/.test(t))
+  const tokens = textTokens.length > 0 ? textTokens : allTokens
+  if (tokens.length === 0) {
+    return { ok: false, error: `No card found matching "${raw}".` }
+  }
+
+  // A token matches a card if it appears in the owner name, nickname, or last
+  // four, or names the card's bank. A card is a candidate only if EVERY token
+  // matches it, so naming an owner who has no such card doesn't fall through to
+  // some unrelated card by bank alone.
+  const candidates = cards.filter((c) => {
+    const haystack = [
+      c.person.name.toLowerCase(),
+      c.cardNickname.toLowerCase(),
+      c.lastFourDigits ?? '',
+      ...bankSynonyms(c.issuingBank),
+    ]
+    return tokens.every((t) => {
+      if (haystack.some((h) => h.includes(t))) return true
+      const bank = normalizeIssuingBank(t)
+      return bank != null && bank === c.issuingBank
+    })
+  })
+
+  if (candidates.length === 1) return resolvedCard(candidates[0])
+  if (candidates.length > 1) {
+    return {
+      ok: false,
+      error: `Multiple cards match "${raw}": ${candidates
+        .map((m) => cardLabel(m))
+        .join('; ')}. Ask the user which one.`,
+    }
+  }
+  return { ok: false, error: `No card found matching "${raw}".` }
 }
 
 /** ---- Write executors (called only after user confirmation) ---------- */
@@ -678,8 +766,8 @@ export function normalizeIssuingBank(input: string | null | undefined): string |
   const q = (input ?? '').trim().toLowerCase()
   if (!q) return null
   if (q.includes('scotia')) return 'SCOTIABANK'
-  if (q.includes('republic')) return 'REPUBLIC_BANK'
-  if (q.includes('first citizen') || q === 'fcb') return 'FIRST_CITIZENS'
+  if (q.includes('republic') || q.includes('rbl')) return 'REPUBLIC_BANK'
+  if (q.includes('first citizen') || q.includes('fcb')) return 'FIRST_CITIZENS'
   if (q.includes('rbc') || q.includes('royal')) return 'RBC'
   return null
 }

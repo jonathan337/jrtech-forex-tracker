@@ -102,7 +102,20 @@ export async function POST(request: Request) {
 
         // ---- Write tools: resolve + build a pending (un-executed) action ----
         if (WRITE_TOOLS.has(name)) {
-          const result = await buildPendingAction(userId, name, args)
+          // A failure to resolve the card/person must come back as a tool error
+          // the model can relay ("I couldn't find that card"), never a 500 that
+          // shows the user "the assistant ran into a problem".
+          let result: Awaited<ReturnType<typeof buildPendingAction>>
+          try {
+            result = await buildPendingAction(userId, name, args)
+          } catch (err) {
+            console.error(`[assistant write ${name}]`, err)
+            result = {
+              ok: false,
+              error:
+                'Could not prepare that action. Ask the user to rephrase, or which card/person they mean.',
+            }
+          }
           responseParts.push({
             functionResponse: {
               name,
