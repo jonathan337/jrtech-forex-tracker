@@ -3,14 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { z } from 'zod'
 import { serverErrorResponse } from '@/lib/api-error'
+import { loadPayments } from '@/lib/payments-data'
 
 export const runtime = 'nodejs'
-
-function monthBoundsUTC(year: number, month: number): { start: Date; end: Date } {
-  const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0))
-  const end = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999))
-  return { start, end }
-}
 
 const postSchema = z.object({
   amountTTD: z.number().positive('Amount must be positive'),
@@ -37,31 +32,8 @@ export async function GET(request: Request) {
     const month =
       Number.isFinite(mi) && mi >= 1 && mi <= 12 ? mi : now.getUTCMonth() + 1
 
-    const { start, end } = monthBoundsUTC(year, month)
-
-    const rows = await prisma.sentPayment.findMany({
-      where: {
-        userId: session.user.id,
-        paidAt: { gte: start, lte: end },
-      },
-      include: {
-        person: { select: { id: true, name: true } },
-      },
-      orderBy: [{ paidAt: 'desc' }, { createdAt: 'desc' }],
-    })
-
-    return NextResponse.json({
-      year,
-      month,
-      payments: rows.map((r) => ({
-        id: r.id,
-        amountTTD: r.amountTTD,
-        paidAt: r.paidAt.toISOString(),
-        notes: r.notes,
-        personId: r.personId,
-        personName: r.person?.name ?? null,
-      })),
-    })
+    const data = await loadPayments(session.user.id, year, month)
+    return NextResponse.json(data)
   } catch (error) {
     console.error('Error fetching payments:', error)
     return serverErrorResponse('Failed to fetch payments', error)

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { z } from 'zod'
+import { loadAvailability } from '@/lib/availability-data'
 
 export const runtime = 'nodejs'
 
@@ -42,27 +43,11 @@ export async function GET(request: Request) {
     const year = searchParams.get('year')
     const month = searchParams.get('month')
 
-    const where = {
-      card: {
-        person: {
-          userId: session.user.id,
-        },
-      },
-      ...(year && { year: parseInt(year) }),
-      ...(month && { month: parseInt(month) }),
-    }
-
-    const availability = await prisma.monthlyAvailability.findMany({
-      where,
-      include: {
-        card: {
-          include: {
-            person: true,
-          },
-        },
-      },
-      orderBy: [{ year: 'desc' }, { month: 'desc' }, { paymentDate: 'asc' }],
-    })
+    const availability = await loadAvailability(
+      session.user.id,
+      year ? parseInt(year) : undefined,
+      month ? parseInt(month) : undefined
+    )
 
     return NextResponse.json(availability)
   } catch (error) {

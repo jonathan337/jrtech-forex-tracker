@@ -6,7 +6,7 @@ import {
   isUsdPurchaseMethod,
   USD_PURCHASE_METHODS,
 } from '@/lib/usd-purchase-methods'
-import { loadMonthUsdCostSummary } from '@/lib/month-usd-cost-summary'
+import { loadUsdPurchases } from '@/lib/usd-purchases-data'
 
 export const runtime = 'nodejs'
 
@@ -41,15 +41,9 @@ export async function GET(request: Request) {
     const y = parseInt(year, 10)
     const m = parseInt(month, 10)
 
-    const [purchases, summary] = await Promise.all([
-      prisma.usdPurchase.findMany({
-        where: { userId: session.user.id, year: y, month: m },
-        orderBy: { purchasedAt: 'desc' },
-      }),
-      loadMonthUsdCostSummary(session.user.id, y, m),
-    ])
+    const data = await loadUsdPurchases(session.user.id, y, m)
 
-    return NextResponse.json({ purchases, summary })
+    return NextResponse.json(data)
   } catch (error) {
     console.error('Error fetching USD purchases:', error)
     return NextResponse.json(
