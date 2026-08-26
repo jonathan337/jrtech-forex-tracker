@@ -180,7 +180,7 @@ export function PendingClient({ data }: { data: PendingAllocations }) {
                   <li key={c.cardId}>
                     <Link
                       href={`/cards/${c.cardId}`}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50/40"
+                      className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm outline-none transition-[transform,background-color,border-color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:border-blue-200 hover:bg-blue-50/40 hover:shadow-md hover:-translate-y-px active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2"
                     >
                       <div className="min-w-0">
                         <p className="font-semibold text-gray-900">

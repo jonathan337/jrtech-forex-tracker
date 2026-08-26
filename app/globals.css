@@ -9,6 +9,10 @@
    */
   color-scheme: light;
   --foreground: #171717;
+  /* Motion — strong, exponential easing (built-in CSS curves are too weak).
+     A professional dashboard: crisp and fast, transform/opacity only. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
 @theme inline {
@@ -74,7 +78,28 @@ select:hover:not(:disabled) {
   background: transparent;
 }
 
+/* One authored moment per route: content settles in from just below,
+   already-visible-to-final. Keyed by pathname in AppShell so it replays on
+   navigation. transform + opacity only — GPU-cheap. */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.page-enter {
+  animation: page-enter 320ms var(--ease-out) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  /* Keep a gentle fade for comprehension; drop the movement. */
+  .page-enter {
+    animation: none;
+  }
   *,
   *::before,
   *::after {
