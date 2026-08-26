@@ -598,7 +598,7 @@ export function AvailabilityClient({
     <div className="space-y-6 min-w-0">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between min-w-0">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.02em] bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-blue-700">
             Monthly Availability
           </h1>
           <p className="text-gray-600 mt-1 text-sm sm:text-base">
@@ -611,7 +611,7 @@ export function AvailabilityClient({
               type="checkbox"
               checked={groupByOwner}
               onChange={(e) => setGroupByOwner(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
             Group by owner
           </label>
@@ -624,7 +624,7 @@ export function AvailabilityClient({
 
       {showForm && (
         <Card className="border-2 border-blue-200 shadow-xl min-w-0 overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-50">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between min-w-0">
               <div className="min-w-0">
                 <CardTitle className="text-xl">
@@ -959,9 +959,9 @@ export function AvailabilityClient({
                     key={card.id}
                     className="shadow-md hover:shadow-lg transition-shadow"
                   >
-                    <CardHeader className="bg-gradient-to-r from-purple-50 to-blue-50 border-b">
+                    <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-50 border-b">
                       <CardTitle className="flex items-center gap-2">
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
                           <span className="text-white font-bold">
                             {card.cardNickname[0]}
                           </span>
@@ -988,9 +988,9 @@ export function AvailabilityClient({
         <div className="grid gap-6">
           {Object.values(groupedByCard).map(({ card, entries }) => (
             <Card key={card.id} className="shadow-md hover:shadow-lg transition-shadow">
-              <CardHeader className="bg-gradient-to-r from-purple-50 to-blue-50 border-b">
+              <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-50 border-b">
                 <CardTitle className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
                     <span className="text-white font-bold">{card.cardNickname[0]}</span>
                   </div>
                   <div>

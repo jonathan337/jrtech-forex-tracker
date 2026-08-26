@@ -739,7 +739,7 @@ export function UsageClient({
     <div className="space-y-6 min-w-0">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between min-w-0">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.02em] bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-blue-700">
             Card usage
           </h1>
           <p className="text-gray-600 mt-1 text-sm sm:text-base">

@@ -299,7 +299,7 @@ export function PeopleClient({ initialData }: { initialData: Person[] | null }) 
     <div className="space-y-6 min-w-0">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between min-w-0">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.02em] bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-blue-700">
             People
           </h1>
           <p className="text-gray-600 mt-1 text-sm sm:text-base">
@@ -367,7 +367,7 @@ export function PeopleClient({ initialData }: { initialData: Person[] | null }) 
 
       {showForm && (
         <Card className="border-2 border-blue-200 shadow-xl min-w-0 overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-50">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between min-w-0">
               <div className="min-w-0">
                 <CardTitle className="text-xl">
@@ -575,11 +575,11 @@ export function PeopleClient({ initialData }: { initialData: Person[] | null }) 
             const spendOverspent = spendTTD < -0.005 || spendUSD < -0.005
             return (
             <Card key={person.id} className="shadow-md hover:shadow-lg transition-shadow min-w-0 overflow-hidden flex flex-col h-full">
-              <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b space-y-3">
+              <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-50 border-b space-y-3">
                 <div className="flex gap-3 min-w-0">
                   <Link
                     href={`/people/${person.id}?year=${budgetYear}&month=${budgetMonth}`}
-                    className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0 text-white font-bold text-lg hover:ring-2 hover:ring-purple-300 hover:ring-offset-2 transition-shadow"
+                    className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0 text-white font-bold text-lg hover:ring-2 hover:ring-blue-300 hover:ring-offset-2 transition-shadow"
                     aria-label={`Open dashboard for ${person.name}`}
                   >
                     {person.name[0]?.toUpperCase() ?? '?'}
@@ -588,20 +588,20 @@ export function PeopleClient({ initialData }: { initialData: Person[] | null }) 
                     <CardTitle className="text-lg font-semibold leading-snug text-gray-900 break-words hyphens-auto">
                       <Link
                         href={`/people/${person.id}?year=${budgetYear}&month=${budgetMonth}`}
-                        className="hover:text-purple-900 hover:underline decoration-purple-400 underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 rounded-sm"
+                        className="hover:text-blue-900 hover:underline decoration-blue-400 underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-sm"
                       >
                         {person.name}
                       </Link>
                     </CardTitle>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">
+                      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
                         {person.cards.length} {person.cards.length === 1 ? 'card' : 'cards'}
                       </span>
                     </div>
                   </div>
                 </div>
                 <div
-                  className="flex flex-wrap items-center gap-2 pt-2 border-t border-purple-200/60 -mb-1"
+                  className="flex flex-wrap items-center gap-2 pt-2 border-t border-blue-200/60 -mb-1"
                   role="toolbar"
                   aria-label={`Actions for ${person.name}`}
                 >
@@ -615,8 +615,8 @@ export function PeopleClient({ initialData }: { initialData: Person[] | null }) 
                     }}
                     className={
                       addPaymentForPersonId === person.id
-                        ? 'bg-violet-700 hover:bg-violet-800 text-white shrink-0'
-                        : 'bg-violet-600 hover:bg-violet-700 text-white shrink-0'
+                        ? 'bg-blue-700 hover:bg-blue-800 text-white shrink-0'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white shrink-0'
                     }
                     title="Record a payment to this person (applied to oldest unpaid usage first)"
                     aria-label={
@@ -656,12 +656,12 @@ export function PeopleClient({ initialData }: { initialData: Person[] | null }) 
                     <Wallet className="w-4 h-4 mr-1.5 shrink-0" aria-hidden />
                     <span>{logUsageForPersonId === person.id ? 'Hide' : 'Log usage'}</span>
                   </Button>
-                  <span className="hidden sm:block w-px h-6 bg-purple-200/90 shrink-0" aria-hidden />
+                  <span className="hidden sm:block w-px h-6 bg-blue-200/90 shrink-0" aria-hidden />
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => handleEdit(person)}
-                    className="hover:bg-purple-100 shrink-0"
+                    className="hover:bg-blue-100 shrink-0"
                     title="Edit person"
                   >
                     <Edit className="w-4 h-4" />

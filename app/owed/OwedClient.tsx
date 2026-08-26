@@ -55,7 +55,7 @@ export function OwedClient({ data }: { data: OwedUsage }) {
   return (
     <div className="space-y-6 min-w-0">
       <div className="min-w-0">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.02em] bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-blue-700">
           Owed to owners
         </h1>
         <p className="text-gray-600 mt-1 text-sm sm:text-base">
@@ -66,7 +66,7 @@ export function OwedClient({ data }: { data: OwedUsage }) {
 
       {/* Summary tiles */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="border-l-4 border-l-red-500 shadow-md">
+        <Card className="shadow-md">
           <CardContent className="pt-5">
             <p className="text-sm font-medium text-gray-600">Total pending</p>
             <p className="mt-1 text-3xl font-bold tabular-nums text-red-700">

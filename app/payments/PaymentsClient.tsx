@@ -233,7 +233,7 @@ export function PaymentsClient({
     <div className="space-y-6 min-w-0">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.02em] bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent inline-flex items-center gap-2">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-blue-700 inline-flex items-center gap-2">
             <Receipt className="w-7 h-7 sm:w-8 sm:h-8 text-emerald-600 shrink-0" aria-hidden />
             Payments
           </h1>
@@ -262,7 +262,7 @@ export function PaymentsClient({
         </div>
       </div>
 
-      <Card className="border-l-4 border-l-emerald-500 shadow-md">
+      <Card className="shadow-md">
         <CardHeader className="pb-2">
           <CardTitle className="text-base sm:text-lg">This month (TTD)</CardTitle>
           <CardDescription>
@@ -296,7 +296,7 @@ export function PaymentsClient({
       </div>
 
       {showForm && (
-        <Card className="border border-indigo-200 bg-indigo-50/40 shadow-sm">
+        <Card className="border border-blue-200 bg-blue-50/40 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">New payment</CardTitle>
           </CardHeader>

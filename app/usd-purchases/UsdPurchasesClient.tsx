@@ -287,7 +287,7 @@ export function UsdPurchasesClient({
     <div className="space-y-6 min-w-0">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.02em] bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-blue-700">
             USD Buys
           </h1>
           <p className="text-gray-600 mt-1 text-sm sm:text-base">
@@ -326,7 +326,7 @@ export function UsdPurchasesClient({
 
       {summary && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Card className="border-l-4 border-l-emerald-500 shadow-md">
+          <Card className="shadow-md">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-emerald-600" />
