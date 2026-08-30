@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { MessageCircle, X, Send, Check, Loader2, Sparkles } from 'lucide-react'
 import type { PendingAction } from '@/lib/assistant/tools'
 import { emitDataChanged } from '@/lib/use-data-changed'
@@ -99,6 +100,7 @@ function RichText({ text }: { text: string }) {
 }
 
 export function ChatWidget() {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -205,8 +207,13 @@ export function ChatWidget() {
         }
       }
       if (anyOk) {
-        // Tell any open page to refresh its data so the changes show immediately.
+        // Refresh the open page's data so changes show without a manual reload.
+        // emitDataChanged covers pages whose client subtree has hydrated and is
+        // listening; router.refresh re-renders the server components and updates
+        // the page even when its subtree hasn't hydrated yet (e.g. the user only
+        // interacted with this assistant, never the page itself).
         emitDataChanged({})
+        router.refresh()
       }
       const content = results
         .map((r) => (actions.length > 1 ? `- ${r}` : r))
