@@ -16,9 +16,10 @@ import {
   User,
   Loader2,
   ChevronRight,
+  RefreshCw,
 } from 'lucide-react'
 import { useGroupByOwner } from '@/hooks/use-group-by-owner'
-import { useDataChanged } from '@/lib/use-data-changed'
+import { useDataChanged, emitDataChanged } from '@/lib/use-data-changed'
 import { MobileAddButton } from '@/components/ui/mobile-add-button'
 import { issuingBankLabel, type Bank } from '@/lib/card-bank'
 import { bankCycleDayFor } from '@/lib/card-cycle'
@@ -385,6 +386,66 @@ export function CardsClient({
       cycleDay: card.cycleDay != null ? String(card.cycleDay) : '',
     })
     setShowForm(true)
+  }
+
+  // Change a recurring card's rate "effective from" a month, freezing prior
+  // months at the old rate (see /api/cards/[id]/change-rate).
+  const [rateCard, setRateCard] = useState<CardType | null>(null)
+  const [rateForm, setRateForm] = useState({ newRate: '', effective: '' })
+  const [rateSaving, setRateSaving] = useState(false)
+  const [rateError, setRateError] = useState('')
+
+  const openRateChange = (card: CardType) => {
+    setRateError('')
+    const now = new Date()
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    setRateForm({
+      newRate:
+        card.recurringExchangeRate != null ? String(card.recurringExchangeRate) : '',
+      effective: ym,
+    })
+    setRateCard(card)
+  }
+
+  const submitRateChange = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!rateCard) return
+    const newRate = parseFloat(rateForm.newRate)
+    if (Number.isNaN(newRate) || newRate <= 0) {
+      setRateError('Enter a positive rate.')
+      return
+    }
+    const m = /^(\d{4})-(\d{2})$/.exec(rateForm.effective)
+    if (!m) {
+      setRateError('Pick the month the new rate takes effect.')
+      return
+    }
+    setRateSaving(true)
+    setRateError('')
+    try {
+      const res = await fetch(`/api/cards/${rateCard.id}/change-rate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          newRate,
+          effectiveYear: parseInt(m[1], 10),
+          effectiveMonth: parseInt(m[2], 10),
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setRateError(typeof data.error === 'string' ? data.error : 'Could not change rate.')
+        return
+      }
+      setRateCard(null)
+      emitDataChanged({})
+      await fetchCards()
+    } catch {
+      setRateError('Network error. Try again.')
+    } finally {
+      setRateSaving(false)
+    }
   }
 
   const handleDelete = async (id: string) => {
@@ -850,6 +911,17 @@ export function CardsClient({
                               onClick={(e) => e.stopPropagation()}
                               onKeyDown={(e) => e.stopPropagation()}
                             >
+                              {card.alwaysAvailable && card.recurringExchangeRate != null && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openRateChange(card)}
+                                  className="hover:bg-blue-100"
+                                  title="Change rate (effective from a month)"
+                                >
+                                  <RefreshCw className="w-4 h-4 text-gray-600" />
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -933,6 +1005,17 @@ export function CardsClient({
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
                       >
+                        {card.alwaysAvailable && card.recurringExchangeRate != null && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openRateChange(card)}
+                            className="hover:bg-blue-100"
+                            title="Change rate (effective from a month)"
+                          >
+                            <RefreshCw className="w-4 h-4 text-gray-600" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -978,6 +1061,97 @@ export function CardsClient({
       )}
 
       <MobileAddButton label="Add card" onClick={openAddForm} />
+
+      {rateCard && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4"
+          onClick={() => !rateSaving && setRateCard(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <form onSubmit={submitRateChange} className="p-6 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="text-lg font-semibold text-gray-900">Change rate</h2>
+                  <p className="mt-0.5 text-sm text-gray-500 truncate">
+                    {rateCard.cardNickname}
+                    {rateCard.lastFourDigits ? ` ••${rateCard.lastFourDigits}` : ''} ·{' '}
+                    {rateCard.person.name}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRateCard(null)}
+                  className="shrink-0 text-gray-400 hover:text-gray-600"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="rc-rate">New rate (TTD/USD)</Label>
+                  <Input
+                    id="rc-rate"
+                    type="number"
+                    step="0.0001"
+                    value={rateForm.newRate}
+                    onChange={(e) =>
+                      setRateForm((f) => ({ ...f, newRate: e.target.value }))
+                    }
+                    placeholder="7.35"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="rc-eff">Effective from</Label>
+                  <input
+                    id="rc-eff"
+                    type="month"
+                    value={rateForm.effective}
+                    onChange={(e) =>
+                      setRateForm((f) => ({ ...f, effective: e.target.value }))
+                    }
+                    className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                    required
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-500">
+                Months before the effective month keep the current rate
+                {rateCard.recurringExchangeRate != null
+                  ? ` of ${rateCard.recurringExchangeRate}`
+                  : ''}
+                ; the effective month onward uses the new rate. Past usage already
+                keeps the rate it was logged at.
+              </p>
+              {rateError && <p className="text-sm text-red-600">{rateError}</p>}
+              <div className="flex gap-2 pt-1">
+                <Button type="submit" disabled={rateSaving}>
+                  {rateSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving…
+                    </>
+                  ) : (
+                    'Apply rate change'
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={rateSaving}
+                  onClick={() => setRateCard(null)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
