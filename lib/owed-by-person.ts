@@ -90,3 +90,133 @@ export async function loadOwedByPerson(userId: string): Promise<OwedByPerson> {
   }
   return { owedTTDByPerson, owedUSDByPerson }
 }
+
+export type CarriedOwedMonth = { year: number; month: number; owedTTD: number }
+
+export type CarriedOwedCard = {
+  cardId: string
+  cardNickname: string
+  lastFourDigits: string | null
+  owedTTD: number
+  months: CarriedOwedMonth[]
+}
+
+export type CarriedOwed = {
+  totalTTD: number
+  cards: CarriedOwedCard[]
+}
+
+/**
+ * Unpaid usage on one person's cards from months strictly BEFORE (year, month),
+ * broken down per card and per usage month. Same rate resolution and legacy-row
+ * handling as loadOwedByPerson, so the numbers reconcile with the all-time
+ * owed totals shown on the People page.
+ */
+export async function loadCarriedOwedForPerson(
+  userId: string,
+  personId: string,
+  year: number,
+  month: number
+): Promise<CarriedOwed> {
+  const rows = await prisma.$queryRaw<
+    Array<{
+      cardId: string
+      cardNickname: string
+      lastFourDigits: string | null
+      year: number
+      month: number
+      owedTTD: number
+    }>
+  >(Prisma.sql`
+    WITH usage_rates AS (
+      SELECT
+        c."id" AS card_id,
+        c."cardNickname" AS card_nickname,
+        c."lastFourDigits" AS last_four,
+        u."year" AS usage_year,
+        u."month" AS usage_month,
+        u."amountUSD" AS amount_usd,
+        u."amountTTD" AS amount_ttd,
+        u."paidToOwnerTTD" AS paid_ttd,
+        COALESCE(
+          ma."exchangeRate",
+          CASE
+            WHEN c."alwaysAvailable" AND c."recurringExchangeRate" IS NOT NULL
+              THEN c."recurringExchangeRate"
+          END,
+          CASE
+            WHEN usr."defaultExchangeRate" > 0 THEN usr."defaultExchangeRate"
+          END
+        ) AS rate
+      FROM "CardUsage" u
+      JOIN "Card" c ON c."id" = u."cardId"
+      JOIN "Person" p
+        ON p."id" = c."personId"
+       AND p."userId" = ${userId}
+       AND p."id" = ${personId}
+      JOIN "User" usr ON usr."id" = p."userId"
+      LEFT JOIN "MonthlyAvailability" ma
+        ON ma."cardId" = u."cardId"
+       AND ma."year" = u."year"
+       AND ma."month" = u."month"
+      WHERE (u."year" < ${year} OR (u."year" = ${year} AND u."month" < ${month}))
+    ),
+    owed_rows AS (
+      SELECT
+        card_id,
+        card_nickname,
+        last_four,
+        usage_year,
+        usage_month,
+        (CASE
+          WHEN amount_usd IS NOT NULL AND abs(amount_ttd - amount_usd) < 0.01
+            THEN amount_usd * rate
+          ELSE amount_ttd
+        END) - paid_ttd AS owed_ttd
+      FROM usage_rates
+      WHERE rate IS NOT NULL AND rate > 0
+    )
+    SELECT
+      card_id AS "cardId",
+      card_nickname AS "cardNickname",
+      last_four AS "lastFourDigits",
+      usage_year AS "year",
+      usage_month AS "month",
+      SUM(owed_ttd) AS "owedTTD"
+    FROM owed_rows
+    WHERE owed_ttd > 0.005
+    GROUP BY card_id, card_nickname, last_four, usage_year, usage_month
+    ORDER BY usage_year, usage_month
+  `)
+
+  const byCard = new Map<string, CarriedOwedCard>()
+  let totalTTD = 0
+  for (const row of rows) {
+    const owed = Number(row.owedTTD)
+    totalTTD += owed
+    let card = byCard.get(row.cardId)
+    if (!card) {
+      card = {
+        cardId: row.cardId,
+        cardNickname: row.cardNickname,
+        lastFourDigits: row.lastFourDigits,
+        owedTTD: 0,
+        months: [],
+      }
+      byCard.set(row.cardId, card)
+    }
+    card.owedTTD += owed
+    card.months.push({
+      year: Number(row.year),
+      month: Number(row.month),
+      owedTTD: owed,
+    })
+  }
+
+  return {
+    totalTTD,
+    cards: [...byCard.values()].sort((a, b) =>
+      a.cardNickname.localeCompare(b.cardNickname)
+    ),
+  }
+}

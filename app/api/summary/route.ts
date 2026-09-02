@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { loadMonthAvailabilityWithUsage } from '@/lib/month-availability-with-usage'
 import { buildMonthSummary, monthUsageTotals } from '@/lib/month-summary'
+import { loadCarriedOwedForPerson, type CarriedOwed } from '@/lib/owed-by-person'
 
 export const runtime = 'nodejs'
 
@@ -32,17 +33,22 @@ export async function GET(request: Request) {
 
     let rows = availabilityWithUsage
     let personMeta: { id: string; name: string } | null = null
+    let carriedOver: CarriedOwed | null = null
 
     const personIdParam = searchParams.get('personId')?.trim()
     if (personIdParam) {
-      const person = await prisma.person.findFirst({
-        where: { id: personIdParam, userId: session.user.id },
-        select: { id: true, name: true },
-      })
+      const [person, carried] = await Promise.all([
+        prisma.person.findFirst({
+          where: { id: personIdParam, userId: session.user.id },
+          select: { id: true, name: true },
+        }),
+        loadCarriedOwedForPerson(session.user.id, personIdParam, y, m),
+      ])
       if (!person) {
         return NextResponse.json({ error: 'Person not found' }, { status: 404 })
       }
       personMeta = person
+      carriedOver = carried
       rows = availabilityWithUsage.filter(
         (row) => row.card.person.id === person.id
       )
@@ -66,7 +72,9 @@ export async function GET(request: Request) {
     })
 
     return NextResponse.json(
-      personMeta ? { ...summary, person: personMeta } : summary
+      personMeta
+        ? { ...summary, person: personMeta, carriedOver }
+        : summary
     )
   } catch (error) {
     console.error('Error fetching summary:', error)

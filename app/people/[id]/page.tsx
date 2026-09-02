@@ -31,10 +31,20 @@ import {
   Plus,
   History,
   ArrowLeft,
+  Landmark,
 } from 'lucide-react'
 import { CardUsagePanel } from '@/components/CardUsagePanel'
 import { usageAmountPaidSyncFromUsdInputs } from '@/lib/usage-paid-sync'
 import { issuingBankLabel } from '@/lib/card-bank'
+import { useGroupByBank } from '@/hooks/use-group-by-bank'
+
+interface CarriedOwedCard {
+  cardId: string
+  cardNickname: string
+  lastFourDigits: string | null
+  owedTTD: number
+  months: Array<{ year: number; month: number; owedTTD: number }>
+}
 
 interface Summary {
   year: number
@@ -51,6 +61,7 @@ interface Summary {
   balanceUSD: number
   balanceTTD: number
   person?: { id: string; name: string }
+  carriedOver?: { totalTTD: number; cards: CarriedOwedCard[] } | null
   availability: Array<{
     id: string
     cardId: string
@@ -97,6 +108,21 @@ function personCardOptionLabel(
   return `${card.cardNickname}${suffix}`
 }
 
+const NO_BANK_LABEL = 'No bank set'
+
+function sumBankTotals(items: Summary['availability']) {
+  return items.reduce(
+    (acc, i) => ({
+      amountUSD: acc.amountUSD + i.amountUSD,
+      balanceUSD: acc.balanceUSD + i.balanceUSD,
+      usageUSD: acc.usageUSD + i.usageUSD,
+      owedTTD: acc.owedTTD + i.owedTTD,
+      ttdValue: acc.ttdValue + i.ttdValue,
+    }),
+    { amountUSD: 0, balanceUSD: 0, usageUSD: 0, owedTTD: 0, ttdValue: 0 }
+  )
+}
+
 export default function PersonDashboardPage() {
   const router = useRouter()
   const pathname = usePathname()
@@ -136,6 +162,7 @@ export default function PersonDashboardPage() {
   const didInitialLoadRef = useRef(false)
   const [loadError, setLoadError] = useState('')
   const [onlyWithBalance, setOnlyWithBalance] = useState(false)
+  const [groupByBank, setGroupByBank] = useGroupByBank()
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
   const [showQuickUsage, setShowQuickUsage] = useState(false)
   const [quickForm, setQuickForm] = useState({
@@ -158,6 +185,39 @@ export default function PersonDashboardPage() {
     if (!onlyWithBalance) return summary.availability
     return summary.availability.filter((r) => r.balanceTTD > 0)
   }, [summary?.availability, onlyWithBalance])
+
+  // Unpaid usage from months before the viewed one, keyed by card for the
+  // per-row "+$x earlier" small print.
+  const carriedOver = summary?.carriedOver ?? null
+  const carriedTotalTTD = carriedOver?.totalTTD ?? 0
+  const carriedByCardId = useMemo(() => {
+    const map = new Map<string, CarriedOwedCard>()
+    for (const c of carriedOver?.cards ?? []) map.set(c.cardId, c)
+    return map
+  }, [carriedOver])
+
+  const monthLabel = (y: number, m: number) =>
+    format(new Date(y, m - 1, 1), 'MMM yyyy')
+
+  const availabilityByBank = useMemo(() => {
+    if (!filteredRows.length) return []
+    type Row = Summary['availability'][number]
+    const map = new Map<string, Row[]>()
+    for (const item of filteredRows) {
+      const bank = item.card.issuingBank
+        ? issuingBankLabel(item.card.issuingBank)
+        : NO_BANK_LABEL
+      if (!map.has(bank)) map.set(bank, [])
+      map.get(bank)!.push(item)
+    }
+    return [...map.entries()]
+      .map(([bankName, items]) => ({ bankName, items }))
+      .sort((a, b) => {
+        if (a.bankName === NO_BANK_LABEL) return 1
+        if (b.bankName === NO_BANK_LABEL) return -1
+        return a.bankName.localeCompare(b.bankName)
+      })
+  }, [filteredRows])
 
   const exchangeRateForQuickCardId = (cardId: string): number | null => {
     const row = summary?.availability.find((r) => r.cardId === cardId)
@@ -454,7 +514,9 @@ export default function PersonDashboardPage() {
   const pill =
     'inline-flex max-w-full justify-end px-1.5 py-0.5 rounded-full font-semibold tabular-nums text-[10px] leading-tight sm:text-xs sm:px-2 sm:py-1'
 
-  const renderRow = (item: AvailRow, zebraClass: string) => (
+  const renderRow = (item: AvailRow, zebraClass: string) => {
+    const carriedForCard = carriedByCardId.get(item.cardId)
+    return (
     <Fragment key={item.id}>
       <tr className={`hover:bg-blue-50 transition-colors ${zebraClass}`}>
         <td className={`${availTd} min-w-0 font-medium text-gray-900`}>
@@ -523,6 +585,19 @@ export default function PersonDashboardPage() {
           >
             ${item.owedTTD.toFixed(2)}
           </span>
+          {carriedForCard && carriedForCard.owedTTD > 0.005 ? (
+            <span
+              className="block mt-0.5 text-[9px] leading-tight text-red-600 tabular-nums sm:text-[10px]"
+              title={carriedForCard.months
+                .map(
+                  (cm) =>
+                    `${monthLabel(cm.year, cm.month)}: $${cm.owedTTD.toFixed(2)} TTD`
+                )
+                .join(' · ')}
+            >
+              +${carriedForCard.owedTTD.toFixed(2)} earlier
+            </span>
+          ) : null}
         </td>
         <td className={`${availTd} text-right`}>
           <span className="font-mono text-[10px] text-gray-700 tabular-nums sm:text-xs">
@@ -587,7 +662,8 @@ export default function PersonDashboardPage() {
         </tr>
       ) : null}
     </Fragment>
-  )
+    )
+  }
 
   const mobileInfoRow = (label: string, value: React.ReactNode, valueClass = '') => (
     <div className="flex items-baseline justify-between gap-3">
@@ -601,6 +677,7 @@ export default function PersonDashboardPage() {
   const renderMobileCard = (item: AvailRow) => {
     const expanded = expandedCardId === item.cardId
     const last4 = item.card.lastFourDigits?.trim()
+    const carriedForCard = carriedByCardId.get(item.cardId)
     return (
       <li key={item.id}>
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -683,6 +760,11 @@ export default function PersonDashboardPage() {
                 >
                   ${item.owedTTD.toFixed(2)}
                 </div>
+                {carriedForCard && carriedForCard.owedTTD > 0.005 ? (
+                  <div className="text-[10px] leading-tight text-red-600 tabular-nums">
+                    +${carriedForCard.owedTTD.toFixed(2)} earlier
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -893,6 +975,12 @@ export default function PersonDashboardPage() {
                 <p className="text-xs text-gray-500">
                   Unpaid usage owed to them (TTD), same basis as the People page
                 </p>
+                {carriedTotalTTD > 0.005 && (
+                  <p className="mt-1 text-xs font-medium text-red-600">
+                    Includes ${carriedTotalTTD.toFixed(2)} owed from months
+                    before {monthName}
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -968,15 +1056,26 @@ export default function PersonDashboardPage() {
                       ) : null}
                     </CardDescription>
                   </div>
-                  <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={onlyWithBalance}
-                      onChange={(e) => setOnlyWithBalance(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    Only cards with balance left (USD)
-                  </label>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={onlyWithBalance}
+                        onChange={(e) => setOnlyWithBalance(e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      Only cards with balance left (USD)
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={groupByBank}
+                        onChange={(e) => setGroupByBank(e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      Group by bank
+                    </label>
+                  </div>
                 </div>
                 <p className="text-xs text-gray-500">
                   Click a card name to expand full usage history. Use Log to add usage for{' '}
@@ -1248,20 +1347,137 @@ export default function PersonDashboardPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {filteredRows.map((item, index) =>
-                          renderRow(
-                            item,
-                            index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
-                          )
-                        )}
+                        {groupByBank
+                          ? availabilityByBank.flatMap((bank) => {
+                              const bt = sumBankTotals(bank.items)
+                              return [
+                                <tr
+                                  key={`bank-${bank.bankName}`}
+                                  className="bg-slate-100/95 border-y border-slate-200"
+                                >
+                                  <td colSpan={10} className="py-2.5 px-2 sm:px-3 text-gray-800">
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-4 sm:gap-y-1">
+                                      <span className="inline-flex items-center gap-2 font-semibold">
+                                        <Landmark
+                                          className="w-4 h-4 shrink-0 text-slate-600"
+                                          aria-hidden
+                                        />
+                                        {bank.bankName}
+                                        <span className="font-normal text-gray-500">
+                                          ({bank.items.length} card
+                                          {bank.items.length !== 1 ? 's' : ''})
+                                        </span>
+                                      </span>
+                                      <span className="text-xs sm:text-sm font-normal text-slate-700 tabular-nums leading-relaxed border-t border-slate-200/90 pt-2 sm:border-0 sm:pt-0 sm:pl-1">
+                                        <span className="text-slate-500">Totals · </span>
+                                        Bal{' '}
+                                        <strong className="text-slate-900">
+                                          ${bt.balanceUSD.toFixed(2)}
+                                        </strong>
+                                        <span className="text-slate-400"> / </span>
+                                        Avail{' '}
+                                        <strong className="text-slate-900">
+                                          ${bt.amountUSD.toFixed(2)}
+                                        </strong>
+                                        USD · Used{' '}
+                                        <strong className="text-slate-900">
+                                          ${bt.usageUSD.toFixed(2)}
+                                        </strong>
+                                        USD · Owed{' '}
+                                        <strong className="text-slate-900">
+                                          ${bt.owedTTD.toFixed(2)}
+                                        </strong>
+                                        TTD
+                                      </span>
+                                    </div>
+                                  </td>
+                                </tr>,
+                                ...bank.items.map((item, ii) =>
+                                  renderRow(
+                                    item,
+                                    ii % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
+                                  )
+                                ),
+                              ]
+                            })
+                          : filteredRows.map((item, index) =>
+                              renderRow(
+                                item,
+                                index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
+                              )
+                            )}
                       </tbody>
                     </table>
                   </div>
 
                   <ul className="md:hidden space-y-3 p-4">
-                    {filteredRows.map((item) => renderMobileCard(item))}
+                    {groupByBank
+                      ? availabilityByBank.flatMap((bank) => {
+                          const bt = sumBankTotals(bank.items)
+                          return [
+                            <li key={`bank-${bank.bankName}`} className="pt-1">
+                              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-1">
+                                <span className="inline-flex items-center gap-2 font-semibold text-gray-800">
+                                  <Landmark
+                                    className="w-4 h-4 shrink-0 text-slate-600"
+                                    aria-hidden
+                                  />
+                                  {bank.bankName}
+                                  <span className="font-normal text-gray-500">
+                                    ({bank.items.length} card
+                                    {bank.items.length !== 1 ? 's' : ''})
+                                  </span>
+                                </span>
+                                <span className="text-xs text-slate-600 tabular-nums">
+                                  Bal ${bt.balanceUSD.toFixed(2)} · Owed $
+                                  {bt.owedTTD.toFixed(2)} TTD
+                                </span>
+                              </div>
+                            </li>,
+                            ...bank.items.map((item) => renderMobileCard(item)),
+                          ]
+                        })
+                      : filteredRows.map((item) => renderMobileCard(item))}
                   </ul>
                 </>
+              )}
+              {carriedOver && carriedOver.cards.length > 0 && (
+                <div className="px-4 py-3 border-t border-red-100 bg-red-50/40">
+                  <p className="text-xs font-semibold text-red-800">
+                    Still owed from previous months: $
+                    {carriedTotalTTD.toFixed(2)} TTD
+                  </p>
+                  <ul className="mt-1.5 space-y-1 text-[11px] leading-snug text-red-700/90">
+                    {carriedOver.cards.map((c) => (
+                      <li key={c.cardId} className="tabular-nums">
+                        <span className="font-medium">{c.cardNickname}</span>
+                        {c.lastFourDigits?.trim() ? (
+                          <span className="font-mono">
+                            {' '}
+                            •••• {c.lastFourDigits.trim()}
+                          </span>
+                        ) : null}{' '}
+                        — ${c.owedTTD.toFixed(2)} TTD (
+                        {c.months.map((cm, i) => (
+                          <Fragment key={`${cm.year}-${cm.month}`}>
+                            {i > 0 ? ', ' : null}
+                            <Link
+                              href={`/people/${personId}?year=${cm.year}&month=${cm.month}`}
+                              className="underline decoration-red-300 underline-offset-2 hover:text-red-900"
+                            >
+                              {monthLabel(cm.year, cm.month)}
+                            </Link>
+                          </Fragment>
+                        ))}
+                        )
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-1.5 text-[11px] text-red-700/70">
+                    These amounts are not in the table above — it only covers{' '}
+                    {monthName}. Tap a month to open it and log payments there.
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>
