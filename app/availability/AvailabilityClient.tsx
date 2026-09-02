@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useDataChanged, emitDataChanged } from '@/lib/use-data-changed'
@@ -20,6 +21,13 @@ interface CardType {
   cardNickname: string
   lastFourDigits: string | null
   issuingBank: string | null
+  /** Recurring template fields — present on the /api/cards payload only; the
+   *  slim card object embedded in availability rows does not carry them. */
+  alwaysAvailable?: boolean
+  recurringAmountUSD?: number | null
+  recurringExchangeRate?: number | null
+  recurringPaymentDay?: number | null
+  recurringNotes?: string | null
   person: {
     id: string
     name: string
@@ -367,22 +375,40 @@ export function AvailabilityClient({
     setShowForm(true)
   }
 
+  /** Always-available cards, keyed by id — their availability lives as a
+   *  recurring template on the card, not as month rows, so they must be merged
+   *  into this page explicitly or they would be invisible here. */
+  const recurringCardById = useMemo(() => {
+    const map = new Map<string, CardType>()
+    for (const c of cards) {
+      if (c.alwaysAvailable) map.set(c.id, c)
+    }
+    return map
+  }, [cards])
+
   const groupedByCard = useMemo(() => {
-    return availability.reduce(
-      (acc, item) => {
+    const acc = availability.reduce(
+      (a, item) => {
         const cardKey = item.card.id
-        if (!acc[cardKey]) {
-          acc[cardKey] = {
+        if (!a[cardKey]) {
+          a[cardKey] = {
             card: item.card,
             entries: [],
           }
         }
-        acc[cardKey].entries.push(item)
-        return acc
+        a[cardKey].entries.push(item)
+        return a
       },
       {} as Record<string, { card: CardType; entries: Availability[] }>
     )
-  }, [availability])
+    // Recurring cards with no explicit month rows still get a section.
+    for (const c of recurringCardById.values()) {
+      if (!acc[c.id]) {
+        acc[c.id] = { card: c, entries: [] }
+      }
+    }
+    return acc
+  }, [availability, recurringCardById])
 
   const groupedByOwner = useMemo(() => {
     type CardGroup = { card: CardType; entries: Availability[] }
@@ -422,6 +448,82 @@ export function AvailabilityClient({
     baselineTtd != null && baselineTtd > 0
       ? ratePremiumTtd(item.amountUSD, item.exchangeRate, baselineTtd)
       : null
+
+  const ordinal = (n: number) => {
+    const s = ['th', 'st', 'nd', 'rd']
+    const v = n % 100
+    return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`
+  }
+
+  /** Recurring-template banner for always-available cards: their availability
+   *  is defined on the card, not as month rows, so it is summarized here and
+   *  edited from the Cards page. */
+  const renderRecurringBanner = (card: CardType, entryCount: number) => {
+    const amt = card.recurringAmountUSD
+    const rate = card.recurringExchangeRate
+    if (
+      typeof amt !== 'number' ||
+      !Number.isFinite(amt) ||
+      typeof rate !== 'number' ||
+      !Number.isFinite(rate)
+    ) {
+      return (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          This card is marked always available, but its recurring amount/rate is
+          incomplete —{' '}
+          <Link href="/cards" className="font-medium underline">
+            fix it on the Cards page
+          </Link>
+          .
+        </div>
+      )
+    }
+    const fee =
+      baselineTtd != null && baselineTtd > 0
+        ? ratePremiumTtd(amt, rate, baselineTtd)
+        : null
+    return (
+      <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50/60 px-4 py-3">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1.5 text-sm text-gray-800">
+          <span className="inline-flex items-center self-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+            Every month
+          </span>
+          <span className="tabular-nums">
+            <strong className="text-green-700">${amt.toFixed(2)}</strong> USD
+          </span>
+          <span className="tabular-nums">
+            Rate <strong>{rate.toFixed(2)}</strong>
+          </span>
+          <span className="tabular-nums">
+            TTD value{' '}
+            <strong className="text-blue-700">${(amt * rate).toFixed(2)}</strong>
+          </span>
+          {fee != null && (
+            <span className="tabular-nums">
+              Fee <strong className="text-red-600">{fee.toFixed(2)} TTD</strong>
+            </span>
+          )}
+          {typeof card.recurringPaymentDay === 'number' && (
+            <span>Pays on the {ordinal(card.recurringPaymentDay)}</span>
+          )}
+        </div>
+        {card.recurringNotes?.trim() ? (
+          <p className="mt-1.5 text-xs text-gray-600">{card.recurringNotes}</p>
+        ) : null}
+        <p className="mt-1.5 text-xs text-blue-800/80">
+          Applies automatically every month
+          {entryCount > 0
+            ? '; the month entries below override it for those months'
+            : ''}
+          . Edit the recurring values on the{' '}
+          <Link href="/cards" className="font-medium underline">
+            Cards page
+          </Link>
+          .
+        </p>
+      </div>
+    )
+  }
 
   const renderEntriesTable = (entries: Availability[]) => (
     <>
@@ -954,7 +1056,9 @@ export function AvailabilityClient({
                 </span>
               </div>
               <div className="grid gap-6">
-                {ownerBlock.cardGroups.map(({ card, entries }) => (
+                {ownerBlock.cardGroups.map(({ card, entries }) => {
+                  const recurring = recurringCardById.get(card.id)
+                  return (
                   <Card
                     key={card.id}
                     className="shadow-md hover:shadow-lg transition-shadow"
@@ -971,22 +1075,37 @@ export function AvailabilityClient({
                         </div>
                       </CardTitle>
                       <CardDescription>
-                        {entries.length}{' '}
-                        {entries.length === 1 ? 'month' : 'months'} of availability
+                        {recurring
+                          ? `Available every month${
+                              entries.length > 0
+                                ? ` · ${entries.length} month-specific ${
+                                    entries.length === 1 ? 'override' : 'overrides'
+                                  }`
+                                : ''
+                            }`
+                          : `${entries.length} ${
+                              entries.length === 1 ? 'month' : 'months'
+                            } of availability`}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="pt-4">
-                      {renderEntriesTable(entries)}
+                      {recurring
+                        ? renderRecurringBanner(recurring, entries.length)
+                        : null}
+                      {entries.length > 0 ? renderEntriesTable(entries) : null}
                     </CardContent>
                   </Card>
-                ))}
+                  )
+                })}
               </div>
             </section>
           ))}
         </div>
       ) : (
         <div className="grid gap-6">
-          {Object.values(groupedByCard).map(({ card, entries }) => (
+          {Object.values(groupedByCard).map(({ card, entries }) => {
+            const recurring = recurringCardById.get(card.id)
+            return (
             <Card key={card.id} className="shadow-md hover:shadow-lg transition-shadow">
               <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-50 border-b">
                 <CardTitle className="flex items-center gap-2">
@@ -999,14 +1118,26 @@ export function AvailabilityClient({
                   </div>
                 </CardTitle>
                 <CardDescription>
-                  {entries.length} {entries.length === 1 ? 'month' : 'months'} of availability
+                  {recurring
+                    ? `Available every month${
+                        entries.length > 0
+                          ? ` · ${entries.length} month-specific ${
+                              entries.length === 1 ? 'override' : 'overrides'
+                            }`
+                          : ''
+                      }`
+                    : `${entries.length} ${
+                        entries.length === 1 ? 'month' : 'months'
+                      } of availability`}
                 </CardDescription>
               </CardHeader>
               <CardContent className="pt-4">
-                {renderEntriesTable(entries)}
+                {recurring ? renderRecurringBanner(recurring, entries.length) : null}
+                {entries.length > 0 ? renderEntriesTable(entries) : null}
               </CardContent>
             </Card>
-          ))}
+            )
+          })}
         </div>
       )}
 
