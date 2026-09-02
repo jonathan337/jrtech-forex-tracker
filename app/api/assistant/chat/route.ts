@@ -11,6 +11,7 @@ import {
 } from '@/lib/assistant/tools'
 import {
   currentYearMonth,
+  getCardUsdLeftForMonth,
   getMonthSummary,
   getPersonBalance,
   listCardBalances,
@@ -43,6 +44,35 @@ function fmtNum(n: number): string {
   return round2(n).toLocaleString('en-US', { maximumFractionDigits: 2 })
 }
 
+/** Errors where a retry cannot help (bad key, bad request) — fail fast. */
+function isNonRetryableAiError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return /INVALID_ARGUMENT|API key|API_KEY|PERMISSION_DENIED|not found/i.test(msg)
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** Gemini flash intermittently 429/500s; retry twice before giving up so a
+ *  transient blip doesn't surface as "the assistant ran into a problem". */
+async function generateWithRetry(
+  ai: GoogleGenAI,
+  request: Parameters<GoogleGenAI['models']['generateContent']>[0]
+) {
+  const delays = [400, 1200]
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await ai.models.generateContent(request)
+    } catch (err) {
+      if (attempt >= delays.length || isNonRetryableAiError(err)) throw err
+      console.warn(
+        `[assistant chat] AI call failed (attempt ${attempt + 1}), retrying:`,
+        err instanceof Error ? err.message : err
+      )
+      await sleep(delays[attempt])
+    }
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const session = await auth()
@@ -71,16 +101,32 @@ export async function POST(request: Request) {
       parts: [{ text: m.content }],
     }))
 
+    // Ambiguous card/person matches collected while tools run; returned with
+    // the final reply so the chat can render them as clickable options.
+    let choices: string[] | undefined
+
     for (let i = 0; i < MAX_ITERATIONS; i++) {
-      const response = await ai.models.generateContent({
-        model: ASSISTANT_MODEL,
-        contents,
-        config: {
-          systemInstruction: systemPrompt(),
-          tools: [{ functionDeclarations: TOOLS }],
-          temperature: 0.2,
-        },
-      })
+      let response: Awaited<ReturnType<typeof generateWithRetry>>
+      try {
+        response = await generateWithRetry(ai, {
+          model: ASSISTANT_MODEL,
+          contents,
+          config: {
+            systemInstruction: systemPrompt(),
+            tools: [{ functionDeclarations: TOOLS }],
+            temperature: 0.2,
+          },
+        })
+      } catch (err) {
+        console.error('[assistant chat] AI call failed after retries:', err)
+        return NextResponse.json(
+          {
+            error:
+              'The AI service had a hiccup answering that — nothing was changed. Please send it again.',
+          },
+          { status: 503 }
+        )
+      }
 
       // These are getters in the SDK that can throw on a blocked/empty response;
       // never let that turn into a 500 for the user.
@@ -98,7 +144,10 @@ export async function POST(request: Request) {
       }
 
       if (calls.length === 0) {
-        return NextResponse.json({ reply: textReply || 'Done.' })
+        return NextResponse.json({
+          reply: textReply || 'Done.',
+          ...(choices?.length ? { choices } : {}),
+        })
       }
 
       // Record the model turn (with its functionCall parts) before answering.
@@ -128,12 +177,21 @@ export async function POST(request: Request) {
                 'Could not prepare that action. Ask the user to rephrase, or which card/person they mean.',
             }
           }
+          if (!result.ok && result.options?.length) {
+            choices = [...new Set([...(choices ?? []), ...result.options])]
+          }
           responseParts.push({
             functionResponse: {
               name,
               response: result.ok
                 ? { status: 'awaiting_user_confirmation' }
-                : { error: result.error },
+                : {
+                    error:
+                      result.error +
+                      (result.options?.length
+                        ? ' (The app is showing these options to the user as clickable buttons — ask briefly which one, do NOT re-list them.)'
+                        : ''),
+                  },
             },
           })
           if (result.ok) pendings.push(result.action)
@@ -222,14 +280,15 @@ async function buildPendingAction(
   name: string,
   args: Record<string, unknown>
 ): Promise<
-  { ok: true; action: PendingAction } | { ok: false; error: string }
+  | { ok: true; action: PendingAction }
+  | { ok: false; error: string; options?: string[] }
 > {
   const cur = currentYearMonth()
 
   if (name === 'log_usage') {
     const cardQuery = String(args.cardQuery ?? '').trim()
     const card = await resolveCard(userId, cardQuery)
-    if (!card.ok) return { ok: false, error: card.error }
+    if (!card.ok) return card
 
     const amountUSD =
       typeof args.amountUSD === 'number' && args.amountUSD > 0
@@ -251,6 +310,11 @@ async function buildPendingAction(
       typeof args.month === 'number' && args.month >= 1 && args.month <= 12
         ? args.month
         : cur.month
+    const daysInMonth = new Date(year, month, 0).getDate()
+    const day =
+      typeof args.day === 'number' && args.day >= 1 && args.day <= 31
+        ? Math.min(Math.round(args.day), daysInMonth)
+        : undefined
     const paidToOwnerTTD =
       typeof args.paidToOwnerTTD === 'number' && args.paidToOwnerTTD > 0
         ? args.paidToOwnerTTD
@@ -264,9 +328,10 @@ async function buildPendingAction(
       amountUSD !== undefined
         ? `$${fmtNum(amountUSD)} USD`
         : `${fmtNum(amountTTD as number)} TTD`
-    const summary = `Log usage of ${amountText} on ${card.label} for ${month}/${year}${
+    const dateText = day !== undefined ? `${day}/${month}/${year}` : `${month}/${year}`
+    const summary = `Log usage of ${amountText} on ${card.label} for ${dateText}${
       paidToOwnerTTD ? `, with ${fmtNum(paidToOwnerTTD)} TTD paid to owner` : ''
-    }?`
+    }${notes ? ` — note: "${notes}"` : ''}?`
 
     return {
       ok: true,
@@ -281,7 +346,72 @@ async function buildPendingAction(
           ...(paidToOwnerTTD !== undefined && { paidToOwnerTTD }),
           year,
           month,
+          ...(day !== undefined && { day }),
           ...(notes !== undefined && { notes }),
+        },
+      },
+    }
+  }
+
+  if (name === 'set_card_remaining') {
+    const cardQuery = String(args.cardQuery ?? '').trim()
+    const card = await resolveCard(userId, cardQuery)
+    if (!card.ok) return card
+
+    const remainingUSD =
+      typeof args.remainingUSD === 'number' && args.remainingUSD >= 0
+        ? round2(args.remainingUSD)
+        : undefined
+    if (remainingUSD === undefined) {
+      return {
+        ok: false,
+        error: 'Provide the USD amount that should remain on the card (0 or more).',
+      }
+    }
+
+    const year =
+      typeof args.year === 'number' && args.year >= 2000 && args.year <= 2100
+        ? args.year
+        : cur.year
+    const month =
+      typeof args.month === 'number' && args.month >= 1 && args.month <= 12
+        ? args.month
+        : cur.month
+
+    // Preview the deduction so the confirmation shows a concrete number; the
+    // executor recomputes it at confirm time so the card lands exactly on target.
+    const balance = await getCardUsdLeftForMonth(userId, card.cardId, year, month)
+    if (!balance) {
+      return {
+        ok: false,
+        error: `${card.label} has no availability for ${month}/${year}, so there is nothing to deduct from.`,
+      }
+    }
+    const deduction = round2(balance.leftUSD - remainingUSD)
+    if (deduction <= 0) {
+      return {
+        ok: false,
+        error: `${card.label} already has $${fmtNum(
+          balance.leftUSD
+        )} USD left for ${month}/${year} (at or below $${fmtNum(
+          remainingUSD
+        )}), so there is nothing to deduct. Tell the user the current balance.`,
+      }
+    }
+
+    return {
+      ok: true,
+      action: {
+        type: 'set_card_remaining',
+        summary: `Log miscellaneous usage of $${fmtNum(deduction)} USD on ${
+          card.label
+        } so it has $${fmtNum(remainingUSD)} USD left for ${month}/${year}?`,
+        params: {
+          cardId: card.cardId,
+          cardLabel: card.label,
+          remainingUSD,
+          year,
+          month,
         },
       },
     }
@@ -294,7 +424,7 @@ async function buildPendingAction(
       return { ok: false, error: 'Provide a positive TTD amount.' }
     }
     const person = await resolvePerson(userId, String(args.personName ?? ''))
-    if (!person.ok) return { ok: false, error: person.error }
+    if (!person.ok) return person
     return {
       ok: true,
       action: {
@@ -321,7 +451,7 @@ async function buildPendingAction(
       typeof args.personName === 'string' ? args.personName.trim() : ''
     if (rawName) {
       const person = await resolvePerson(userId, rawName)
-      if (!person.ok) return { ok: false, error: person.error }
+      if (!person.ok) return person
       personId = person.personId
       personName = person.name
     }
@@ -352,7 +482,7 @@ async function buildPendingAction(
 
   if (name === 'add_card') {
     const person = await resolvePerson(userId, String(args.personName ?? ''))
-    if (!person.ok) return { ok: false, error: person.error }
+    if (!person.ok) return person
 
     const cardNickname =
       typeof args.cardNickname === 'string' ? args.cardNickname.trim() : ''

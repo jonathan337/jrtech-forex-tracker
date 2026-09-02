@@ -6,6 +6,7 @@ import {
   executeApplyOwnerPayment,
   executeLogPayment,
   executeLogUsage,
+  executeSetCardRemaining,
 } from '@/lib/assistant/actions'
 
 export const runtime = 'nodejs'
@@ -21,7 +22,18 @@ const actionSchema = z.discriminatedUnion('type', [
       paidToOwnerTTD: z.number().min(0).optional(),
       year: z.number().int().min(2000).max(2100),
       month: z.number().int().min(1).max(12),
+      day: z.number().int().min(1).max(31).optional(),
       notes: z.string().optional(),
+    }),
+  }),
+  z.object({
+    type: z.literal('set_card_remaining'),
+    params: z.object({
+      cardId: z.string().min(1),
+      cardLabel: z.string().optional(),
+      remainingUSD: z.number().min(0),
+      year: z.number().int().min(2000).max(2100),
+      month: z.number().int().min(1).max(12),
     }),
   }),
   z.object({
@@ -77,6 +89,9 @@ export async function POST(request: Request) {
     switch (action.type) {
       case 'log_usage':
         result = await executeLogUsage({ userId, ...action.params })
+        break
+      case 'set_card_remaining':
+        result = await executeSetCardRemaining({ userId, ...action.params })
         break
       case 'apply_owner_payment':
         result = await executeApplyOwnerPayment({ userId, ...action.params })

@@ -11,6 +11,8 @@ type ChatMessage = {
   role: 'user' | 'assistant'
   content: string
   pendingActions?: PendingAction[]
+  /** Clickable answers to a which-card/which-person question. */
+  choices?: string[]
   done?: boolean
 }
 
@@ -130,7 +132,11 @@ export function ChatWidget() {
     const trimmed = text.trim()
     if (!trimmed || loading) return
     const userMsg: ChatMessage = { id: uid(), role: 'user', content: trimmed }
-    const nextMessages = [...messages, userMsg]
+    // Answering (typed or clicked) retires any option buttons still showing.
+    const nextMessages = [
+      ...messages.map((m) => (m.choices ? { ...m, choices: undefined } : m)),
+      userMsg,
+    ]
     setMessages(nextMessages)
     setInput('')
     setLoading(true)
@@ -165,6 +171,9 @@ export function ChatWidget() {
           role: 'assistant',
           content: data.reply || 'Done.',
           pendingActions: data.pendingActions as PendingAction[] | undefined,
+          choices: Array.isArray(data.choices)
+            ? (data.choices as string[])
+            : undefined,
         },
       ])
     } catch {
@@ -322,6 +331,22 @@ export function ChatWidget() {
                     )}
                   </div>
                 </div>
+
+                {m.choices && m.choices.length > 0 && (
+                  <div className="mt-2 ml-1 space-y-1.5">
+                    {m.choices.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        disabled={loading}
+                        onClick={() => send(c)}
+                        className="block w-full rounded-lg border border-blue-200 bg-blue-50/60 px-3 py-2 text-left text-sm text-gray-800 transition-colors hover:border-blue-300 hover:bg-blue-50 disabled:opacity-60"
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {m.pendingActions && m.pendingActions.length > 0 && (
                   <div className="mt-2 ml-1 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">

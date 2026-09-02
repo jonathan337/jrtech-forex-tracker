@@ -291,11 +291,35 @@ export async function listCards(userId: string, personName?: string) {
   }))
 }
 
+/** A single card's USD availability/used/left for one month, or null if the
+ *  card has no availability that month. */
+export async function getCardUsdLeftForMonth(
+  userId: string,
+  cardId: string,
+  year: number,
+  month: number
+): Promise<{ availableUSD: number; usedUSD: number; leftUSD: number } | null> {
+  const { availabilityWithUsage } = await loadMonthAvailabilityWithUsage(
+    userId,
+    year,
+    month
+  )
+  const rows = availabilityWithUsage.filter((r) => r.cardId === cardId)
+  if (rows.length === 0) return null
+  return {
+    availableUSD: round2(rows.reduce((s, r) => s + r.amountUSD, 0)),
+    usedUSD: round2(rows.reduce((s, r) => s + r.usageUSD, 0)),
+    leftUSD: round2(rows.reduce((s, r) => s + r.balanceUSD, 0)),
+  }
+}
+
 /** ---- Resolvers (fuzzy id lookup for write previews) ----------------- */
 
 type ResolvePersonResult =
   | { ok: true; personId: string; name: string }
-  | { ok: false; error: string }
+  /** `options` is set when the query is ambiguous — the labels the user can
+   *  pick between, surfaced in the chat as clickable buttons. */
+  | { ok: false; error: string; options?: string[] }
 
 export async function resolvePerson(
   userId: string,
@@ -353,6 +377,7 @@ export async function resolvePerson(
     error: `Multiple people match "${raw}": ${best
       .map((p) => p.name)
       .join(', ')}. Ask the user which one.`,
+    options: best.map((p) => p.name),
   }
 }
 
@@ -364,7 +389,9 @@ type ResolveCardResult =
       personId: string
       personName: string
     }
-  | { ok: false; error: string }
+  /** `options` is set when the query is ambiguous — the labels the user can
+   *  pick between, surfaced in the chat as clickable buttons. */
+  | { ok: false; error: string; options?: string[] }
 
 /** Words a card query can contain that carry no matching signal — filler,
  *  verbs, and the generic word "card" itself (nicknames like "Black Card" are
@@ -499,10 +526,14 @@ export async function resolveCard(
     .replace(/\s+/g, ' ')
     .trim()
 
-  // Strongest signal: a 4-digit run that matches exactly one card's last four.
+  // Strongest signal: a 4-digit run matching a card's last four. A unique match
+  // wins outright; when several cards share those digits, narrow the candidate
+  // set to them so the remaining words only have to pick between those cards.
+  let candidates = cards
   for (const digits of cleaned.match(/\b\d{4}\b/g) ?? []) {
-    const hits = cards.filter((c) => c.lastFourDigits === digits)
+    const hits = candidates.filter((c) => c.lastFourDigits === digits)
     if (hits.length === 1) return resolvedCard(hits[0])
+    if (hits.length > 1) candidates = hits
   }
 
   const allTokens = cleaned
@@ -521,34 +552,47 @@ export async function resolveCard(
   // last four, or bank synonym — all fuzzy, so typos and possessives still
   // count). Best score wins; a tie means genuinely ambiguous, so ask. Filler
   // words that match nothing simply don't add score instead of disqualifying the
-  // card, which is what lets ordinary phrasing resolve.
-  const scoreCard = (c: CardRow): number => {
-    const nameFields = [c.person.name.toLowerCase(), c.cardNickname.toLowerCase()]
+  // card, which is what lets ordinary phrasing resolve. Owner-name hits are
+  // tracked separately: when total scores tie (e.g. "john ramcharitar" matches
+  // both John's card and a card *nicknamed* "John ..."), the card whose OWNER
+  // matched more tokens wins — a person reference means the person's card.
+  const scoreCard = (c: CardRow): { score: number; ownerScore: number } => {
+    const ownerName = c.person.name.toLowerCase()
+    const nickname = c.cardNickname.toLowerCase()
     const bankWords = bankSynonyms(c.issuingBank)
     const last4 = c.lastFourDigits ?? ''
     let score = 0
+    let ownerScore = 0
     for (const t of tokens) {
+      const ownerHit = tokenMatchesField(t, ownerName)
       const hit =
-        nameFields.some((f) => tokenMatchesField(t, f)) ||
+        ownerHit ||
+        tokenMatchesField(t, nickname) ||
         bankWords.some((w) => fuzzyWordMatch(t, w)) ||
         (last4 !== '' && (last4 === t || last4.includes(t)))
       if (hit) score++
+      if (ownerHit) ownerScore++
     }
-    return score
+    return { score, ownerScore }
   }
 
-  const scored = cards.map((c) => ({ card: c, score: scoreCard(c) }))
+  const scored = candidates.map((c) => ({ card: c, ...scoreCard(c) }))
   const maxScore = Math.max(...scored.map((s) => s.score))
   if (maxScore === 0) {
     return { ok: false, error: `No card found matching "${raw}".` }
   }
-  const best = scored.filter((s) => s.score === maxScore).map((s) => s.card)
-  if (best.length === 1) return resolvedCard(best[0])
+  let best = scored.filter((s) => s.score === maxScore)
+  if (best.length > 1) {
+    const maxOwnerScore = Math.max(...best.map((s) => s.ownerScore))
+    best = best.filter((s) => s.ownerScore === maxOwnerScore)
+  }
+  if (best.length === 1) return resolvedCard(best[0].card)
   return {
     ok: false,
     error: `Multiple cards match "${raw}": ${best
-      .map((m) => cardLabel(m))
+      .map((m) => cardLabel(m.card))
       .join('; ')}. Ask the user which one.`,
+    options: best.map((m) => cardLabel(m.card)),
   }
 }
 
@@ -562,6 +606,7 @@ export async function executeLogUsage(params: {
   paidToOwnerTTD?: number
   year: number
   month: number
+  day?: number
   notes?: string
 }): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
   const { userId, cardId } = params
@@ -616,7 +661,7 @@ export async function executeLogUsage(params: {
       amountUSD,
       amountTTD,
       paidToOwnerTTD: paidToOwner,
-      usageDate: new Date(),
+      usageDate: usageDateForParams(params),
       notes: params.notes || null,
     },
     include: { card: { include: { person: true } } },
@@ -631,11 +676,80 @@ export async function executeLogUsage(params: {
     year: entry.year,
   })
 
+  const dateText =
+    params.day !== undefined
+      ? `${entry.usageDate.getDate()}/${params.month}/${params.year}`
+      : `${params.month}/${params.year}`
   return {
     ok: true,
     message: `Logged usage of $${round2(amountUSD)} USD (TTD ${round2(
       amountTTD
-    )}) on ${cardLabel(entry.card)} for ${params.month}/${params.year}.`,
+    )}) on ${cardLabel(entry.card)} for ${dateText}${
+      params.notes ? ` — note: "${params.notes}"` : ''
+    }.`,
+  }
+}
+
+/** Noon on the given day (clamped to the month) so timezones can't roll the date; today if no day given. */
+function usageDateForParams(params: {
+  year: number
+  month: number
+  day?: number
+}): Date {
+  if (params.day === undefined) return new Date()
+  const daysInMonth = new Date(params.year, params.month, 0).getDate()
+  const day = Math.min(Math.max(1, Math.round(params.day)), daysInMonth)
+  return new Date(params.year, params.month - 1, day, 12)
+}
+
+export const MISC_USAGE_NOTE = 'Miscellaneous usage'
+
+/** Bring a card's USD left for a month down to a stated remaining balance by
+ *  logging the difference as a "Miscellaneous usage" entry. The deduction is
+ *  recomputed here rather than trusted from the preview, so the card lands
+ *  exactly on the target even if entries were added since the user confirmed. */
+export async function executeSetCardRemaining(params: {
+  userId: string
+  cardId: string
+  remainingUSD: number
+  year: number
+  month: number
+}): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const { userId, cardId, year, month } = params
+
+  const card = await prisma.card.findFirst({
+    where: { id: cardId, person: { userId } },
+    include: { person: true },
+  })
+  if (!card) return { ok: false, error: 'Card not found.' }
+
+  const target = round2(Math.max(0, params.remainingUSD))
+  const balance = await getCardUsdLeftForMonth(userId, cardId, year, month)
+  if (!balance) return { ok: false, error: USAGE_REQUIRES_AVAILABILITY_MESSAGE }
+
+  const deduction = round2(balance.leftUSD - target)
+  if (deduction <= EPS) {
+    return {
+      ok: false,
+      error: `${cardLabel(card)} already has $${balance.leftUSD} USD left for ${month}/${year} — nothing to deduct to be at $${target}.`,
+    }
+  }
+
+  const logged = await executeLogUsage({
+    userId,
+    cardId,
+    amountUSD: deduction,
+    year,
+    month,
+    notes: MISC_USAGE_NOTE,
+  })
+  if (!logged.ok) return logged
+
+  return {
+    ok: true,
+    message: `Logged miscellaneous usage of $${deduction} USD on ${cardLabel(
+      card
+    )} — $${target} USD now left for ${month}/${year}.`,
   }
 }
 

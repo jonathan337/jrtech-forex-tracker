@@ -5,6 +5,7 @@ export const ASSISTANT_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
 /** Write tools never execute directly — they produce a pending action the user confirms. */
 export const WRITE_TOOLS = new Set([
   'log_usage',
+  'set_card_remaining',
   'apply_owner_payment',
   'log_payment',
   'add_card',
@@ -22,7 +23,19 @@ export type PendingAction =
         paidToOwnerTTD?: number
         year: number
         month: number
+        day?: number
         notes?: string
+      }
+    }
+  | {
+      type: 'set_card_remaining'
+      summary: string
+      params: {
+        cardId: string
+        cardLabel: string
+        remainingUSD: number
+        year: number
+        month: number
       }
     }
   | {
@@ -80,8 +93,11 @@ export function systemPrompt(): string {
     '- When you call a write tool, identify the card or person by the user\'s words; the tool resolves it. Pass the user\'s reference straight into cardQuery/personName — an owner name plus a bank or last-4 digits (e.g. "Esther fcb", "Jonathan 9689") resolves fine. The matching is fuzzy and tolerates misspellings ("ramcharitarrr" still finds Ramcharitar), so do NOT bail on a small name mismatch — just pass what the user said. Do NOT ask which card or list options first; only ask if the tool itself comes back ambiguous or not-found.',
     '- Bank shorthand you should pass through as-is: FCB = First Citizens, RBL = Republic Bank, Scotia = Scotiabank, RBC. The tools understand these.',
     '- If a write tool returns not-found or ambiguous, do not just give up — call list_cards (or list_people) for that owner and either pick the obvious match yourself or show the short list and ask which one.',
+    '- When the user answers a which-card question, call the write tool AGAIN with a cardQuery that combines everything known so far — the original reference plus their answer (e.g. first "ending 2348", then they say "John" → cardQuery "John 2348"). Never pass just their one-word reply on its own, and never re-ask the same question without re-calling the tool.',
+    '- If the user tells you what is LEFT on a card ("Esther\'s card has only 500 USD left", "only 500 remaining on the fcb card") rather than how much was spent, call set_card_remaining with that remaining amount. Do NOT do the subtraction yourself and do NOT use log_usage for this — the app computes the deduction and labels the entry "Miscellaneous usage".',
     '- If the user asks for several actions at once (e.g. log usage on two different cards, or log usage and a payment together), call the matching write tool ONCE PER ACTION in the same turn — do not collapse them into one or drop any.',
     '- Prefer specifying amounts in the currency the user used. Usage can take USD or TTD; payments are in TTD.',
+    '- Capture everything the user tells you about the transaction. Any short description of what the usage/payment was for ("atm pull", "amazon order", "groceries") goes in notes — never drop it. If they give a specific day ("24th aug", "on the 3rd"), pass day (plus month/year when stated).',
     '- Never invent card names, people, or balances — always use tool results.',
     '',
     'Formatting (this is a narrow chat panel, ~380px wide):',
@@ -189,9 +205,44 @@ export const TOOLS: FunctionDeclaration[] = [
           type: Type.INTEGER,
           description: 'Optional 1-12; defaults to current month.',
         },
-        notes: { type: Type.STRING, description: 'Optional note.' },
+        day: {
+          type: Type.INTEGER,
+          description:
+            'Optional day of month (1-31) the usage happened, when the user gives a specific date like "24th aug". Defaults to today.',
+        },
+        notes: {
+          type: Type.STRING,
+          description:
+            'Optional note. Include any description the user gives of what the usage was for, e.g. "atm pull" or "amazon order".',
+        },
       },
       required: ['cardQuery'],
+    },
+  },
+  {
+    name: 'set_card_remaining',
+    description:
+      'Prepare a "Miscellaneous usage" entry that brings a card\'s USD left down to a stated remaining balance (requires user confirmation). Use when the user states what is LEFT on a card ("this card has only 500 USD left", "only 500 remaining") instead of an amount spent — the app computes the deduction so exactly that much USD remains for the month.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        cardQuery: {
+          type: Type.STRING,
+          description:
+            'Card identifier from the user: nickname, last 4 digits, or owner name.',
+        },
+        remainingUSD: {
+          type: Type.NUMBER,
+          description:
+            'The USD amount that should remain on the card after the entry (0 or more).',
+        },
+        year: { type: Type.INTEGER, description: 'Optional; defaults to current year.' },
+        month: {
+          type: Type.INTEGER,
+          description: 'Optional 1-12; defaults to current month.',
+        },
+      },
+      required: ['cardQuery', 'remainingUSD'],
     },
   },
   {
