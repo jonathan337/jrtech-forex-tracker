@@ -25,6 +25,7 @@ export type PendingAction =
         month: number
         day?: number
         notes?: string
+        allowDuplicate?: boolean
       }
     }
   | {
@@ -96,6 +97,7 @@ export function systemPrompt(): string {
     '- When the user answers a which-card question, call the write tool AGAIN with a cardQuery that combines everything known so far — the original reference plus their answer (e.g. first "ending 2348", then they say "John" → cardQuery "John 2348"). Never pass just their one-word reply on its own, and never re-ask the same question without re-calling the tool.',
     '- If the user tells you what is LEFT on a card ("Esther\'s card has only 500 USD left", "only 500 remaining on the fcb card") rather than how much was spent, call set_card_remaining with that remaining amount. Do NOT do the subtraction yourself and do NOT use log_usage for this — the app computes the deduction and labels the entry "Miscellaneous usage".',
     '- If the user asks for several actions at once (e.g. log usage on two different cards, or log usage and a payment together), call the matching write tool ONCE PER ACTION in the same turn — do not collapse them into one or drop any.',
+    '- If log_usage reports a possible duplicate, tell the user what already exists and ask if they really want a second identical entry. Only when they clearly say yes, call log_usage again with allowDuplicate: true. Never set allowDuplicate on a first attempt.',
     '- Prefer specifying amounts in the currency the user used. Usage can take USD or TTD; payments are in TTD.',
     '- Capture everything the user tells you about the transaction. Any short description of what the usage/payment was for ("atm pull", "amazon order", "groceries") goes in notes — never drop it. If they give a specific day ("24th aug", "on the 3rd"), pass day (plus month/year when stated).',
     '- Never invent card names, people, or balances — always use tool results.',
@@ -214,6 +216,11 @@ export const TOOLS: FunctionDeclaration[] = [
           type: Type.STRING,
           description:
             'Optional note. Include any description the user gives of what the usage was for, e.g. "atm pull" or "amazon order".',
+        },
+        allowDuplicate: {
+          type: Type.BOOLEAN,
+          description:
+            'Set true ONLY after the tool reported a possible duplicate AND the user explicitly said they want a second identical entry. Never set it on the first attempt.',
         },
       },
       required: ['cardQuery'],

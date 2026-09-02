@@ -32,6 +32,7 @@ import {
   UsagePeriodSelect,
   resolveLogPeriod,
 } from '@/components/UsagePeriod'
+import { postUsageGuarded } from '@/lib/usage-post'
 
 type CardOption = UsageCardOption
 
@@ -79,6 +80,9 @@ export function UsageClient({
   // SSR already delivered this month's entries + cards; skip the first fetch.
   const skipInitialFetchRef = useRef(initialData != null)
   const [saving, setSaving] = useState(false)
+  // Hard double-submit lock: a second click in the same tick beats the async
+  // `saving` state update, so the disabled prop alone can't stop it.
+  const submitLockRef = useRef(false)
   const [formError, setFormError] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({
@@ -320,26 +324,23 @@ export function UsageClient({
       return
     }
 
+    if (submitLockRef.current) return
+    submitLockRef.current = true
     setSaving(true)
     setFormError('')
     try {
       const usageDate = new Date(`${form.usageDate}T12:00:00`).toISOString()
-      const res = await fetch('/api/usage', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          cardId: form.cardId,
-          year: period.year,
-          month: period.month,
-          amountUSD: usageUSD,
-          // TTD is derived server-side from the target month's rate.
-          paidToOwnerTTD: paidToOwner,
-          usageDate,
-          notes: form.notes.trim() || undefined,
-        }),
+      const { cancelled, res, data } = await postUsageGuarded({
+        cardId: form.cardId,
+        year: period.year,
+        month: period.month,
+        amountUSD: usageUSD,
+        // TTD is derived server-side from the target month's rate.
+        paidToOwnerTTD: paidToOwner,
+        usageDate,
+        notes: form.notes.trim() || undefined,
       })
-      const data = await res.json().catch(() => ({}))
+      if (cancelled) return
       if (res.ok) {
         setForm({
           cardId: '',
@@ -360,6 +361,7 @@ export function UsageClient({
       console.error(err)
       setFormError('Network error. Try again.')
     } finally {
+      submitLockRef.current = false
       setSaving(false)
     }
   }

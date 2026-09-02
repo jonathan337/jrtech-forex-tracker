@@ -8,6 +8,10 @@ import {
 } from '@/lib/card-available-for-month'
 import { resolveUsageUsdAndTtdForMonth } from '@/lib/usage-entry-amounts'
 import { recordOwnerPaymentDelta } from '@/lib/sent-payment-sync'
+import {
+  findLikelyDuplicateUsage,
+  duplicateUsageDescription,
+} from '@/lib/usage-duplicate'
 
 export const runtime = 'nodejs'
 
@@ -21,6 +25,8 @@ const usageSchema = z
     paidToOwnerTTD: z.number().min(0).optional(),
     usageDate: z.string().datetime().optional(),
     notes: z.string().optional(),
+    /** Skip the likely-duplicate check (set after the user confirms). */
+    allowDuplicate: z.boolean().optional(),
   })
   .refine((d) => d.amountUSD != null || d.amountTTD != null, {
     message: 'Either amountUSD or amountTTD is required',
@@ -147,6 +153,39 @@ export async function POST(request: Request) {
       )
     }
 
+    const usageDate = validatedData.usageDate
+      ? new Date(validatedData.usageDate)
+      : new Date()
+
+    // Guard against double-logs (double-clicked save, re-confirmed assistant
+    // action, or the same charge logged from two month views): same card, same
+    // amount, same day → 409 unless the client explicitly overrides.
+    if (!validatedData.allowDuplicate) {
+      const dup = await findLikelyDuplicateUsage({
+        cardId: validatedData.cardId,
+        usageDate,
+        amountUSD,
+        amountTTD,
+      })
+      if (dup) {
+        return NextResponse.json(
+          {
+            error: `Possible duplicate — ${duplicateUsageDescription(dup)}. Nothing was saved.`,
+            duplicate: {
+              id: dup.id,
+              year: dup.year,
+              month: dup.month,
+              amountUSD: dup.amountUSD,
+              amountTTD: dup.amountTTD,
+              usageDate: dup.usageDate.toISOString(),
+              notes: dup.notes,
+            },
+          },
+          { status: 409 }
+        )
+      }
+    }
+
     const entry = await prisma.cardUsage.create({
       data: {
         cardId: validatedData.cardId,
@@ -155,9 +194,7 @@ export async function POST(request: Request) {
         amountUSD,
         amountTTD,
         paidToOwnerTTD: paidToOwner,
-        usageDate: validatedData.usageDate
-          ? new Date(validatedData.usageDate)
-          : new Date(),
+        usageDate,
         notes: validatedData.notes || null,
       },
       include: {

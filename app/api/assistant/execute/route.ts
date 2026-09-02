@@ -24,6 +24,7 @@ const actionSchema = z.discriminatedUnion('type', [
       month: z.number().int().min(1).max(12),
       day: z.number().int().min(1).max(31).optional(),
       notes: z.string().optional(),
+      allowDuplicate: z.boolean().optional(),
     }),
   }),
   z.object({

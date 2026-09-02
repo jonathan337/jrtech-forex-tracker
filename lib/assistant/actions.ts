@@ -7,6 +7,10 @@ import {
   USAGE_REQUIRES_AVAILABILITY_MESSAGE,
 } from '@/lib/card-available-for-month'
 import { recordOwnerPaymentDelta } from '@/lib/sent-payment-sync'
+import {
+  findLikelyDuplicateUsage,
+  duplicateUsageDescription,
+} from '@/lib/usage-duplicate'
 
 const EPS = 1e-6
 
@@ -608,6 +612,8 @@ export async function executeLogUsage(params: {
   month: number
   day?: number
   notes?: string
+  /** Skip the likely-duplicate check (only after the user explicitly insists). */
+  allowDuplicate?: boolean
 }): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
   const { userId, cardId } = params
 
@@ -653,6 +659,27 @@ export async function executeLogUsage(params: {
     }
   }
 
+  const usageDate = usageDateForParams(params)
+
+  // Guard against double-logs (re-confirmed action, or the same charge already
+  // logged from a form): same card, same amount, same day.
+  if (!params.allowDuplicate) {
+    const dup = await findLikelyDuplicateUsage({
+      cardId,
+      usageDate,
+      amountUSD,
+      amountTTD,
+    })
+    if (dup) {
+      return {
+        ok: false,
+        error: `Not saved — possible duplicate: ${duplicateUsageDescription(
+          dup
+        )}. Ask the user whether they really want a second identical entry; only if they say yes, call log_usage again with allowDuplicate set to true.`,
+      }
+    }
+  }
+
   const entry = await prisma.cardUsage.create({
     data: {
       cardId,
@@ -661,7 +688,7 @@ export async function executeLogUsage(params: {
       amountUSD,
       amountTTD,
       paidToOwnerTTD: paidToOwner,
-      usageDate: usageDateForParams(params),
+      usageDate,
       notes: params.notes || null,
     },
     include: { card: { include: { person: true } } },
@@ -742,6 +769,9 @@ export async function executeSetCardRemaining(params: {
     year,
     month,
     notes: MISC_USAGE_NOTE,
+    // Idempotent by design: the deduction is recomputed from the live balance,
+    // so a repeat lands on "nothing to deduct" instead of double-logging.
+    allowDuplicate: true,
   })
   if (!logged.ok) return logged
 

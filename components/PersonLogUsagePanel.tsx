@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,7 @@ import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { usageCardSelectLabel, type UsageCardOption } from '@/lib/usage-card-label'
 import { UsagePeriodNotice, resolveLogPeriod } from '@/components/UsagePeriod'
+import { postUsageGuarded } from '@/lib/usage-post'
 
 type Props = {
   personId: string
@@ -22,6 +23,9 @@ export function PersonLogUsagePanel({ personId, onLogged }: Props) {
   const [cardsLoading, setCardsLoading] = useState(false)
   const [cardsError, setCardsError] = useState('')
   const [saving, setSaving] = useState(false)
+  // Hard double-submit lock: a second click in the same tick beats the async
+  // `saving` state update, so the disabled prop alone can't stop it.
+  const submitLockRef = useRef(false)
   const [formError, setFormError] = useState('')
   const [form, setForm] = useState({
     cardId: '',
@@ -133,26 +137,23 @@ export function PersonLogUsagePanel({ personId, onLogged }: Props) {
       return
     }
 
+    if (submitLockRef.current) return
+    submitLockRef.current = true
     setSaving(true)
     setFormError('')
     try {
       const usageDate = new Date(`${form.usageDate}T12:00:00`).toISOString()
-      const res = await fetch('/api/usage', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          cardId: form.cardId,
-          year: period.year,
-          month: period.month,
-          amountUSD: usageUSD,
-          // TTD is derived server-side from the target month's rate.
-          paidToOwnerTTD: paidToOwner,
-          usageDate,
-          notes: form.notes.trim() || undefined,
-        }),
+      const { cancelled, res, data } = await postUsageGuarded({
+        cardId: form.cardId,
+        year: period.year,
+        month: period.month,
+        amountUSD: usageUSD,
+        // TTD is derived server-side from the target month's rate.
+        paidToOwnerTTD: paidToOwner,
+        usageDate,
+        notes: form.notes.trim() || undefined,
       })
-      const data = await res.json().catch(() => ({}))
+      if (cancelled) return
       if (res.ok) {
         setForm({
           cardId: '',
@@ -171,6 +172,7 @@ export function PersonLogUsagePanel({ personId, onLogged }: Props) {
     } catch {
       setFormError('Network error. Try again.')
     } finally {
+      submitLockRef.current = false
       setSaving(false)
     }
   }

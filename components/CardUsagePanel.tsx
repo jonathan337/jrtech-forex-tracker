@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState, Fragment } from 'react'
+import { useCallback, useEffect, useRef, useState, Fragment } from 'react'
 import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,6 +15,7 @@ import {
   UsagePeriodSelect,
   resolveLogPeriod,
 } from '@/components/UsagePeriod'
+import { postUsageGuarded } from '@/lib/usage-post'
 
 const MONTHS = [
   'Jan',
@@ -82,6 +83,9 @@ export function CardUsagePanel({
   const [entries, setEntries] = useState<UsageEntryRow[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  // Hard double-submit lock: a second click in the same tick beats the async
+  // `saving` state update, so the disabled prop alone can't stop it.
+  const submitLockRef = useRef(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({
     amountUSD: '',
@@ -172,26 +176,23 @@ export function CardUsagePanel({
       return
     }
 
+    if (submitLockRef.current) return
+    submitLockRef.current = true
     setSaving(true)
     setError('')
     try {
       const usageDate = new Date(`${form.usageDate}T12:00:00`).toISOString()
-      const res = await fetch('/api/usage', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          cardId,
-          year: period.year,
-          month: period.month,
-          amountUSD: usageUSD,
-          // TTD is derived server-side from the target month's rate.
-          paidToOwnerTTD: paidToOwner,
-          usageDate,
-          notes: form.notes.trim() || undefined,
-        }),
+      const { cancelled, res, data } = await postUsageGuarded({
+        cardId,
+        year: period.year,
+        month: period.month,
+        amountUSD: usageUSD,
+        // TTD is derived server-side from the target month's rate.
+        paidToOwnerTTD: paidToOwner,
+        usageDate,
+        notes: form.notes.trim() || undefined,
       })
-      const data = await res.json().catch(() => ({}))
+      if (cancelled) return
       if (res.ok) {
         setForm({
           amountUSD: '',
@@ -210,6 +211,7 @@ export function CardUsagePanel({
     } catch {
       setError('Network error. Try again.')
     } finally {
+      submitLockRef.current = false
       setSaving(false)
     }
   }

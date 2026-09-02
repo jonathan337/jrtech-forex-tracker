@@ -36,6 +36,7 @@ import {
 import { CardUsagePanel } from '@/components/CardUsagePanel'
 import { usageAmountPaidSyncFromUsdInputs } from '@/lib/usage-paid-sync'
 import { UsagePeriodNotice, resolveLogPeriod } from '@/components/UsagePeriod'
+import { postUsageGuarded } from '@/lib/usage-post'
 import { issuingBankLabel } from '@/lib/card-bank'
 import { useGroupByBank } from '@/hooks/use-group-by-bank'
 
@@ -175,6 +176,9 @@ export default function PersonDashboardPage() {
   })
   const [quickError, setQuickError] = useState('')
   const [quickSaving, setQuickSaving] = useState(false)
+  // Hard double-submit lock: a second click in the same tick beats the async
+  // `quickSaving` state update, so the disabled prop alone can't stop it.
+  const quickSubmitLockRef = useRef(false)
   // When the picked date falls in another month, the user can opt to count the
   // entry against that month instead of the one being viewed.
   const [useDateMonth, setUseDateMonth] = useState(false)
@@ -454,26 +458,23 @@ export default function PersonDashboardPage() {
       return
     }
 
+    if (quickSubmitLockRef.current) return
+    quickSubmitLockRef.current = true
     setQuickSaving(true)
     setQuickError('')
     try {
       const usageDate = new Date(`${quickForm.usageDate}T12:00:00`).toISOString()
-      const res = await fetch('/api/usage', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          cardId: quickForm.cardId,
-          year: period.year,
-          month: period.month,
-          amountUSD: usageUSD,
-          // TTD is derived server-side from the target month's rate.
-          paidToOwnerTTD: paidToOwner,
-          usageDate,
-          notes: quickForm.notes.trim() || undefined,
-        }),
+      const { cancelled, res, data } = await postUsageGuarded({
+        cardId: quickForm.cardId,
+        year: period.year,
+        month: period.month,
+        amountUSD: usageUSD,
+        // TTD is derived server-side from the target month's rate.
+        paidToOwnerTTD: paidToOwner,
+        usageDate,
+        notes: quickForm.notes.trim() || undefined,
       })
-      const data = await res.json().catch(() => ({}))
+      if (cancelled) return
       if (res.ok) {
         setQuickForm({
           cardId: '',
@@ -493,6 +494,7 @@ export default function PersonDashboardPage() {
     } catch {
       setQuickError('Network error. Try again.')
     } finally {
+      quickSubmitLockRef.current = false
       setQuickSaving(false)
     }
   }

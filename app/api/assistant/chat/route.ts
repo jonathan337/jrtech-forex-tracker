@@ -22,6 +22,10 @@ import {
   resolvePerson,
   round2,
 } from '@/lib/assistant/actions'
+import {
+  findLikelyDuplicateUsage,
+  duplicateUsageDescription,
+} from '@/lib/usage-duplicate'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -323,6 +327,29 @@ async function buildPendingAction(
       typeof args.notes === 'string' && args.notes.trim()
         ? args.notes.trim()
         : undefined
+    const allowDuplicate = args.allowDuplicate === true
+
+    // Warn before even offering the confirm button when a matching entry
+    // already exists (same card, amount, and day — any month). The executor
+    // re-checks at confirm time, so a double-confirm is caught there too.
+    if (!allowDuplicate) {
+      const previewDate =
+        day !== undefined ? new Date(year, month - 1, day, 12) : new Date()
+      const dup = await findLikelyDuplicateUsage({
+        cardId: card.cardId,
+        usageDate: previewDate,
+        ...(amountUSD !== undefined && { amountUSD }),
+        ...(amountTTD !== undefined && { amountTTD }),
+      })
+      if (dup) {
+        return {
+          ok: false,
+          error: `Possible duplicate: ${duplicateUsageDescription(
+            dup
+          )}. Ask the user whether they really meant to log it again; only if they clearly say yes, call log_usage again with allowDuplicate: true.`,
+        }
+      }
+    }
 
     const amountText =
       amountUSD !== undefined
@@ -348,6 +375,7 @@ async function buildPendingAction(
           month,
           ...(day !== undefined && { day }),
           ...(notes !== undefined && { notes }),
+          ...(allowDuplicate && { allowDuplicate: true }),
         },
       },
     }
