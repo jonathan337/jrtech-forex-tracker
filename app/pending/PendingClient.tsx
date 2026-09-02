@@ -5,11 +5,14 @@ import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { CreditCard, Users, Search, X, Wallet } from 'lucide-react'
+import { CreditCard, Users, Search, X, Wallet, Landmark } from 'lucide-react'
 import { issuingBankLabel } from '@/lib/card-bank'
-import type { PendingAllocations } from '@/lib/pending-allocations'
+import { useGroupByBank } from '@/hooks/use-group-by-bank'
+import type { AllocationCard, PendingAllocations } from '@/lib/pending-allocations'
 
 type View = 'cards' | 'people'
+
+const NO_BANK_LABEL = 'No bank set'
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -30,6 +33,7 @@ const fmtTTD = (n: number) =>
 export function PendingClient({ data }: { data: PendingAllocations }) {
   const [view, setView] = useState<View>('cards')
   const [search, setSearch] = useState('')
+  const [groupByBank, setGroupByBank] = useGroupByBank()
   const q = search.trim().toLowerCase()
 
   const monthLabel = `${MONTHS[data.month - 1] ?? ''} ${data.year}`
@@ -53,6 +57,41 @@ export function PendingClient({ data }: { data: PendingAllocations }) {
     if (!q) return data.people
     return data.people.filter((p) => p.personName.toLowerCase().includes(q))
   }, [data.people, q])
+
+  // Bank sections for the card view: alphabetical, cards without a bank last.
+  const cardsByBank = useMemo(() => {
+    const map = new Map<string, AllocationCard[]>()
+    for (const c of cards) {
+      const bank = c.issuingBank ? issuingBankLabel(c.issuingBank) : NO_BANK_LABEL
+      const list = map.get(bank)
+      if (list) list.push(c)
+      else map.set(bank, [c])
+    }
+    return [...map.entries()]
+      .map(([bankName, items]) => ({
+        bankName,
+        items,
+        leftUSD: items.reduce((s, c) => s + c.leftUSD, 0),
+        leftTTD: items.reduce((s, c) => s + c.leftTTD, 0),
+      }))
+      .sort((a, b) => {
+        if (a.bankName === NO_BANK_LABEL) return 1
+        if (b.bankName === NO_BANK_LABEL) return -1
+        return a.bankName.localeCompare(b.bankName)
+      })
+  }, [cards])
+
+  // Each person's cards (already sorted by USD left desc), for the bank lines
+  // in the person view.
+  const cardsByPerson = useMemo(() => {
+    const map = new Map<string, AllocationCard[]>()
+    for (const c of data.cards) {
+      const list = map.get(c.personId)
+      if (list) list.push(c)
+      else map.set(c.personId, [c])
+    }
+    return map
+  }, [data.cards])
 
   const shownCount = view === 'cards' ? cards.length : people.length
   const totalCount = view === 'cards' ? data.cards.length : data.people.length
@@ -103,6 +142,7 @@ export function PendingClient({ data }: { data: PendingAllocations }) {
 
       {/* Toggle + search */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="inline-flex rounded-lg border border-gray-200 bg-gray-100 p-1 self-start">
           <button
             type="button"
@@ -130,6 +170,19 @@ export function PendingClient({ data }: { data: PendingAllocations }) {
             <Users className="h-4 w-4" />
             By person
           </button>
+        </div>
+
+        {view === 'cards' && (
+          <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={groupByBank}
+              onChange={(e) => setGroupByBank(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            Group by bank
+          </label>
+        )}
         </div>
 
         <div className="relative w-full sm:w-72">
@@ -174,38 +227,44 @@ export function PendingClient({ data }: { data: PendingAllocations }) {
           {view === 'cards' ? (
             cards.length === 0 ? (
               <NoMatch onClear={() => setSearch('')} />
+            ) : groupByBank ? (
+              <div className="space-y-5">
+                {cardsByBank.map((bank) => (
+                  <section key={bank.bankName}>
+                    <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-1">
+                      <span className="inline-flex items-center gap-2 font-semibold text-gray-800">
+                        <Landmark
+                          className="h-4 w-4 shrink-0 text-slate-600"
+                          aria-hidden
+                        />
+                        {bank.bankName}
+                        <span className="font-normal text-gray-500">
+                          ({bank.items.length}{' '}
+                          {bank.items.length === 1 ? 'card' : 'cards'})
+                        </span>
+                      </span>
+                      <span className="text-sm font-semibold tabular-nums text-emerald-700">
+                        {fmtUSD(bank.leftUSD)}
+                        <span className="ml-2 text-xs font-normal tabular-nums text-gray-500">
+                          ≈ {fmtTTD(bank.leftTTD)}
+                        </span>
+                      </span>
+                    </div>
+                    <ul className="space-y-2">
+                      {bank.items.map((c) => (
+                        <li key={c.cardId}>
+                          <CardRow c={c} showBank={false} />
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+              </div>
             ) : (
               <ul className="space-y-2">
                 {cards.map((c) => (
                   <li key={c.cardId}>
-                    <Link
-                      href={`/cards/${c.cardId}`}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm outline-none transition-[transform,background-color,border-color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:border-blue-200 hover:bg-blue-50/40 hover:shadow-md hover:-translate-y-px active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-semibold text-gray-900">
-                          {c.cardNickname}
-                          {c.lastFourDigits ? (
-                            <span className="text-gray-400"> ••{c.lastFourDigits}</span>
-                          ) : null}
-                        </p>
-                        <p className="mt-0.5 truncate text-xs text-gray-500">
-                          {c.personName}
-                          {c.issuingBank ? ` · ${issuingBankLabel(c.issuingBank)}` : ''}
-                          {' · '}
-                          {`$${c.usedUSD.toLocaleString('en-US')} of $${c.allocationUSD.toLocaleString('en-US')} used`}
-                          {c.cycleLabel ? ` · ${c.cycleLabel}` : ''}
-                        </p>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <p className="font-semibold tabular-nums text-emerald-700">
-                          {fmtUSD(c.leftUSD)}
-                        </p>
-                        <p className="text-xs tabular-nums text-gray-500">
-                          ≈ {fmtTTD(c.leftTTD)}
-                        </p>
-                      </div>
-                    </Link>
+                    <CardRow c={c} showBank />
                   </li>
                 ))}
               </ul>
@@ -225,6 +284,27 @@ export function PendingClient({ data }: { data: PendingAllocations }) {
                       <p className="mt-0.5 truncate text-xs text-gray-500">
                         {p.cardCount} {p.cardCount === 1 ? 'card' : 'cards'} with allocation left
                       </p>
+                      <ul className="mt-1.5 space-y-0.5">
+                        {(cardsByPerson.get(p.personId) ?? []).map((c) => (
+                          <li
+                            key={c.cardId}
+                            className="truncate text-xs text-gray-500"
+                          >
+                            <span className="font-medium text-gray-700">
+                              {c.cardNickname}
+                              {c.lastFourDigits ? ` ••${c.lastFourDigits}` : ''}
+                            </span>
+                            {' · '}
+                            {c.issuingBank
+                              ? issuingBankLabel(c.issuingBank)
+                              : NO_BANK_LABEL}
+                            {' · '}
+                            <span className="tabular-nums">
+                              ${c.leftUSD.toLocaleString('en-US')} left
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="font-semibold tabular-nums text-emerald-700">
@@ -242,6 +322,39 @@ export function PendingClient({ data }: { data: PendingAllocations }) {
         </div>
       )}
     </div>
+  )
+}
+
+function CardRow({ c, showBank }: { c: AllocationCard; showBank: boolean }) {
+  return (
+    <Link
+      href={`/cards/${c.cardId}`}
+      className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm outline-none transition-[transform,background-color,border-color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:border-blue-200 hover:bg-blue-50/40 hover:shadow-md hover:-translate-y-px active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2"
+    >
+      <div className="min-w-0">
+        <p className="font-semibold text-gray-900">
+          {c.cardNickname}
+          {c.lastFourDigits ? (
+            <span className="text-gray-400"> ••{c.lastFourDigits}</span>
+          ) : null}
+        </p>
+        <p className="mt-0.5 truncate text-xs text-gray-500">
+          {c.personName}
+          {showBank && c.issuingBank
+            ? ` · ${issuingBankLabel(c.issuingBank)}`
+            : ''}
+          {' · '}
+          {`$${c.usedUSD.toLocaleString('en-US')} of $${c.allocationUSD.toLocaleString('en-US')} used`}
+          {c.cycleLabel ? ` · ${c.cycleLabel}` : ''}
+        </p>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="font-semibold tabular-nums text-emerald-700">
+          {fmtUSD(c.leftUSD)}
+        </p>
+        <p className="text-xs tabular-nums text-gray-500">≈ {fmtTTD(c.leftTTD)}</p>
+      </div>
+    </Link>
   )
 }
 
