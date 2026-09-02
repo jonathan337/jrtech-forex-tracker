@@ -34,6 +34,7 @@ import type { MonthUsdCostSummary } from '@/lib/month-usd-cost-summary'
 import { CardUsagePanel } from '@/components/CardUsagePanel'
 import { usageAmountPaidSyncFromUsdInputs } from '@/lib/usage-paid-sync'
 import { issuingBankLabel } from '@/lib/card-bank'
+import { UsagePeriodNotice, resolveLogPeriod } from '@/components/UsagePeriod'
 
 interface Summary {
   year: number
@@ -209,6 +210,9 @@ export function DashboardClient({
     usageDate: format(new Date(), 'yyyy-MM-dd'),
     notes: '',
   })
+  // When the picked date falls in another month, the user can opt to count the
+  // entry against that month instead of the one being viewed.
+  const [useDateMonth, setUseDateMonth] = useState(false)
   const [quickError, setQuickError] = useState('')
   const [quickSaving, setQuickSaving] = useState(false)
   const [usageRevision, setUsageRevision] = useState(0)
@@ -346,6 +350,7 @@ export function DashboardClient({
     setQuickError('')
     setExpandedCardId(null)
     setTableSearch('')
+    setUseDateMonth(false)
   }, [year, month])
 
   useEffect(() => {
@@ -417,14 +422,22 @@ export function DashboardClient({
     if (!quickForm.cardId || !quickForm.amountUSD) return
     const usageUSD = parseFloat(quickForm.amountUSD)
     if (Number.isNaN(usageUSD) || usageUSD <= 0) return
+
+    // Logging into a different month than the viewed one? The server resolves
+    // that month's rate itself, so the viewed-month rate checks don't apply.
+    const { period, movedFromViewed } = resolveLogPeriod(
+      quickForm.usageDate,
+      { year, month },
+      useDateMonth
+    )
+
     const rate = exchangeRateForQuickCardId(quickForm.cardId)
-    if (rate == null) {
+    if (!movedFromViewed && rate == null) {
       setQuickError(
         'This card has no rate for this month in the dashboard. Refresh or add availability.'
       )
       return
     }
-    const amt = usageUSD * rate
 
     const paidRaw = quickForm.paidToOwnerTTD.trim()
     const paidToOwner = paidRaw === '' ? 0 : parseFloat(paidRaw)
@@ -432,7 +445,7 @@ export function DashboardClient({
       setQuickError('Paid to owner must be a valid non-negative amount.')
       return
     }
-    if (paidToOwner - amt > 1e-6) {
+    if (!movedFromViewed && rate != null && paidToOwner - usageUSD * rate > 1e-6) {
       setQuickError(
         'Paid to owner (TTD) cannot be more than usage in TTD for this month.'
       )
@@ -449,10 +462,10 @@ export function DashboardClient({
         credentials: 'include',
         body: JSON.stringify({
           cardId: quickForm.cardId,
-          year,
-          month,
+          year: period.year,
+          month: period.month,
           amountUSD: usageUSD,
-          amountTTD: amt,
+          // TTD is derived server-side from the target month's rate.
           paidToOwnerTTD: paidToOwner,
           usageDate,
           notes: quickForm.notes.trim() || undefined,
@@ -467,6 +480,7 @@ export function DashboardClient({
           usageDate: format(new Date(), 'yyyy-MM-dd'),
           notes: '',
         })
+        setUseDateMonth(false)
         setShowQuickUsage(false)
         await afterUsageChange()
       } else {
@@ -1365,6 +1379,13 @@ export function DashboardClient({
                             />
                           </div>
                         </div>
+                        <UsagePeriodNotice
+                          usageDate={quickForm.usageDate}
+                          viewYear={year}
+                          viewMonth={month}
+                          useDateMonth={useDateMonth}
+                          onUseDateMonthChange={setUseDateMonth}
+                        />
                         <Button type="submit" size="sm" disabled={quickSaving}>
                           {quickSaving ? (
                             <>

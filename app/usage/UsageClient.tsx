@@ -27,6 +27,11 @@ import {
   type UsageCardOption,
 } from '@/lib/usage-card-label'
 import { issuingBankLabel } from '@/lib/card-bank'
+import {
+  UsagePeriodNotice,
+  UsagePeriodSelect,
+  resolveLogPeriod,
+} from '@/components/UsagePeriod'
 
 type CardOption = UsageCardOption
 
@@ -83,12 +88,17 @@ export function UsageClient({
     usageDate: format(new Date(), 'yyyy-MM-dd'),
     notes: '',
   })
+  // When the picked date falls in another month, the user can opt to count the
+  // entry against that month instead of the one being viewed.
+  const [useDateMonth, setUseDateMonth] = useState(false)
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState({
     amountUSD: '',
     paidToOwnerTTD: '',
     usageDate: '',
     notes: '',
+    year: '',
+    month: '',
   })
   const [editEntryError, setEditEntryError] = useState('')
   const [savingEntryId, setSavingEntryId] = useState<string | null>(null)
@@ -115,7 +125,12 @@ export function UsageClient({
     }
   }, [status, router])
 
-  
+  // A month switch changes what "count against the viewed month" means.
+  useEffect(() => {
+    setUseDateMonth(false)
+  }, [year, month])
+
+
 
   const fetchEntries = useCallback(async () => {
     if (!didInitialLoadRef.current) setLoading(true)
@@ -273,14 +288,22 @@ export function UsageClient({
     if (!form.cardId || !form.amountUSD) return
     const usageUSD = parseFloat(form.amountUSD)
     if (Number.isNaN(usageUSD) || usageUSD <= 0) return
+
+    // Logging into a different month than the viewed one? The server resolves
+    // that month's rate itself, so the viewed-month rate checks don't apply.
+    const { period, movedFromViewed } = resolveLogPeriod(
+      form.usageDate,
+      { year, month },
+      useDateMonth
+    )
+
     const cardRate = rateForCardId(form.cardId)
-    if (cardRate == null || cardRate <= 0) {
+    if (!movedFromViewed && (cardRate == null || cardRate <= 0)) {
       setFormError(
         'This card has no exchange rate for this month. Add availability for this month first.'
       )
       return
     }
-    const amountTTD = usageUSD * cardRate
 
     const paidRaw = form.paidToOwnerTTD.trim()
     const paidToOwner = paidRaw === '' ? 0 : parseFloat(paidRaw)
@@ -288,7 +311,11 @@ export function UsageClient({
       setFormError('Paid to owner must be a valid non-negative amount.')
       return
     }
-    if (paidToOwner - amountTTD > 1e-6) {
+    if (
+      !movedFromViewed &&
+      cardRate != null &&
+      paidToOwner - usageUSD * cardRate > 1e-6
+    ) {
       setFormError('Paid to owner (TTD) cannot be more than usage in TTD for this month.')
       return
     }
@@ -303,10 +330,10 @@ export function UsageClient({
         credentials: 'include',
         body: JSON.stringify({
           cardId: form.cardId,
-          year,
-          month,
+          year: period.year,
+          month: period.month,
           amountUSD: usageUSD,
-          amountTTD,
+          // TTD is derived server-side from the target month's rate.
           paidToOwnerTTD: paidToOwner,
           usageDate,
           notes: form.notes.trim() || undefined,
@@ -321,6 +348,7 @@ export function UsageClient({
           usageDate: format(new Date(), 'yyyy-MM-dd'),
           notes: '',
         })
+        setUseDateMonth(false)
         setShowForm(false)
         fetchEntries()
       } else {
@@ -361,6 +389,8 @@ export function UsageClient({
       paidToOwnerTTD: String(row.paidToOwnerTTD),
       usageDate: format(new Date(row.usageDate), 'yyyy-MM-dd'),
       notes: row.notes ?? '',
+      year: String(row.year),
+      month: String(row.month),
     })
   }
 
@@ -408,21 +438,40 @@ export function UsageClient({
       setEditEntryError('Usage amount (USD) must be a positive number.')
       return
     }
+    const targetYear = parseInt(editDraft.year, 10)
+    const targetMonth = parseInt(editDraft.month, 10)
+    if (
+      !Number.isFinite(targetYear) ||
+      !Number.isFinite(targetMonth) ||
+      targetMonth < 1 ||
+      targetMonth > 12
+    ) {
+      setEditEntryError('Pick a valid month for the entry to count against.')
+      return
+    }
+    const periodChanged =
+      row != null && (targetYear !== row.year || targetMonth !== row.month)
+    // The viewed-month rate only applies when the entry counts against the
+    // viewed month; for any other target the server resolves that month's rate.
+    const targetIsViewedMonth = targetYear === year && targetMonth === month
     const cardRate = row ? rateForCardId(row.cardId) : null
-    if (cardRate == null || cardRate <= 0) {
+    if (targetIsViewedMonth && (cardRate == null || cardRate <= 0)) {
       setEditEntryError(
         'This card has no exchange rate for this month. Add availability for this month first.'
       )
       return
     }
-    const amountTTD = usageUSD * cardRate
     const paidRaw = editDraft.paidToOwnerTTD.trim()
     const paidToOwner = paidRaw === '' ? 0 : parseFloat(paidRaw)
     if (Number.isNaN(paidToOwner) || paidToOwner < 0) {
       setEditEntryError('Paid to owner must be a valid non-negative amount.')
       return
     }
-    if (paidToOwner - amountTTD > 1e-6) {
+    if (
+      targetIsViewedMonth &&
+      cardRate != null &&
+      paidToOwner - usageUSD * cardRate > 1e-6
+    ) {
       setEditEntryError('Paid to owner (TTD) cannot be more than usage in TTD for this month.')
       return
     }
@@ -436,11 +485,14 @@ export function UsageClient({
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
+          // Sending USD makes the server recompute TTD at the target month's rate.
           amountUSD: usageUSD,
-          amountTTD,
           paidToOwnerTTD: paidToOwner,
           usageDate,
           notes: editDraft.notes.trim() || null,
+          ...(periodChanged
+            ? { year: targetYear, month: targetMonth }
+            : {}),
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -470,7 +522,7 @@ export function UsageClient({
     setFilterSearch('')
   }
 
-  const renderUsageEditForm = (row: UsageEntry) => (
+  const renderUsageEditForm = (row: UsageEntry, idSuffix = '') => (
     <>
       {editEntryError && (
         <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded px-3 py-2 mb-3">
@@ -482,9 +534,9 @@ export function UsageClient({
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
         <div>
-          <Label htmlFor={`edit-amt-usd-${row.id}-m`}>Usage amount (USD) *</Label>
+          <Label htmlFor={`edit-amt-usd-${row.id}${idSuffix}`}>Usage amount (USD) *</Label>
           <Input
-            id={`edit-amt-usd-${row.id}-m`}
+            id={`edit-amt-usd-${row.id}${idSuffix}`}
             type="number"
             step="0.01"
             min="0"
@@ -495,9 +547,9 @@ export function UsageClient({
           />
         </div>
         <div>
-          <Label htmlFor={`edit-paid-${row.id}-m`}>Paid to owner (TTD)</Label>
+          <Label htmlFor={`edit-paid-${row.id}${idSuffix}`}>Paid to owner (TTD)</Label>
           <Input
-            id={`edit-paid-${row.id}-m`}
+            id={`edit-paid-${row.id}${idSuffix}`}
             type="number"
             step="0.01"
             min="0"
@@ -511,9 +563,9 @@ export function UsageClient({
           />
         </div>
         <div>
-          <Label htmlFor={`edit-date-${row.id}-m`}>Date</Label>
+          <Label htmlFor={`edit-date-${row.id}${idSuffix}`}>Date</Label>
           <DatePicker
-            id={`edit-date-${row.id}-m`}
+            id={`edit-date-${row.id}${idSuffix}`}
             value={editDraft.usageDate}
             onChange={(v) =>
               setEditDraft((d) => ({
@@ -523,10 +575,24 @@ export function UsageClient({
             }
           />
         </div>
+        <UsagePeriodSelect
+          id={`edit-period-${row.id}${idSuffix}`}
+          monthValue={editDraft.month}
+          yearValue={editDraft.year}
+          usageDate={editDraft.usageDate}
+          disabled={savingEntryId === row.id}
+          onChange={(next) =>
+            setEditDraft((d) => ({
+              ...d,
+              month: next.month,
+              year: next.year,
+            }))
+          }
+        />
         <div className="sm:col-span-2 lg:col-span-1">
-          <Label htmlFor={`edit-notes-${row.id}-m`}>Notes</Label>
+          <Label htmlFor={`edit-notes-${row.id}${idSuffix}`}>Notes</Label>
           <Input
-            id={`edit-notes-${row.id}-m`}
+            id={`edit-notes-${row.id}${idSuffix}`}
             value={editDraft.notes}
             onChange={(e) =>
               setEditDraft((d) => ({ ...d, notes: e.target.value }))
@@ -727,7 +793,7 @@ export function UsageClient({
           </div>
           {editing ? (
             <div className="border-t border-blue-100 bg-blue-50/40 p-4">
-              {renderUsageEditForm(row)}
+              {renderUsageEditForm(row, '-m')}
             </div>
           ) : null}
         </div>
@@ -887,6 +953,13 @@ export function UsageClient({
                   placeholder="e.g. groceries, transfer"
                 />
               </div>
+              <UsagePeriodNotice
+                usageDate={form.usageDate}
+                viewYear={year}
+                viewMonth={month}
+                useDateMonth={useDateMonth}
+                onUseDateMonthChange={setUseDateMonth}
+              />
               <div className="flex gap-2">
                 <Button
                   type="submit"
@@ -1163,126 +1236,7 @@ export function UsageClient({
                       {editingEntryId === row.id && (
                         <tr className="bg-blue-50/40 border-b border-blue-100">
                           <td colSpan={8} className="p-4">
-                            {editEntryError && (
-                              <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded px-3 py-2 mb-3">
-                                {editEntryError}
-                              </p>
-                            )}
-                            <p className="text-sm font-medium text-gray-800 mb-3">
-                              Edit usage — {row.card.cardNickname} ({row.card.person.name})
-                            </p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
-                              <div>
-                                <Label htmlFor={`edit-amt-usd-${row.id}`}>Usage amount (USD) *</Label>
-                                <Input
-                                  id={`edit-amt-usd-${row.id}`}
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={editDraft.amountUSD}
-                                  onChange={(e) =>
-                                    setEditDraft((d) => ({ ...d, amountUSD: e.target.value }))
-                                  }
-                                />
-                              </div>
-                              <div>
-                                <Label htmlFor={`edit-paid-${row.id}`}>Paid to owner (TTD)</Label>
-                                <Input
-                                  id={`edit-paid-${row.id}`}
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={editDraft.paidToOwnerTTD}
-                                  onChange={(e) =>
-                                    setEditDraft((d) => ({
-                                      ...d,
-                                      paidToOwnerTTD: e.target.value,
-                                    }))
-                                  }
-                                />
-                              </div>
-                              <div>
-                                <Label htmlFor={`edit-date-${row.id}`}>Date</Label>
-                                <DatePicker
-                                  id={`edit-date-${row.id}`}
-                                  value={editDraft.usageDate}
-                                  onChange={(v) =>
-                                    setEditDraft((d) => ({
-                                      ...d,
-                                      usageDate: v,
-                                    }))
-                                  }
-                                />
-                              </div>
-                              <div className="sm:col-span-2 lg:col-span-1">
-                                <Label htmlFor={`edit-notes-${row.id}`}>Notes</Label>
-                                <Input
-                                  id={`edit-notes-${row.id}`}
-                                  value={editDraft.notes}
-                                  onChange={(e) =>
-                                    setEditDraft((d) => ({ ...d, notes: e.target.value }))
-                                  }
-                                />
-                              </div>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                type="button"
-                                size="sm"
-                                onClick={saveEntryEdit}
-                                disabled={savingEntryId === row.id}
-                              >
-                                {savingEntryId === row.id ? (
-                                  <>
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Saving…
-                                  </>
-                                ) : (
-                                  'Save changes'
-                                )}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={cancelEntryEdit}
-                                disabled={savingEntryId === row.id}
-                              >
-                                Cancel
-                              </Button>
-                              {(() => {
-                                const usd = parseFloat(editDraft.amountUSD)
-                                const cardRate = rateForCardId(row.cardId)
-                                const ttd =
-                                  !Number.isNaN(usd) && cardRate && cardRate > 0
-                                    ? usd * cardRate
-                                    : null
-                                const paid = parseFloat(editDraft.paidToOwnerTTD || '0')
-                                return ttd != null && ttd - paid > 1e-6
-                              })() && (
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  disabled={savingEntryId === row.id}
-                                  onClick={() => {
-                                    const usd = parseFloat(editDraft.amountUSD)
-                                    const cardRate = rateForCardId(row.cardId)
-                                    const a =
-                                      !Number.isNaN(usd) && cardRate && cardRate > 0
-                                        ? usd * cardRate
-                                        : null
-                                    if (a != null)
-                                      setEditDraft((d) => ({
-                                        ...d,
-                                        paidToOwnerTTD: String(a),
-                                      }))
-                                  }}
-                                >
-                                  Match paid to full usage
-                                </Button>
-                              )}
-                            </div>
+                            {renderUsageEditForm(row)}
                           </td>
                         </tr>
                       )}

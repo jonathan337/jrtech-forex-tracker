@@ -9,6 +9,7 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { usageCardSelectLabel, type UsageCardOption } from '@/lib/usage-card-label'
+import { UsagePeriodNotice, resolveLogPeriod } from '@/components/UsagePeriod'
 
 type Props = {
   personId: string
@@ -29,6 +30,9 @@ export function PersonLogUsagePanel({ personId, onLogged }: Props) {
     usageDate: format(new Date(), 'yyyy-MM-dd'),
     notes: '',
   })
+  // When the picked date falls in another month, the user can opt to count the
+  // entry against that month instead of the one being viewed.
+  const [useDateMonth, setUseDateMonth] = useState(false)
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth() + 1
@@ -83,6 +87,7 @@ export function PersonLogUsagePanel({ personId, onLogged }: Props) {
 
   useEffect(() => {
     setFormError('')
+    setUseDateMonth(false)
   }, [year, month, personId])
 
   const rateForCardId = (cardId: string): number | null => {
@@ -96,14 +101,22 @@ export function PersonLogUsagePanel({ personId, onLogged }: Props) {
     if (!form.cardId || !form.amountUSD) return
     const usageUSD = parseFloat(form.amountUSD)
     if (Number.isNaN(usageUSD) || usageUSD <= 0) return
+
+    // Logging into a different month than the viewed one? The server resolves
+    // that month's rate itself, so the viewed-month rate checks don't apply.
+    const { period, movedFromViewed } = resolveLogPeriod(
+      form.usageDate,
+      { year, month },
+      useDateMonth
+    )
+
     const cardRate = rateForCardId(form.cardId)
-    if (cardRate == null || cardRate <= 0) {
+    if (!movedFromViewed && (cardRate == null || cardRate <= 0)) {
       setFormError(
         'This card has no exchange rate for this month. Add availability for this month first.'
       )
       return
     }
-    const amountTTD = usageUSD * cardRate
 
     const paidRaw = form.paidToOwnerTTD.trim()
     const paidToOwner = paidRaw === '' ? 0 : parseFloat(paidRaw)
@@ -111,7 +124,11 @@ export function PersonLogUsagePanel({ personId, onLogged }: Props) {
       setFormError('Paid to owner must be a valid non-negative amount.')
       return
     }
-    if (paidToOwner - amountTTD > 1e-6) {
+    if (
+      !movedFromViewed &&
+      cardRate != null &&
+      paidToOwner - usageUSD * cardRate > 1e-6
+    ) {
       setFormError('Paid to owner (TTD) cannot be more than usage in TTD for this month.')
       return
     }
@@ -126,10 +143,10 @@ export function PersonLogUsagePanel({ personId, onLogged }: Props) {
         credentials: 'include',
         body: JSON.stringify({
           cardId: form.cardId,
-          year,
-          month,
+          year: period.year,
+          month: period.month,
           amountUSD: usageUSD,
-          amountTTD,
+          // TTD is derived server-side from the target month's rate.
           paidToOwnerTTD: paidToOwner,
           usageDate,
           notes: form.notes.trim() || undefined,
@@ -144,6 +161,7 @@ export function PersonLogUsagePanel({ personId, onLogged }: Props) {
           usageDate: format(new Date(), 'yyyy-MM-dd'),
           notes: '',
         })
+        setUseDateMonth(false)
         onLogged?.()
       } else {
         setFormError(
@@ -292,6 +310,13 @@ export function PersonLogUsagePanel({ personId, onLogged }: Props) {
             placeholder="e.g. groceries, transfer"
           />
         </div>
+        <UsagePeriodNotice
+          usageDate={form.usageDate}
+          viewYear={year}
+          viewMonth={month}
+          useDateMonth={useDateMonth}
+          onUseDateMonthChange={setUseDateMonth}
+        />
         <Button
           type="submit"
           size="sm"

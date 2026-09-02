@@ -10,6 +10,11 @@ import { Loader2, Trash2, Pencil, CheckCircle2 } from 'lucide-react'
 import { usageAmountPaidSyncFromUsdInputs } from '@/lib/usage-paid-sync'
 import { usageTtd, usageUsd } from '@/lib/usage-ttd'
 import { currentCycleWindow } from '@/lib/card-cycle'
+import {
+  UsagePeriodNotice,
+  UsagePeriodSelect,
+  resolveLogPeriod,
+} from '@/components/UsagePeriod'
 
 const MONTHS = [
   'Jan',
@@ -84,12 +89,17 @@ export function CardUsagePanel({
     usageDate: format(new Date(), 'yyyy-MM-dd'),
     notes: '',
   })
+  // When the picked date falls in another month, the user can opt to count the
+  // entry against that month instead of the one being viewed.
+  const [useDateMonth, setUseDateMonth] = useState(false)
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState({
     amountUSD: '',
     paidToOwnerTTD: '',
     usageDate: '',
     notes: '',
+    year: '',
+    month: '',
   })
   const [editRowError, setEditRowError] = useState('')
   const [savingEntryId, setSavingEntryId] = useState<string | null>(null)
@@ -118,23 +128,36 @@ export function CardUsagePanel({
     load()
   }, [load, usageRevision])
 
+  // A month switch changes what "count against the viewed month" means.
+  useEffect(() => {
+    setUseDateMonth(false)
+  }, [year, month])
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
+    const usageUSD = parseFloat(form.amountUSD)
+    if (Number.isNaN(usageUSD) || usageUSD <= 0) return
+
+    // Logging into a different month than the viewed one? The server resolves
+    // that month's rate itself, so the viewed-month rate checks don't apply.
+    const { period, movedFromViewed } = resolveLogPeriod(
+      form.usageDate,
+      { year, month },
+      useDateMonth
+    )
+
     const rate =
       typeof monthExchangeRate === 'number' &&
       Number.isFinite(monthExchangeRate) &&
       monthExchangeRate > 0
         ? monthExchangeRate
         : null
-    if (rate == null) {
+    if (!movedFromViewed && rate == null) {
       setError(
         'Cannot log usage: no monthly exchange rate for this card (add availability first).'
       )
       return
     }
-    const usageUSD = parseFloat(form.amountUSD)
-    if (Number.isNaN(usageUSD) || usageUSD <= 0) return
-    const amt = usageUSD * rate
 
     const paidRaw = form.paidToOwnerTTD.trim()
     const paidToOwner = paidRaw === '' ? 0 : parseFloat(paidRaw)
@@ -142,7 +165,7 @@ export function CardUsagePanel({
       setError('Paid to owner must be a valid non-negative amount.')
       return
     }
-    if (paidToOwner - amt > 1e-6) {
+    if (!movedFromViewed && rate != null && paidToOwner - usageUSD * rate > 1e-6) {
       setError(
         'Paid to owner (TTD) cannot be more than usage in TTD for this month.'
       )
@@ -159,10 +182,10 @@ export function CardUsagePanel({
         credentials: 'include',
         body: JSON.stringify({
           cardId,
-          year,
-          month,
+          year: period.year,
+          month: period.month,
           amountUSD: usageUSD,
-          amountTTD: amt,
+          // TTD is derived server-side from the target month's rate.
           paidToOwnerTTD: paidToOwner,
           usageDate,
           notes: form.notes.trim() || undefined,
@@ -176,6 +199,7 @@ export function CardUsagePanel({
           usageDate: format(new Date(), 'yyyy-MM-dd'),
           notes: '',
         })
+        setUseDateMonth(false)
         await load()
         onUsageChanged()
       } else {
@@ -222,6 +246,8 @@ export function CardUsagePanel({
       paidToOwnerTTD: String(row.paidToOwnerTTD),
       usageDate: format(new Date(row.usageDate), 'yyyy-MM-dd'),
       notes: row.notes ?? '',
+      year: String(row.year),
+      month: String(row.month),
     })
   }
 
@@ -267,13 +293,30 @@ export function CardUsagePanel({
 
   const saveEntryEdit = async () => {
     if (!editingEntryId) return
+    const row = entries.find((e) => e.id === editingEntryId)
+    const targetYear = parseInt(editDraft.year, 10)
+    const targetMonth = parseInt(editDraft.month, 10)
+    if (
+      !Number.isFinite(targetYear) ||
+      !Number.isFinite(targetMonth) ||
+      targetMonth < 1 ||
+      targetMonth > 12
+    ) {
+      setEditRowError('Pick a valid month for the entry to count against.')
+      return
+    }
+    const periodChanged =
+      row != null && (targetYear !== row.year || targetMonth !== row.month)
+    // The viewed-month rate only applies when the entry counts against the
+    // viewed month; for any other target the server resolves that month's rate.
+    const targetIsViewedMonth = targetYear === year && targetMonth === month
     const rate =
       typeof monthExchangeRate === 'number' &&
       Number.isFinite(monthExchangeRate) &&
       monthExchangeRate > 0
         ? monthExchangeRate
         : null
-    if (rate == null) {
+    if (targetIsViewedMonth && rate == null) {
       setEditRowError(
         'No monthly exchange rate for this row; reopen after availability is fixed.'
       )
@@ -284,14 +327,17 @@ export function CardUsagePanel({
       setEditRowError('Amount must be a positive USD value.')
       return
     }
-    const amt = usageUSD * rate
     const paidRaw = editDraft.paidToOwnerTTD.trim()
     const paidToOwner = paidRaw === '' ? 0 : parseFloat(paidRaw)
     if (Number.isNaN(paidToOwner) || paidToOwner < 0) {
       setEditRowError('Paid to owner must be a valid non-negative amount.')
       return
     }
-    if (paidToOwner - amt > 1e-6) {
+    if (
+      targetIsViewedMonth &&
+      rate != null &&
+      paidToOwner - usageUSD * rate > 1e-6
+    ) {
       setEditRowError(
         'Paid to owner (TTD) cannot be more than usage in TTD for this month.'
       )
@@ -307,11 +353,14 @@ export function CardUsagePanel({
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
+          // Sending USD makes the server recompute TTD at the target month's rate.
           amountUSD: usageUSD,
-          amountTTD: amt,
           paidToOwnerTTD: paidToOwner,
           usageDate,
           notes: editDraft.notes.trim() || null,
+          ...(periodChanged
+            ? { year: targetYear, month: targetMonth }
+            : {}),
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -584,6 +633,20 @@ export function CardUsagePanel({
                               }
                             />
                           </div>
+                          <UsagePeriodSelect
+                            id={`panel-edit-period-${u.id}`}
+                            monthValue={editDraft.month}
+                            yearValue={editDraft.year}
+                            usageDate={editDraft.usageDate}
+                            disabled={savingEntryId === u.id}
+                            onChange={(next) =>
+                              setEditDraft((d) => ({
+                                ...d,
+                                month: next.month,
+                                year: next.year,
+                              }))
+                            }
+                          />
                           <div className="sm:col-span-2 lg:col-span-1">
                             <Label htmlFor={`panel-edit-notes-${u.id}`}>Notes</Label>
                             <Input
@@ -747,6 +810,13 @@ export function CardUsagePanel({
             />
           </div>
         </div>
+        <UsagePeriodNotice
+          usageDate={form.usageDate}
+          viewYear={year}
+          viewMonth={month}
+          useDateMonth={useDateMonth}
+          onUseDateMonthChange={setUseDateMonth}
+        />
         <Button type="submit" size="sm" disabled={saving}>
           {saving ? (
             <>
