@@ -21,6 +21,7 @@ import {
 import { useGroupByOwner } from '@/hooks/use-group-by-owner'
 import { useDataChanged, emitDataChanged } from '@/lib/use-data-changed'
 import { MobileAddButton } from '@/components/ui/mobile-add-button'
+import { Modal } from '@/components/ui/modal'
 import { issuingBankLabel, type Bank } from '@/lib/card-bank'
 import { bankCycleDayFor } from '@/lib/card-cycle'
 
@@ -117,7 +118,6 @@ export function CardsClient({
   const [saving, setSaving] = useState(false)
   const savingLockRef = useRef(false)
   const [formError, setFormError] = useState('')
-  const formCardRef = useRef<HTMLDivElement>(null)
   const [groupByOwner, setGroupByOwner] = useGroupByOwner()
   /** User baseline TTD/USD from Settings; used to prefill recurring exchange on new cards. */
   const [defaultExchangeRate, setDefaultExchangeRate] = useState<number | null>(
@@ -242,15 +242,6 @@ export function CardsClient({
       cancelled = true
     }
   }, [status])
-
-  /** Bring the add/edit form into view when it opens (it renders at the top of the page). */
-  useEffect(() => {
-    if (!showForm) return
-    const id = window.requestAnimationFrame(() => {
-      formCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
-    return () => window.cancelAnimationFrame(id)
-  }, [showForm])
 
   /** If baseline loads after the add form is open, prefill an empty recurring rate. */
   useEffect(() => {
@@ -530,17 +521,21 @@ export function CardsClient({
             />
             Group by owner
           </label>
-          {!showForm && (
-            <Button onClick={openAddForm} className="shadow-lg">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Card
-            </Button>
-          )}
+          <Button onClick={openAddForm} className="shadow-lg">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Card
+          </Button>
         </div>
       </div>
 
-      {showForm && (
-        <Card ref={formCardRef} className="border-2 border-blue-200 shadow-xl min-w-0 overflow-hidden scroll-mt-20">
+      <Modal
+        open={showForm}
+        onClose={() => {
+          if (!saving) resetForm()
+        }}
+        ariaLabel={editingCard ? 'Edit card' : 'Add new card'}
+      >
+        <Card className="border-2 border-blue-200 shadow-xl min-w-0 overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-50">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between min-w-0">
               <div className="min-w-0">
@@ -823,7 +818,7 @@ export function CardsClient({
             </form>
           </CardContent>
         </Card>
-      )}
+      </Modal>
 
       {loading ? (
         <div className="text-center py-12">
