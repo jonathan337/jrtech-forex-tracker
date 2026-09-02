@@ -35,6 +35,7 @@ import {
 } from 'lucide-react'
 import { CardUsagePanel } from '@/components/CardUsagePanel'
 import { usageAmountPaidSyncFromUsdInputs } from '@/lib/usage-paid-sync'
+import { lockedUsageRate } from '@/lib/usage-ttd'
 import { UsagePeriodNotice, resolveLogPeriod } from '@/components/UsagePeriod'
 import { postUsageGuarded } from '@/lib/usage-post'
 import { issuingBankLabel } from '@/lib/card-bank'
@@ -532,6 +533,11 @@ export default function PersonDashboardPage() {
 
   const renderRow = (item: AvailRow, zebraClass: string) => {
     const carriedForCard = carriedByCardId.get(item.cardId)
+    const lockedRate = lockedUsageRate(
+      item.usageTTD,
+      item.usageUSD,
+      item.exchangeRate
+    )
     return (
     <Fragment key={item.id}>
       <tr className={`hover:bg-blue-50 transition-colors ${zebraClass}`}>
@@ -601,6 +607,14 @@ export default function PersonDashboardPage() {
           >
             ${item.owedTTD.toFixed(2)}
           </span>
+          {lockedRate != null && item.owedTTD > 0.005 ? (
+            <span
+              className="block mt-0.5 text-[9px] leading-tight text-gray-500 tabular-nums sm:text-[10px]"
+              title={`This month's usage was priced at ${lockedRate.toFixed(2)} TTD/USD when logged; the card's rate is now ${item.exchangeRate.toFixed(2)}. Owed keeps the rate in effect at log time.`}
+            >
+              logged @ {lockedRate.toFixed(2)}
+            </span>
+          ) : null}
           {carriedForCard && carriedForCard.owedTTD > 0.005 ? (
             <span
               className="block mt-0.5 text-[9px] leading-tight text-red-600 tabular-nums sm:text-[10px]"
@@ -694,6 +708,11 @@ export default function PersonDashboardPage() {
     const expanded = expandedCardId === item.cardId
     const last4 = item.card.lastFourDigits?.trim()
     const carriedForCard = carriedByCardId.get(item.cardId)
+    const lockedRate = lockedUsageRate(
+      item.usageTTD,
+      item.usageUSD,
+      item.exchangeRate
+    )
     return (
       <li key={item.id}>
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -776,6 +795,11 @@ export default function PersonDashboardPage() {
                 >
                   ${item.owedTTD.toFixed(2)}
                 </div>
+                {lockedRate != null && item.owedTTD > 0.005 ? (
+                  <div className="text-[10px] leading-tight text-gray-500 tabular-nums">
+                    logged @ {lockedRate.toFixed(2)}
+                  </div>
+                ) : null}
                 {carriedForCard && carriedForCard.owedTTD > 0.005 ? (
                   <div className="text-[10px] leading-tight text-red-600 tabular-nums">
                     +${carriedForCard.owedTTD.toFixed(2)} earlier

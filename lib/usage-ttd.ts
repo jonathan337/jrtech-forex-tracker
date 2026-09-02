@@ -38,6 +38,25 @@ export function usageTtd(
   return row.amountTTD
 }
 
+/**
+ * Blended TTD/USD rate a month's logged usage was actually priced at, when it
+ * differs from the card's current month rate — i.e. the usage predates a rate
+ * change. Null when the rates agree (or there is no usage), so callers can
+ * show a "logged @ x.xx" note only when it explains an owed/rate mismatch.
+ */
+export function lockedUsageRate(
+  usageTTD: number,
+  usageUSD: number,
+  currentRate: number
+): number | null {
+  if (!(usageUSD > 0) || !Number.isFinite(usageTTD) || usageTTD <= 0) {
+    return null
+  }
+  const implied = usageTTD / usageUSD
+  if (!Number.isFinite(implied)) return null
+  return Math.abs(implied - currentRate) > 0.005 ? implied : null
+}
+
 /** USD magnitude of a usage row (rate-independent when stored). */
 export function usageUsd(
   row: { amountUSD?: number | null; amountTTD: number },

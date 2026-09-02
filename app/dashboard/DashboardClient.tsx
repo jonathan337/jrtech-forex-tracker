@@ -33,6 +33,7 @@ import { useGroupByOwner } from '@/hooks/use-group-by-owner'
 import type { MonthUsdCostSummary } from '@/lib/month-usd-cost-summary'
 import { CardUsagePanel } from '@/components/CardUsagePanel'
 import { usageAmountPaidSyncFromUsdInputs } from '@/lib/usage-paid-sync'
+import { lockedUsageRate } from '@/lib/usage-ttd'
 import { issuingBankLabel } from '@/lib/card-bank'
 import { UsagePeriodNotice, resolveLogPeriod } from '@/components/UsagePeriod'
 import { postUsageGuarded } from '@/lib/usage-post'
@@ -602,6 +603,21 @@ export function DashboardClient({
           >
             ${item.owedTTD.toFixed(2)}
           </span>
+          {(() => {
+            const lockedRate = lockedUsageRate(
+              item.usageTTD,
+              item.usageUSD,
+              item.exchangeRate
+            )
+            return lockedRate != null && item.owedTTD > 0.005 ? (
+              <span
+                className="block mt-0.5 text-[10px] leading-tight text-gray-500 tabular-nums"
+                title={`This month's usage was priced at ${lockedRate.toFixed(2)} TTD/USD when logged; the card's rate is now ${item.exchangeRate.toFixed(2)}. Owed keeps the rate in effect at log time.`}
+              >
+                logged @ {lockedRate.toFixed(2)}
+              </span>
+            ) : null
+          })()}
         </td>
         <td className="py-3 px-3 sm:py-4 sm:px-6 text-right whitespace-nowrap">
           <span className="font-mono text-gray-700">
@@ -765,6 +781,18 @@ export function DashboardClient({
                 >
                   ${item.owedTTD.toFixed(2)}
                 </div>
+                {(() => {
+                  const lockedRate = lockedUsageRate(
+                    item.usageTTD,
+                    item.usageUSD,
+                    item.exchangeRate
+                  )
+                  return lockedRate != null && item.owedTTD > 0.005 ? (
+                    <div className="text-[10px] leading-tight text-gray-500 tabular-nums">
+                      logged @ {lockedRate.toFixed(2)}
+                    </div>
+                  ) : null
+                })()}
               </div>
             </div>
 
